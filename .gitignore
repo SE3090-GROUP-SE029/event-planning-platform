@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+*.user
+appsettings.Development.json
+appsettings.*.local.json
+
+# Node / React
+node_modules/
+web/build/
+web/dist/
+.env
+.env.local
+
+# Flutter
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/ios/Pods/
+*.iml
+
+# General
+.vscode/
+.idea/
+.DS_Store
+*.log
