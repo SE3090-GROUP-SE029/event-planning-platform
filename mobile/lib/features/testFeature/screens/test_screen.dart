@@ -32,11 +32,14 @@ class _TestScreenState extends State<TestScreen> {
         _pingResult = result;
         _error = null;
       });
+      if (!context.mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Ping successful')),
       );
     } catch (e) {
       setState(() => _error = 'Ping failed: $e');
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ ${e.toString()}')),
       );
@@ -59,11 +62,13 @@ class _TestScreenState extends State<TestScreen> {
         _messageController.clear();
         _error = null;
       });
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Message created')),
       );
     } catch (e) {
       setState(() => _error = 'Create failed: $e');
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ ${e.toString()}')),
       );

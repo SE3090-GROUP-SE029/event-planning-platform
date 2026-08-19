@@ -10,10 +10,10 @@ class PingResponse(BaseModel):
     timestamp: datetime
     service: str = "agentic-ai"
 
-class TestMessageRequest(BaseModel):
+class MessageRequest(BaseModel):
     message: str
 
-class TestMessageResponse(BaseModel):
+class MessageResponse(BaseModel):
     id: int
     message: str
     createdAt: datetime

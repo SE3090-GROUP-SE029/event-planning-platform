@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class DioClient {
@@ -26,7 +27,7 @@ class DioClient {
       LogInterceptor(
         requestBody: true,
         responseBody: true,
-        logPrint: (log) => print('[DIO] $log'),
+        logPrint: (log) => debugPrint('[DIO] $log'),
       ),
     );
   }

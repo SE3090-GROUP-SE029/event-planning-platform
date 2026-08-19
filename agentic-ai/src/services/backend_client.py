@@ -2,7 +2,7 @@ import httpx
 import os
 from typing import Any, Optional
 from datetime import datetime
-from src.models.test_models import TestMessageResponse
+from src.models.message_models import MessageResponse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class BackendClient:
             logger.error(f"❌ Backend ping failed: {e}")
             raise
 
-    async def create_message(self, message: str) -> TestMessageResponse:
+    async def create_message(self, message: str) -> MessageResponse:
         """Call backend /api/test/message (POST)"""
         try:
             response = await self.client.post(
@@ -33,19 +33,19 @@ class BackendClient:
             response.raise_for_status()
             data = response.json()
             logger.info(f"✅ Message created via backend: {data}")
-            return TestMessageResponse(**data)
+            return MessageResponse(**data)
         except httpx.HTTPError as e:
             logger.error(f"❌ Create message failed: {e}")
             raise
 
-    async def get_message(self, message_id: int) -> TestMessageResponse:
+    async def get_message(self, message_id: int) -> MessageResponse:
         """Call backend /api/test/message/{id} (GET)"""
         try:
             response = await self.client.get(f"/api/test/message/{message_id}")
             response.raise_for_status()
             data = response.json()
             logger.info(f"✅ Message retrieved via backend: {data}")
-            return TestMessageResponse(**data)
+            return MessageResponse(**data)
         except httpx.HTTPError as e:
             logger.error(f"❌ Get message failed: {e}")
             raise

@@ -6,10 +6,10 @@ import logging
 import os
 from dotenv import load_dotenv
 
-from src.models.test_models import (
+from src.models.message_models import (
     PingResponse,
-    TestMessageRequest,
-    TestMessageResponse,
+    MessageRequest,
+    MessageResponse,
     PingRequest,
 )
 from src.services.backend_client import BackendClient
@@ -98,8 +98,8 @@ async def backend_ping():
             detail=f"Backend service unavailable: {str(e)}",
         )
 
-@app.post("/api/test/ai-propose-message", response_model=TestMessageResponse, tags=["Test - Backend Integration"])
-async def ai_propose_message(request: TestMessageRequest):
+@app.post("/api/test/ai-propose-message", response_model=MessageResponse, tags=["Test - Backend Integration"])
+async def ai_propose_message(request: MessageRequest):
     """
     AI proposes a message through the backend.
     
@@ -123,7 +123,7 @@ async def ai_propose_message(request: TestMessageRequest):
             detail=f"Failed to propose message: {str(e)}",
         )
 
-@app.get("/api/test/ai-retrieve-message/{message_id}", response_model=TestMessageResponse, tags=["Test - Backend Integration"])
+@app.get("/api/test/ai-retrieve-message/{message_id}", response_model=MessageResponse, tags=["Test - Backend Integration"])
 async def ai_retrieve_message(message_id: int):
     """
     AI retrieves a message from the backend.
