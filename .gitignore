@@ -5,12 +5,26 @@ obj/
 appsettings.Development.json
 appsettings.*.local.json
 
+backend/bin/
+backend/obj/
+backend/src/**/appsettings.Development.json
+backend/src/**/appsettings.Production.json
+backend/.vs/
+backend/.vscode/
+*.csproj.user
+
 # Node / React
 node_modules/
 web/build/
 web/dist/
 .env
 .env.local
+
+web/node_modules/
+web/.env.local
+web/.env.*.local
+web/dist/
+web/.vscode/
 
 # Flutter
 mobile/build/
@@ -20,8 +34,33 @@ mobile/.flutter-plugins-dependencies
 mobile/ios/Pods/
 *.iml
 
+mobile/build/
+mobile/.dart_tool/
+mobile/.env
+mobile/pubspec.lock
+mobile/ios/Flutter/Flutter.podspec
+mobile/android/.gradle/
+mobile/android/local.properties
+
 # General
 .vscode/
 .idea/
 .DS_Store
 *.log
+
+.DS_Store
+*.log
+.env
+.env.local
+
+EOF
+
+# AI
+agentic-ai/venv/
+agentic-ai/__pycache__/
+agentic-ai/.env
+agentic-ai/.venv/
+agentic-ai/dist/
+agentic-ai/build/
+*.pyc
+.fake

@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { TestApiWidget } from './features/testFeature/TestApiWidget'
 
 function App() {
   
 
   return (
     <>
-      <h1>Get started</h1>
+      <TestApiWidget />
     </>
   )
 }
