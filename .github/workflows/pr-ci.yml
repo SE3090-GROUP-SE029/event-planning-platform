@@ -115,7 +115,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - run: npm test -- --watchAll=false
+      - run: npm test
 
   flutter-analyze:
     needs: changes

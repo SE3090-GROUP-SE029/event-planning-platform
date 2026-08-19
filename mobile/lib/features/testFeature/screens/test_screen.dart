@@ -25,57 +25,75 @@ class _TestScreenState extends State<TestScreen> {
   }
 
   Future<void> _handlePing() async {
-    setState(() => _loading = true);
-    try {
-      final result = await _testApi.ping();
-      setState(() {
-        _pingResult = result;
-        _error = null;
-      });
-      if (!context.mounted) return;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Ping successful')),
-      );
-    } catch (e) {
-      setState(() => _error = 'Ping failed: $e');
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ ${e.toString()}')),
-      );
-    } finally {
-      setState(() => _loading = false);
-    }
+  if (!mounted) return;
+
+  setState(() => _loading = true);
+
+  try {
+    final result = await _testApi.ping();
+
+    if (!mounted) return;
+
+    setState(() {
+      _pingResult = result;
+      _error = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('✅ Ping successful')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => _error = 'Ping failed: $e');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('❌ ${e.toString()}')),
+    );
+  } finally {
+    if (!mounted) return;
+
+    setState(() => _loading = false);
   }
+}
 
   Future<void> _handleCreateMessage() async {
-    if (_messageController.text.isEmpty) {
-      setState(() => _error = 'Message cannot be empty');
-      return;
-    }
-
-    setState(() => _loading = true);
-    try {
-      final result = await _testApi.createMessage(_messageController.text);
-      setState(() {
-        _messages.add(result);
-        _messageController.clear();
-        _error = null;
-      });
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Message created')),
-      );
-    } catch (e) {
-      setState(() => _error = 'Create failed: $e');
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ ${e.toString()}')),
-      );
-    } finally {
-      setState(() => _loading = false);
-    }
+  if (_messageController.text.isEmpty) {
+    setState(() => _error = 'Message cannot be empty');
+    return;
   }
+
+  setState(() => _loading = true);
+
+  try {
+    final result =
+        await _testApi.createMessage(_messageController.text);
+
+    if (!mounted) return;
+
+    setState(() {
+      _messages.add(result);
+      _messageController.clear();
+      _error = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('✅ Message created')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => _error = 'Create failed: $e');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('❌ ${e.toString()}')),
+    );
+  } finally {
+    if (!mounted) return;
+
+    setState(() => _loading = false);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
