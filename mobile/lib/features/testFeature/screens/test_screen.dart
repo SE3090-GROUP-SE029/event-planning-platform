@@ -24,39 +24,6 @@ class _TestScreenState extends State<TestScreen> {
     super.dispose();
   }
 
-  Future<void> _handlePing() async {
-  if (!mounted) return;
-
-  setState(() => _loading = true);
-
-  try {
-    final result = await _testApi.ping();
-
-    if (!mounted) return;
-
-    setState(() {
-      _pingResult = result;
-      _error = null;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Ping successful')),
-    );
-  } catch (e) {
-    if (!mounted) return;
-
-    setState(() => _error = 'Ping failed: $e');
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('❌ ${e.toString()}')),
-    );
-  } finally {
-    if (!mounted) return;
-
-    setState(() => _loading = false);
-  }
-}
-
   Future<void> _handleCreateMessage() async {
   if (_messageController.text.isEmpty) {
     setState(() => _error = 'Message cannot be empty');
@@ -89,9 +56,42 @@ class _TestScreenState extends State<TestScreen> {
       SnackBar(content: Text('❌ ${e.toString()}')),
     );
   } finally {
+    if (mounted) {
+      setState(() => _loading = false);
+    }
+  }
+}
+
+  Future<void> _handlePing() async {
+  if (!mounted) return;
+
+  setState(() => _loading = true);
+
+  try {
+    final result = await _testApi.ping();
+
     if (!mounted) return;
 
-    setState(() => _loading = false);
+    setState(() {
+      _pingResult = result;
+      _error = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('✅ Ping successful')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => _error = 'Ping failed: $e');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('❌ ${e.toString()}')),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => _loading = false);
+    }
   }
 }
 
