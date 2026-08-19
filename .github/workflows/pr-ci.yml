@@ -70,7 +70,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Restore
-        run: dotnet restore backend/Backend.sln
+        run: dotnet restore backend/backend.sln
       - name: Unit tests
         run: dotnet test backend/Backend.sln --no-restore --configuration Release --logger "trx" --results-directory ./TestResults
         env:
@@ -144,7 +144,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.x'
+          flutter-version: '3.47.x'
           channel: 'stable'
       - run: flutter pub get
       - run: flutter test
@@ -188,7 +188,7 @@ jobs:
           dotnet-version: '8.0.x'
       - run: dotnet tool install --global dotnet-ef
       - name: Apply all migrations to a scratch DB
-        run: dotnet ef database update --project backend/src/YourApi --connection "Host=localhost;Database=app_migrate_check;Username=test;Password=test"
+        run: dotnet ef database update --project backend/src/Api/Api.csproj --startup-project backend/src/Api/Api.csproj --connection "Host=localhost;Database=app_migrate_check;Username=test;Password=test"
 
   ci-gate:
     if: always()
