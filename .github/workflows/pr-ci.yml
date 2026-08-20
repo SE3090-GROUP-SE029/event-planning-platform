@@ -19,7 +19,7 @@ jobs:
       mobile: ${{ steps.filter.outputs.mobile }}
       ai: ${{ steps.filter.outputs.ai }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -38,7 +38,7 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
@@ -65,7 +65,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
@@ -90,7 +90,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -108,7 +108,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -125,7 +125,7 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.x'
@@ -141,7 +141,7 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.x'
@@ -157,7 +157,7 @@ jobs:
       run:
         working-directory: agentic-ai
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -183,7 +183,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
