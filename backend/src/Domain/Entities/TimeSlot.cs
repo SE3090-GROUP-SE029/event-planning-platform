@@ -3,15 +3,14 @@ using Microsoft.VisualBasic;
 
 namespace Domain.Entities;
 
-public class User
+public class TimeSlot
 {
     [Key]
     private int Id { set; get; }
-    private string Email { set; get; }
-    private string PasswordHash { set; get; }
-    private string FirstName { set; get; }
-    private string LastName { set; get; }
+    private int ActivityId { set; get; }
+    private TimeOnly StartTime { set; get; }
+    private TimeOnly EndTime { set; get; }
+    private bool IsProposed { set; get; }
     private DateAndTime CreatedAt { set; get; }
     private DateAndTime UpdatedAt { set; get; }
-    private bool IsActive { set; get; }
 }

@@ -2,6 +2,13 @@
 
 A 4-person, 2-month full-stack project: REST API backend, React web, Flutter mobile, and AI planning service.
 
+## Project workflow
+![happy_flow](docs/happy_flow.png)
+
+## Relationship Schema Diagram
+
+![entity_relationship_diagram](docs/entity_relationship_diagram.png)
+
 ## Quick Start
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full local development setup.
