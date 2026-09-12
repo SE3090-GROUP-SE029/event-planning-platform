@@ -1,3 +1,4 @@
+using System.Reflection;
 using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,17 +8,15 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<TestMessage> TestMessages { get; set; }
+    public DbSet<User> Users {get; set;} = default!;
+    public DbSet<Role> Roles {get; set;} = default!;
+    public DbSet<UserRole> UserRoles {get; set;} = default!;
+    public DbSet<RefreshToken> RefreshTokens {get; set;} = default!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<TestMessage>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Message).IsRequired().HasMaxLength(500);
-            entity.Property(e => e.CreatedAt).IsRequired();
-        });
+        modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
     }
 }
