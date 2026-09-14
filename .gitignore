@@ -3,6 +3,7 @@ bin/
 obj/
 *.user
 appsettings.Development.json
+appsettings.json
 appsettings.*.local.json
 
 backend/bin/
