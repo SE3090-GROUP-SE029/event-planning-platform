@@ -5,7 +5,7 @@ namespace Application.Services.Auth;
 
 public interface ITokenService
 {
-    string GenerateAccessToken(User user, IEnumerable<UserRole> role, out DateTime expiresAt);
+    string GenerateAccessToken(User user, IEnumerable<string> roles, out DateTime expiresAt);
     string GenerateRefreshToken();
     string HashToken(string token);
     ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);

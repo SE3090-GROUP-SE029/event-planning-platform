@@ -19,14 +19,20 @@ public class TokenService : ITokenService
         _settings = settings.Value;
     }
 
-    public string GenerateAccessToken(User user, IEnumerable<UserRole> roles, out DateTime expiresAt)
+    public string GenerateAccessToken(User user, IEnumerable<string> roles, out DateTime expiresAt)
     {
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
         };
+
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

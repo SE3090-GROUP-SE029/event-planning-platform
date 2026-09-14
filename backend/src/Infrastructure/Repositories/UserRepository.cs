@@ -14,5 +14,5 @@ public class UserRepository : IUserRepository
     public Task<User?> GetByIdWithRoleAsync(Guid id) => _db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).FirstOrDefaultAsync(u => u.Id == id);
     public Task<Role?> GetRoleByNameAsync(RoleName roleName) => _db.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
     public async Task AddAsync(User user) => await _db.Users.AddAsync(user);
-    public async Task SaveChangesAsync() => _db.SaveChangesAsync();
+    public async Task SaveChangesAsync() => await _db.SaveChangesAsync();
 }

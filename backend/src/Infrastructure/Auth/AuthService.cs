@@ -106,8 +106,8 @@ public class AuthService : IAuthService
 
     private async Task<AuthResponse> IssueTokensAsync(User user, IEnumerable<RoleName> roles, string? ipAddress)
     {
-        var roleList = roles.ToList();
-        var accessToken = _tokenService.GenerateAccessToken(user, roleList, out var expiresAt);
+        var roleStrings = roles.Select(r => r.ToString()).ToList();
+        var accessToken = _tokenService.GenerateAccessToken(user, roleStrings, out var expiresAt);
         var refreshToken = _tokenService.GenerateRefreshToken();
         
         await _refreshRepo.AddAsync(new RefreshToken{
@@ -128,7 +128,7 @@ public class AuthService : IAuthService
             AccessTokenExpiresAt = expiresAt,
             UserId = user.Id,
             Email = user.Email,
-            Roles = [.. roleList.Select(ur => ur.Role.RoleName.ToString())]
+            Roles = roleStrings
         };
     } 
 }

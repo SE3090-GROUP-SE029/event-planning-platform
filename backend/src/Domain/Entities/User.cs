@@ -10,6 +10,6 @@ public class User
     public DateTime CreatedAt {set; get;}
     public DateTime? UpdatedAt {get; set;}
     public bool IsActive {get; set;} = true;
-    public ICollection<UserRole> UserRoles {get; set;}
-    public ICollection<RefreshToken> RefreshTokens {get; set;} = [];
+    public ICollection<UserRole> UserRoles { get; set; } = [];
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
 }

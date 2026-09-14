@@ -45,6 +45,7 @@ public class AuthController : ControllerBase
         }
     }
 
+    [HttpPost("refresh")]
     public async Task<ActionResult<AuthResponse>> Refresh(RefreshRequest request)
     {
         try
@@ -55,13 +56,32 @@ public class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(new {message = ex.Message});
+            return Unauthorized(new { message = ex.Message });
         }
     }
 
+    [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshRequest request)
     {
         await _authService.LogoutAsync(request.RefreshToken);
         return NoContent();
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult GetCurrentUser()
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+        var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+            ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email)?.Value;
+        var roles = User.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value).ToList();
+
+        return Ok(new
+        {
+            userId,
+            email,
+            roles
+        });
     }
 }
