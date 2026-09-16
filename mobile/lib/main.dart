@@ -3,11 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'core/api/dio_client.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/api/auth_remote_datasource.dart';
 import 'features/auth/api/auth_repository.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/pages/login_page.dart';
 import 'features/auth/pages/register_page.dart';
+import 'features/dashboard/pages/dashboard_page.dart';
 import 'features/test/pages/test_screen.dart';
 
 Future<void> main() async {
@@ -44,19 +46,12 @@ class MyApp extends StatelessWidget {
         child: MaterialApp(
           title: 'Plan It',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-            useMaterial3: true,
-            inputDecorationTheme: InputDecorationTheme(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
+          theme: AppTheme.pastelTheme,
           initialRoute: '/login',
           routes: {
             '/login': (context) => const LoginPage(),
             '/register': (context) => const RegisterPage(),
+            '/dashboard': (context) => const DashboardPage(),
             '/test': (context) => const TestScreen(),
           },
         ),

@@ -62,7 +62,7 @@ class _LoginPageState extends State<LoginPage> {
                 backgroundColor: Colors.green,
               ),
             );
-            Navigator.of(context).pushReplacementNamed('/test');
+            Navigator.of(context).pushReplacementNamed('/dashboard');
           } else if (state is AuthFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -188,10 +188,20 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 16),
                 Center(
-                  child: TextButton.icon(
-                    onPressed: () => Navigator.of(context).pushNamed('/test'),
-                    icon: const Icon(Icons.science_outlined),
-                    label: const Text('Open Integration Test Screen'),
+                  child: Wrap(
+                    spacing: 12,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => Navigator.of(context).pushNamed('/dashboard'),
+                        icon: const Icon(Icons.dashboard_customize_outlined),
+                        label: const Text('Open Dashboard'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => Navigator.of(context).pushNamed('/test'),
+                        icon: const Icon(Icons.science_outlined),
+                        label: const Text('API Test'),
+                      ),
+                    ],
                   ),
                 ),
               ],

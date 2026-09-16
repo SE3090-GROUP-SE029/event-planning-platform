@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { Box, Typography, Button, Container, Paper } from '@mui/material';
+import { Typography, Button, Container, Paper } from '@mui/material';
 import { useAuthStore } from '../store/authStore';
 
 export default function ProtectedRoute({ children, requiredRole }) {

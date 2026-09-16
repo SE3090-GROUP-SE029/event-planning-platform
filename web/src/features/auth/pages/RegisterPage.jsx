@@ -14,7 +14,6 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
-  Grid,
   Divider,
 } from '@mui/material';
 import { useRegister } from '../api/authQueries';
@@ -45,7 +44,8 @@ export default function RegisterPage() {
   const selectedRole = watch('role');
 
   const onSubmit = (data) => {
-    const { confirmPassword, ...payload } = data;
+    const payload = { ...data };
+    delete payload.confirmPassword;
     registerUser(payload, {
       onSuccess: () => {
         navigate('/dashboard');
@@ -54,29 +54,63 @@ export default function RegisterPage() {
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 6, mb: 6, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        backgroundColor: '#F7F3E9',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: 2,
+      }}
+    >
+      <Container maxWidth="sm">
         <Paper
-          elevation={4}
           sx={{
-            p: 4,
+            p: { xs: 3, sm: 4.5 },
             width: '100%',
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
+            borderRadius: '24px',
+            boxShadow: '0 8px 32px rgba(35, 25, 15, 0.05)',
+            border: 'none',
+            backgroundColor: '#FFFFFF',
           }}
         >
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography component="h1" variant="h4" fontWeight="bold" color="primary" gutterBottom>
+          {/* Brand Logo & Header */}
+          <Box sx={{ textAlign: 'center', mb: 3.5 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                backgroundColor: '#F9BFD8',
+                color: '#19191C',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 1.5,
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="3" y="4" width="18" height="18" rx="3" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </Box>
+            <Typography
+              component="h1"
+              variant="h5"
+              sx={{ fontWeight: 700, letterSpacing: '-0.02em', color: '#1E1E22' }}
+            >
               Join Plan It
             </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Typography variant="body2" sx={{ color: '#636369', mt: 0.5 }}>
               Create an account to start planning or offering services
             </Typography>
           </Box>
 
           {authError && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ mb: 3, borderRadius: '12px' }}>
               {authError}
             </Alert>
           )}
@@ -118,7 +152,9 @@ export default function RegisterPage() {
             />
 
             <FormControl component="fieldset" sx={{ mt: 2, mb: 1, width: '100%' }}>
-              <FormLabel component="legend">Account Type</FormLabel>
+              <FormLabel component="legend" sx={{ fontSize: '13px', fontWeight: 600, color: '#1E1E22' }}>
+                Account Type
+              </FormLabel>
               <RadioGroup
                 row
                 value={selectedRole}
@@ -126,13 +162,13 @@ export default function RegisterPage() {
               >
                 <FormControlLabel
                   value="EVENT_PLANNER"
-                  control={<Radio />}
-                  label="Event Planner"
+                  control={<Radio sx={{ color: '#19191C', '&.Mui-checked': { color: '#19191C' } }} />}
+                  label={<Typography sx={{ fontSize: '13.5px' }}>Event Planner</Typography>}
                 />
                 <FormControlLabel
                   value="VENDOR"
-                  control={<Radio />}
-                  label="Vendor / Supplier"
+                  control={<Radio sx={{ color: '#19191C', '&.Mui-checked': { color: '#19191C' } }} />}
+                  label={<Typography sx={{ fontSize: '13.5px' }}>Vendor / Supplier</Typography>}
                 />
               </RadioGroup>
             </FormControl>
@@ -167,16 +203,26 @@ export default function RegisterPage() {
               fullWidth
               variant="contained"
               size="large"
-              sx={{ mt: 3, mb: 2, py: 1.3, fontWeight: 'bold' }}
+              sx={{
+                mt: 3,
+                mb: 2,
+                py: 1.4,
+                backgroundColor: '#19191C',
+                color: '#FFFFFF',
+                borderRadius: 9999,
+                fontWeight: 600,
+                fontSize: '14px',
+                '&:hover': { backgroundColor: '#2E2E36' },
+              }}
               disabled={isPending}
             >
               {isPending ? <CircularProgress size={24} color="inherit" /> : 'Create Account'}
             </Button>
 
-            <Divider sx={{ my: 2 }} />
+            <Divider sx={{ my: 2.5, borderColor: 'rgba(0,0,0,0.06)' }} />
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+              <Typography variant="body2" sx={{ color: '#636369' }}>
                 Already have an account?
               </Typography>
               <Button
@@ -184,14 +230,21 @@ export default function RegisterPage() {
                 to="/login"
                 variant="outlined"
                 size="small"
-                sx={{ textTransform: 'none' }}
+                sx={{
+                  textTransform: 'none',
+                  borderRadius: 9999,
+                  borderColor: 'rgba(0,0,0,0.1)',
+                  color: '#1E1E22',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                }}
               >
                 Sign In
               </Button>
             </Box>
           </Box>
         </Paper>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 }
