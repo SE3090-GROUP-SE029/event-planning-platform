@@ -1,6 +1,9 @@
 import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import { router } from './routes';
+import { pastelTheme } from './shared/theme/pastelTheme';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,7 +17,10 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <ThemeProvider theme={pastelTheme}>
+        <CssBaseline />
+        <RouterProvider router={router} />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
