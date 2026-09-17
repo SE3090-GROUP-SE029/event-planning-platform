@@ -2,6 +2,7 @@ using System.Text;
 using Application.Common.Interfaces;
 using Application.Services.Auth;
 using Application.Services.Test;
+using Application.Services.Vendors;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
@@ -51,16 +52,20 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddScoped<ITestService, TestService>();
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IVendorRepository, VendorRepository>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IVendorService, VendorService>();
 
 builder.Services.AddAuthentication(options =>
     {

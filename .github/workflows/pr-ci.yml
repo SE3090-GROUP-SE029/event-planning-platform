@@ -60,7 +60,7 @@ jobs:
           POSTGRES_DB: app_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d app_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -179,7 +179,7 @@ jobs:
           POSTGRES_DB: app_migrate_check
         ports: ['5432:5432']
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test -d app_migrate_check"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -189,19 +189,41 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - run: dotnet restore backend/backend.sln
-      - run: dotnet tool install --global dotnet-ef
+      - name: Build backend
+        run: dotnet build backend/backend.sln --configuration Release --no-restore
+      - name: Install EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 8.0.11
       - name: Apply all migrations to a scratch DB
-        run: dotnet ef database update --project backend/src/Api/Api.csproj --startup-project backend/src/Api/Api.csproj --connection "Host=localhost;Database=app_migrate_check;Username=test;Password=test"
+        run: >
+          dotnet ef database update
+          --project backend/src/Infrastructure/Infrastructure.csproj
+          --startup-project backend/src/Api/Api.csproj
+          --configuration Release
+          --no-build
+          --verbose
+          --connection
+          "Host=localhost;Port=5432;Database=app_migrate_check;Username=test;Password=test"
 
   ci-gate:
     if: always()
-    needs: [test-backend, test-web, flutter-test, ai-checks, migration-check]
+    needs:
+      - changes
+      - build-backend
+      - test-backend
+      - build-web
+      - test-web
+      - flutter-analyze
+      - flutter-test
+      - ai-checks
+      - migration-check
     runs-on: ubuntu-latest
     steps:
       - name: Check results
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "A required job failed."
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ||
+                "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "A required CI job failed or was cancelled."
             exit 1
           fi
-          echo "All run jobs passed (or were correctly skipped)."
+
+          echo "All required CI jobs passed or were skipped because their component was unchanged."

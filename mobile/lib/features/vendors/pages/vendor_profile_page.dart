@@ -174,13 +174,13 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                     const Text('Category'),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _category,
+                      initialValue: _category,
                       items: vendorCategories
                           .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                           .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _category = value);
+                      onChanged: (newValue) {
+                        if (newValue != null) {
+                          setState(() => _category = newValue);
                         }
                       },
                     ),
