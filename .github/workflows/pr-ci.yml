@@ -147,6 +147,7 @@ jobs:
         with:
           flutter-version: '3.47.x'
           channel: 'stable'
+      - run: cp .env.example .env.local
       - run: flutter pub get
       - run: flutter test
 
@@ -219,11 +220,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check results
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ||
-                "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+          echo "$NEEDS_JSON" | jq -r '
+            to_entries[]
+            | "\(.key): \(.value.result)"
+          '
+
+          if echo "$NEEDS_JSON" | jq -e '
+            any(.[]; .result == "failure" or .result == "cancelled")
+          ' >/dev/null; then
             echo "A required CI job failed or was cancelled."
             exit 1
           fi
 
-          echo "All required CI jobs passed or were skipped because their component was unchanged."
+          echo "All required CI jobs passed or were skipped."
