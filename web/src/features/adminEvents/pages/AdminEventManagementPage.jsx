@@ -54,7 +54,7 @@ export default function AdminEventManagementPage() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 }, gap: { xs: 2, md: 3 } }}>
-      <CollapsibleSidebar activeTab="events" onSelectTab={(tab) => tab === 'dashboard' && navigate('/dashboard')} onLogout={() => { logout(); navigate('/login'); }} />
+      <CollapsibleSidebar activeTab="events" showEvents onSelectTab={(tab) => tab === 'dashboard' && navigate('/dashboard')} onLogout={() => { logout(); navigate('/login'); }} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <TopSearchNavbar user={user} onSearch={(value) => setFilters((current) => ({ ...current, search: value }))} />
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} sx={{ mb: 2 }}>

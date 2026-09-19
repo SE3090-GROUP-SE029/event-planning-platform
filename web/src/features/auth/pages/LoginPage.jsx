@@ -172,21 +172,6 @@ export default function LoginPage() {
               </Button>
             </Box>
 
-            <Box sx={{ textAlign: 'center', mt: 2.5 }}>
-              <Button
-                component={Link}
-                to="/test"
-                size="small"
-                sx={{
-                  color: '#8F8F96',
-                  fontSize: '11px',
-                  textTransform: 'none',
-                  '&:hover': { color: '#1E1E22' },
-                }}
-              >
-                Go to Backend Integration Test &rarr;
-              </Button>
-            </Box>
           </Box>
         </Paper>
       </Container>

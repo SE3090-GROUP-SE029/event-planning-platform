@@ -190,25 +190,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Center(
-                child: Wrap(
-                  spacing: 12,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () =>
-                          Navigator.of(context).pushNamed('/dashboard'),
-                      icon: const Icon(Icons.dashboard_customize_outlined),
-                      label: const Text('Open Dashboard'),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => Navigator.of(context).pushNamed('/test'),
-                      icon: const Icon(Icons.science_outlined),
-                      label: const Text('API Test'),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),

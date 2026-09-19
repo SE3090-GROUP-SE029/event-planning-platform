@@ -65,7 +65,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.of(context).pushReplacementNamed('/test');
+          Navigator.of(context).pushReplacementNamed('/dashboard');
         },
         error: (error, _) {
           ScaffoldMessenger.of(context).showSnackBar(

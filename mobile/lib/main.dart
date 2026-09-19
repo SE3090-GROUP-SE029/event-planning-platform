@@ -6,10 +6,10 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/pages/login_page.dart';
 import 'features/auth/pages/register_page.dart';
 import 'features/dashboard/pages/dashboard_page.dart';
-import 'features/test/pages/test_screen.dart';
 import 'features/events/pages/event_details_page.dart';
 import 'features/events/pages/event_form_page.dart';
 import 'features/events/pages/event_list_page.dart';
+import 'features/vendors/pages/vendor_profile_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,11 +37,11 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/dashboard': (context) => const DashboardPage(),
-        '/test': (context) => const TestScreen(),
         '/events': (context) => const EventListPage(),
         '/events/create': (context) => const EventFormPage(),
         '/events/details': (context) => const EventDetailsPage(),
         '/events/edit': (context) => const EventFormPage(isEditing: true),
+        '/vendors/profile': (context) => const VendorProfilePage(),
       },
     );
   }
