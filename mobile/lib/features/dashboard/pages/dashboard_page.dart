@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/pastel_card.dart';
+import '../../auth/models/auth_response_model.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -12,6 +13,9 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentNavIndex = 0;
   int _selectedDate = 15;
+
+  AuthResponseModel? get _auth =>
+      ModalRoute.of(context)?.settings.arguments as AuthResponseModel?;
 
   final List<Map<String, dynamic>> _events = [
     {
@@ -96,6 +100,15 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
         actions: [
+          IconButton(
+            onPressed: _auth == null
+                ? null
+                : () => Navigator.of(context).pushNamed(
+                      '/events',
+                      arguments: _auth,
+                    ),
+            icon: const Icon(Icons.event_note_outlined),
+          ),
           IconButton(
             onPressed: () {},
             icon: Container(

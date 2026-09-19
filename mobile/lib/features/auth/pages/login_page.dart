@@ -62,7 +62,10 @@ class _LoginPageState extends State<LoginPage> {
                 backgroundColor: Colors.green,
               ),
             );
-            Navigator.of(context).pushReplacementNamed('/dashboard');
+            Navigator.of(context).pushReplacementNamed(
+              '/dashboard',
+              arguments: state.authResponse,
+            );
           } else if (state is AuthFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -90,7 +93,10 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 16),
                       Text(
                         'Welcome Back',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                       ),
@@ -155,12 +161,14 @@ class _LoginPageState extends State<LoginPage> {
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
                                 ),
                               )
                             : const Text(
                                 'Login',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w600),
                               ),
                       ),
                     );
@@ -180,7 +188,8 @@ class _LoginPageState extends State<LoginPage> {
                             fontWeight: FontWeight.bold,
                           ),
                           recognizer: TapGestureRecognizer()
-                            ..onTap = () => Navigator.of(context).pushNamed('/register'),
+                            ..onTap = () =>
+                                Navigator.of(context).pushNamed('/register'),
                         ),
                       ],
                     ),
@@ -192,12 +201,14 @@ class _LoginPageState extends State<LoginPage> {
                     spacing: 12,
                     children: [
                       TextButton.icon(
-                        onPressed: () => Navigator.of(context).pushNamed('/dashboard'),
+                        onPressed: () =>
+                            Navigator.of(context).pushNamed('/dashboard'),
                         icon: const Icon(Icons.dashboard_customize_outlined),
                         label: const Text('Open Dashboard'),
                       ),
                       TextButton.icon(
-                        onPressed: () => Navigator.of(context).pushNamed('/test'),
+                        onPressed: () =>
+                            Navigator.of(context).pushNamed('/test'),
                         icon: const Icon(Icons.science_outlined),
                         label: const Text('API Test'),
                       ),
