@@ -125,6 +125,11 @@ export default function DashboardPage() {
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {user?.roles?.includes('ADMIN') && (
+              <Button variant="contained" onClick={() => navigate('/admin/events')}>
+                Admin events
+              </Button>
+            )}
             <Button
               variant="text"
               onClick={() => navigate('/test')}

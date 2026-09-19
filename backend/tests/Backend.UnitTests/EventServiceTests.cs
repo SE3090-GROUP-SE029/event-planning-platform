@@ -4,6 +4,7 @@ using Application.Services.Events;
 using Application.Validators.Events;
 using Domain.Entities;
 using Domain.Enums;
+using FluentValidation;
 
 namespace Backend.UnitTests;
 
@@ -168,6 +169,24 @@ public class EventServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_RejectsInvalidStatus()
+    {
+        var eventEntity = CreateEvent(Guid.NewGuid());
+        var service = new EventService(new TestEventRepository(eventEntity), new CreateEventRequestValidator());
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpdateAsync(eventEntity.Id, eventEntity.OwnerId, new UpdateEventRequest
+            {
+                EventType = EventType.WEDDING,
+                GuestCount = 10,
+                Budget = 100,
+                PreferredVenue = "Hall",
+                PreferredDate = DateTime.UtcNow.AddDays(5),
+                Status = (EventStatus)999
+            }));
+    }
+
+    [Fact]
     public async Task DeleteAsync_DeletesOwnerEvent()
     {
         var eventEntity = CreateEvent(Guid.NewGuid());
@@ -236,6 +255,9 @@ public class EventServiceTests
 
             return Task.FromResult(((IReadOnlyList<Event>)filtered, filtered.Count));
         }
+
+        public Task<(IReadOnlyList<Event> Items, int TotalCount)> ListAdminAsync(AdminEventQuery query) =>
+            Task.FromResult(((IReadOnlyList<Event>)_events, _events.Count));
 
         public Task AddAsync(Event eventEntity)
         {

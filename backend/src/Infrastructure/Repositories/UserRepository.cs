@@ -12,6 +12,8 @@ public class UserRepository : IUserRepository
     public UserRepository(AppDbContext db) => _db = db; 
     public Task<User?> GetByEmailAsync(string email) => _db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).FirstOrDefaultAsync(u => u.Email == email);
     public Task<User?> GetByIdWithRoleAsync(Guid id) => _db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role).FirstOrDefaultAsync(u => u.Id == id);
+    public async Task<IReadOnlyList<User>> GetByIdsAsync(IEnumerable<Guid> ids) =>
+        await _db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToListAsync();
     public Task<Role?> GetRoleByNameAsync(RoleName roleName) => _db.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
     public async Task AddAsync(User user) => await _db.Users.AddAsync(user);
     public async Task SaveChangesAsync() => await _db.SaveChangesAsync();

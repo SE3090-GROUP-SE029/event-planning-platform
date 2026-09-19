@@ -3,6 +3,7 @@ using Application.Dtos.Events;
 using Domain.Entities;
 using Domain.Enums;
 using FluentValidation;
+using FluentValidation.Results;
 
 namespace Application.Services.Events;
 
@@ -95,6 +96,13 @@ public class EventService : IEventService
             Requirements = request.Requirements
         };
         await _validator.ValidateAndThrowAsync(createRequest);
+        if (!Enum.IsDefined(request.Status))
+        {
+            throw new ValidationException(new[]
+            {
+                new ValidationFailure(nameof(request.Status), "Status must be a valid event status.")
+            });
+        }
 
         eventEntity.EventType = request.EventType!.Value;
         eventEntity.GuestCount = request.GuestCount;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/models/auth_response_model.dart';
+import '../models/event_model.dart';
 import '../providers/event_providers.dart';
 
 class EventListPage extends ConsumerStatefulWidget {
@@ -47,6 +48,33 @@ class _EventListPageState extends ConsumerState<EventListPage> {
     final controller = ref.watch(eventListProvider(_auth!.accessToken));
     return Scaffold(
       appBar: AppBar(title: const Text('My Events'), actions: [
+        PopupMenuButton<String>(
+            icon: const Icon(Icons.filter_list),
+            onSelected: (value) {
+              if (value == 'clear') {
+                controller.typeFilter = null;
+                controller.statusFilter = null;
+              } else if (value.startsWith('type:')) {
+                controller.typeFilter = EventType.values
+                    .firstWhere((item) => item.name == value.substring(5));
+              } else if (value.startsWith('status:')) {
+                controller.statusFilter = EventStatus.values
+                    .firstWhere((item) => item.name == value.substring(7));
+              }
+              controller.load(refresh: true);
+            },
+            itemBuilder: (_) => [
+                  const PopupMenuItem(
+                      value: 'clear', child: Text('Clear filters')),
+                  const PopupMenuDivider(),
+                  ...EventType.values.map((type) => PopupMenuItem(
+                      value: 'type:${type.name}',
+                      child: Text('Type: ${type.name}'))),
+                  const PopupMenuDivider(),
+                  ...EventStatus.values.map((status) => PopupMenuItem(
+                      value: 'status:${status.name}',
+                      child: Text('Status: ${status.name}'))),
+                ]),
         PopupMenuButton<String>(
             initialValue: controller.sortBy,
             onSelected: (v) {

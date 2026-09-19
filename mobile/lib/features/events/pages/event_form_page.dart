@@ -85,12 +85,11 @@ class _EventFormPageState extends State<EventFormPage> {
   }
 
   Future<void> _pickDate() async {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
     final value = await showDatePicker(
         context: context,
-        initialDate: _date.isAfter(DateTime.now())
-            ? _date
-            : DateTime.now().add(const Duration(days: 1)),
-        firstDate: DateTime.now(),
+        initialDate: _date.isAfter(tomorrow) ? _date : tomorrow,
+        firstDate: tomorrow,
         lastDate: DateTime.now().add(const Duration(days: 3650)));
     if (value != null) setState(() => _date = value);
   }

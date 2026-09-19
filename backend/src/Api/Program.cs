@@ -71,6 +71,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVendorService, VendorService>();
 builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 
