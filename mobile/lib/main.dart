@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'core/api/dio_client.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/api/auth_remote_datasource.dart';
-import 'features/auth/api/auth_repository.dart';
-import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/pages/login_page.dart';
 import 'features/auth/pages/register_page.dart';
 import 'features/dashboard/pages/dashboard_page.dart';
@@ -33,38 +28,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dioClient = DioClient();
-    final authRemoteDataSource = AuthRemoteDataSourceImpl(dio: dioClient.dio);
-    final authRepository =
-        AuthRepository(remoteDataSource: authRemoteDataSource);
-
-    return MultiRepositoryProvider(
-      providers: [
-        RepositoryProvider<AuthRepository>.value(value: authRepository),
-      ],
-      child: MultiBlocProvider(
-        providers: [
-          BlocProvider<AuthBloc>(
-            create: (context) => AuthBloc(authRepository: authRepository),
-          ),
-        ],
-        child: MaterialApp(
-          title: 'Plan It',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.pastelTheme,
-          initialRoute: '/login',
-          routes: {
-            '/login': (context) => const LoginPage(),
-            '/register': (context) => const RegisterPage(),
-            '/dashboard': (context) => const DashboardPage(),
-            '/test': (context) => const TestScreen(),
-            '/events': (context) => const EventListPage(),
-            '/events/create': (context) => const EventFormPage(),
-            '/events/details': (context) => const EventDetailsPage(),
-            '/events/edit': (context) => const EventFormPage(isEditing: true),
-          },
-        ),
-      ),
+    return MaterialApp(
+      title: 'Plan It',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.pastelTheme,
+      initialRoute: '/login',
+      routes: {
+        '/login': (context) => const LoginPage(),
+        '/register': (context) => const RegisterPage(),
+        '/dashboard': (context) => const DashboardPage(),
+        '/test': (context) => const TestScreen(),
+        '/events': (context) => const EventListPage(),
+        '/events/create': (context) => const EventFormPage(),
+        '/events/details': (context) => const EventDetailsPage(),
+        '/events/edit': (context) => const EventFormPage(isEditing: true),
+      },
     );
   }
 }
