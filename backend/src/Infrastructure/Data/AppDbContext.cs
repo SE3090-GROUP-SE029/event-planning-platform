@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles {get; set;} = default!;
     public DbSet<RefreshToken> RefreshTokens {get; set;} = default!;
     public DbSet<Vendor> Vendors => Set<Vendor>();
+    public DbSet<Event> Events => Set<Event>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
