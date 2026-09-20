@@ -23,6 +23,9 @@ export const pastelTheme = createTheme({
   },
   typography: {
     fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    h1: { fontWeight: 800, letterSpacing: '-0.04em' },
+    h2: { fontWeight: 700, letterSpacing: '-0.03em' },
+    h3: { fontWeight: 700, letterSpacing: '-0.025em' },
     h4: {
       fontWeight: 700,
       letterSpacing: '-0.02em',
@@ -73,16 +76,21 @@ export const pastelTheme = createTheme({
           margin: 0,
           padding: 0,
         },
+        '*': {
+          boxSizing: 'border-box',
+        },
       },
     },
     MuiButton: {
       styleOverrides: {
         root: {
           borderRadius: 9999,
-          padding: '8px 20px',
+          padding: '10px 20px',
           boxShadow: 'none',
+          textTransform: 'none',
+          fontWeight: 700,
           '&:hover': {
-            boxShadow: '0 4px 14px rgba(25, 25, 28, 0.12)',
+            boxShadow: '0 8px 18px rgba(25, 25, 28, 0.12)',
           },
         },
         containedPrimary: {
@@ -93,10 +101,10 @@ export const pastelTheme = createTheme({
           },
         },
         outlined: {
-          borderColor: tokens.colors.borderLight,
+          borderColor: 'rgba(25, 25, 28, 0.12)',
           color: tokens.colors.textPrimary,
           '&:hover': {
-            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            backgroundColor: 'rgba(25, 25, 28, 0.04)',
             borderColor: tokens.colors.obsidian,
           },
         },
@@ -105,9 +113,9 @@ export const pastelTheme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 20,
+          borderRadius: 24,
           boxShadow: tokens.shadows.card,
-          border: 'none',
+          border: '1px solid rgba(25, 25, 28, 0.05)',
           backgroundColor: '#FFFFFF',
         },
       },
@@ -115,7 +123,7 @@ export const pastelTheme = createTheme({
     MuiPaper: {
       styleOverrides: {
         root: {
-          borderRadius: 20,
+          borderRadius: 24,
         },
       },
     },
@@ -123,8 +131,9 @@ export const pastelTheme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 9999,
-          fontWeight: 600,
-          fontSize: '0.775rem',
+          fontWeight: 700,
+          fontSize: '0.77rem',
+          height: 28,
         },
       },
     },
@@ -132,15 +141,42 @@ export const pastelTheme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
-            borderRadius: 14,
+            borderRadius: 16,
             backgroundColor: '#FFFFFF',
             '& fieldset': {
-              borderColor: 'rgba(0,0,0,0.08)',
+              borderColor: 'rgba(18, 17, 20, 0.12)',
             },
             '&:hover fieldset': {
               borderColor: tokens.colors.obsidian,
             },
+            '&.Mui-focused fieldset': {
+              borderColor: tokens.colors.obsidian,
+              borderWidth: 1.4,
+            },
           },
+        },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: {
+        select: {
+          backgroundColor: '#FFFFFF',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        head: {
+          color: tokens.colors.textSecondary,
+          fontWeight: 700,
+          fontSize: '0.76rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          backgroundColor: 'rgba(247, 243, 233, 0.8)',
+        },
+        body: {
+          fontSize: '0.9rem',
+          color: tokens.colors.textPrimary,
         },
       },
     },

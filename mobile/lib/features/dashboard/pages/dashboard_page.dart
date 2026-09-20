@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_dimens.dart';
+import '../../../shared/widgets/pastel_bottom_nav_bar.dart';
+import '../../../shared/widgets/pastel_card.dart';
+import '../../../shared/widgets/pastel_icon_badge.dart';
+import '../../../shared/widgets/pastel_list_item.dart';
+import '../../../shared/widgets/pastel_pill_badge.dart';
+import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/providers/auth_providers.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -11,94 +19,274 @@ class DashboardPage extends ConsumerWidget {
     final session = ref.watch(currentUserProvider);
     final roles = session?.roles ?? const <String>[];
     final isVendor = roles.contains('VENDOR');
+    final email = session?.email ?? 'User';
+    final name = email.split('@').first;
+    final displayName = name.isNotEmpty
+        ? '${name[0].toUpperCase()}${name.substring(1)}'
+        : 'Planner';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Plan It'),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            onPressed: () async {
-              await ref.read(authNotifierProvider.notifier).logout();
-              if (context.mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
-              }
-            },
-            icon: const Icon(Icons.logout),
-          ),
-        ],
+      backgroundColor: AppColors.canvas,
+      bottomNavigationBar: PastelBottomNavBar(
+        currentIndex: 0,
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.of(context).pushNamed('/events', arguments: session);
+          } else if (index == 2 && isVendor) {
+            Navigator.of(context)
+                .pushNamed('/vendors/profile', arguments: session);
+          }
+        },
+        onCenterActionTap: () {
+          Navigator.of(context).pushNamed('/events/create', arguments: session);
+        },
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            'Welcome back',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppDimens.space20,
+            AppDimens.space14,
+            AppDimens.space20,
+            AppDimens.space28,
           ),
-          const SizedBox(height: 8),
-          Text(
-            session?.email ?? 'Your account',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 24),
-          _HomeAction(
-            icon: Icons.event_outlined,
-            title: 'Events',
-            description: 'Create, view, update, and delete your events.',
-            onPressed: () => Navigator.of(context).pushNamed('/events', arguments: session),
-          ),
-          if (isVendor) ...[
-            const SizedBox(height: 12),
-            _HomeAction(
-              icon: Icons.storefront_outlined,
-              title: 'Vendor profile',
-              description: 'Manage the vendor profile linked to your account.',
-              onPressed: () => Navigator.of(context).pushNamed('/vendors/profile', arguments: session),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeAction extends StatelessWidget {
-  const _HomeAction({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
           children: [
-            Icon(icon, size: 32),
-            const SizedBox(width: 16),
-            Expanded(
+            // Top Bar
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Plan It',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.8,
+                        ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () async {
+                    await ref.read(authNotifierProvider.notifier).logout();
+                    if (context.mounted) {
+                      Navigator.of(context)
+                          .pushNamedAndRemoveUntil('/login', (_) => false);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfacePure,
+                      borderRadius:
+                          BorderRadius.circular(AppDimens.radiusMedium),
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: const Icon(
+                      Icons.logout_rounded,
+                      size: 20,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimens.space18),
+
+            // Profile Header Card inspired directly by reference
+            PastelCard(
+              padding: const EdgeInsets.all(AppDimens.space20),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text(description),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Squircle Avatar Container
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: AppColors.pastelPinkLight,
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: const Color(0x20F9BFD8),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.person_rounded,
+                          color: AppColors.pastelPinkText,
+                          size: 38,
+                        ),
+                      ),
+                      const SizedBox(width: AppDimens.space16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              email,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: AppDimens.space8),
+                            // Quick metadata row
+                            Row(
+                              children: [
+                                _buildMetadataItem(
+                                  label: 'ROLE',
+                                  value: isVendor ? 'Vendor' : 'Planner',
+                                ),
+                                const SizedBox(width: AppDimens.space16),
+                                _buildMetadataItem(
+                                  label: 'ACCESS',
+                                  value: 'Active',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimens.space16),
+
+                  // Olive Ribbon Pill (inspired by reference olive ribbon)
+                  PastelRibbonBanner(
+                    icon: Icons.shield_outlined,
+                    title: session?.userId.isNotEmpty == true
+                        ? 'ID: ${session!.userId.substring(0, session.userId.length > 12 ? 12 : session.userId.length)}'
+                        : 'Plan It Member',
+                    subtitle: isVendor ? 'VENDOR ACCESS' : 'PLANNER ACCESS',
+                  ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton(onPressed: onPressed, icon: const Icon(Icons.arrow_forward)),
+
+            // Section: Workspace
+            const PastelSectionHeader(title: 'Workspace'),
+
+            // Card Group containing items (matching reference "Clinical profile" card)
+            PastelCard(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space16,
+                vertical: AppDimens.space8,
+              ),
+              child: Column(
+                children: [
+                  PastelListItem(
+                    icon: Icons.event_available_rounded,
+                    iconVariant: PastelIconVariant.pink,
+                    title: 'Events',
+                    subtitle: 'Create, review, edit, and manage your event plans',
+                    showDivider: true,
+                    onTap: () => Navigator.of(context)
+                        .pushNamed('/events', arguments: session),
+                  ),
+                  if (isVendor) ...[
+                    PastelListItem(
+                      icon: Icons.storefront_rounded,
+                      iconVariant: PastelIconVariant.olive,
+                      title: 'Vendor profile',
+                      subtitle:
+                          'Update the business profile linked to your account',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/vendors/profile', arguments: session),
+                    ),
+                  ],
+                  PastelListItem(
+                    icon: Icons.add_circle_outline_rounded,
+                    iconVariant: PastelIconVariant.yellow,
+                    title: 'Plan new event',
+                    subtitle: 'Start a new event planning journey',
+                    showDivider: false,
+                    onTap: () => Navigator.of(context)
+                        .pushNamed('/events/create', arguments: session),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: AppDimens.space12),
+
+            // Section: Account & Settings
+            const PastelSectionHeader(title: 'Settings'),
+
+            PastelCard(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.space16,
+                vertical: AppDimens.space8,
+              ),
+              child: Column(
+                children: [
+                  if (isVendor)
+                    const PastelListItem(
+                      icon: Icons.security_rounded,
+                      iconVariant: PastelIconVariant.blue,
+                      title: 'Account status',
+                      subtitle: 'Verified vendor permissions',
+                      countBadge: 'Active',
+                      showDivider: true,
+                    )
+                  else
+                    const PastelListItem(
+                      icon: Icons.security_rounded,
+                      iconVariant: PastelIconVariant.blue,
+                      title: 'Account status',
+                      subtitle: 'Verified planner permissions',
+                      countBadge: 'Active',
+                      showDivider: true,
+                    ),
+                  const PastelListItem(
+                    icon: Icons.help_outline_rounded,
+                    iconVariant: PastelIconVariant.lavender,
+                    title: 'Help & support',
+                    subtitle: 'Guidance and platform resources',
+                    showDivider: false,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMetadataItem({required String label, required String value}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_dimens.dart';
+import '../../../shared/widgets/pastel_card.dart';
+import '../../../shared/widgets/pastel_pill_badge.dart';
+import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
 import '../../auth/widgets/custom_text_field.dart';
 import '../api/vendor_remote_datasource.dart';
@@ -127,8 +133,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vendor profile saved.'),
-          backgroundColor: Colors.green,
+          content: Text('Vendor profile saved successfully.'),
+          backgroundColor: AppColors.success,
         ),
       );
     } catch (e) {
@@ -143,87 +149,265 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_hasProfile ? 'Edit Vendor Profile' : 'Create Vendor Profile')),
+      backgroundColor: AppColors.canvas,
+      appBar: AppBar(
+        title:
+            Text(_hasProfile ? 'Edit vendor profile' : 'Create vendor profile'),
+      ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(AppColors.obsidianBlack),
+              ),
+            )
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(
+                AppDimens.space20,
+                AppDimens.space12,
+                AppDimens.space20,
+                AppDimens.space32,
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_status != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Chip(label: Text('Status: $_status')),
+                    // Business Hero Card inspired by the reference top card
+                    PastelCard(
+                      padding: const EdgeInsets.all(AppDimens.space20),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 68,
+                                height: 68,
+                                decoration: BoxDecoration(
+                                  color: AppColors.pastelGreenLight,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: const Color(0x30C4DDB8),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.storefront_rounded,
+                                  color: AppColors.pastelGreenText,
+                                  size: 34,
+                                ),
+                              ),
+                              const SizedBox(width: AppDimens.space16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _businessNameController.text.isNotEmpty
+                                          ? _businessNameController.text
+                                          : 'Your Business',
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _category,
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _contactEmailController.text.isNotEmpty
+                                          ? _contactEmailController.text
+                                          : (_auth?.email ?? 'Verified vendor'),
+                                      style: const TextStyle(
+                                        color: AppColors.textMuted,
+                                        fontSize: 12,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          PastelRibbonBanner(
+                            icon: Icons.storefront_outlined,
+                            title: _hasProfile
+                                ? 'REGISTERED VENDOR'
+                                : 'NEW VENDOR PROFILE',
+                            subtitle: _status != null && _status!.isNotEmpty
+                                ? 'STATUS: $_status'
+                                : 'PENDING ACTIVATION',
+                          ),
+                        ],
                       ),
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    ),
+
+                    if (_error != null) ...[
+                      const SizedBox(height: AppDimens.space16),
+                      Container(
+                        padding: const EdgeInsets.all(AppDimens.space14),
+                        decoration: BoxDecoration(
+                          color: AppColors.errorBg,
+                          borderRadius:
+                              BorderRadius.circular(AppDimens.radiusMedium),
+                          border: Border.all(color: const Color(0x30C7434D)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline_rounded,
+                                color: AppColors.error, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    CustomTextField(
-                      label: 'Business name',
-                      hint: 'Green Leaf Catering',
-                      controller: _businessNameController,
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'Required' : null,
+                    ],
+
+                    const PastelSectionHeader(title: 'Business Information'),
+
+                    PastelCard(
+                      padding: const EdgeInsets.all(AppDimens.space20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CustomTextField(
+                            label: 'Business name',
+                            hint: 'Green Leaf Catering',
+                            controller: _businessNameController,
+                            prefixIcon: const Icon(
+                              Icons.business_rounded,
+                              color: AppColors.textSecondary,
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Required'
+                                    : null,
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          Text(
+                            'Category',
+                            style:
+                                Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            initialValue: _category,
+                            decoration: const InputDecoration(
+                              hintText: 'Select category',
+                            ),
+                            items: vendorCategories
+                                .map((c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(
+                                        c,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (newValue) {
+                              if (newValue != null) {
+                                setState(() => _category = newValue);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    const Text('Category'),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _category,
-                      items: vendorCategories
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                          .toList(),
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setState(() => _category = newValue);
-                        }
-                      },
+
+                    const PastelSectionHeader(title: 'Contact & Details'),
+
+                    PastelCard(
+                      padding: const EdgeInsets.all(AppDimens.space20),
+                      child: Column(
+                        children: [
+                          CustomTextField(
+                            label: 'Contact email',
+                            hint: 'vendor@business.com',
+                            controller: _contactEmailController,
+                            keyboardType: TextInputType.emailAddress,
+                            prefixIcon: const Icon(
+                              Icons.email_outlined,
+                              color: AppColors.textSecondary,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Required';
+                              }
+                              if (!value.contains('@')) {
+                                return 'Enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          CustomTextField(
+                            label: 'Contact phone',
+                            hint: '0771234567',
+                            controller: _contactPhoneController,
+                            keyboardType: TextInputType.phone,
+                            prefixIcon: const Icon(
+                              Icons.phone_outlined,
+                              color: AppColors.textSecondary,
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Required'
+                                    : null,
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          CustomTextField(
+                            label: 'Description',
+                            hint:
+                                'Tell clients about your services, experience, and specialties...',
+                            controller: _descriptionController,
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    CustomTextField(
-                      label: 'Contact email',
-                      hint: 'vendor@business.com',
-                      controller: _contactEmailController,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) return 'Required';
-                        if (!value.contains('@')) return 'Enter a valid email';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    CustomTextField(
-                      label: 'Contact phone',
-                      hint: '0771234567',
-                      controller: _contactPhoneController,
-                      keyboardType: TextInputType.phone,
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    CustomTextField(
-                      label: 'Description',
-                      hint: 'Short description of your services',
-                      controller: _descriptionController,
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 24),
+
+                    const SizedBox(height: AppDimens.space24),
+
                     SizedBox(
                       width: double.infinity,
+                      height: 52,
                       child: ElevatedButton(
                         onPressed: _saving ? null : _save,
                         child: _saving
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
                               )
-                            : Text(_hasProfile ? 'Save changes' : 'Create profile'),
+                            : Text(_hasProfile
+                                ? 'Save changes'
+                                : 'Create profile'),
                       ),
                     ),
                   ],

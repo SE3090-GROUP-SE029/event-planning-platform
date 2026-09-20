@@ -1,14 +1,29 @@
-enum EventType { wedding, corporate, birthday }
+enum EventType { wedding, corporate, birthday, anniversary, other }
 
-enum EventStatus { draft, planning, confirmed, completed, cancelled }
+enum EventStatus {
+  draft,
+  planning,
+  inPlanning,
+  confirmed,
+  completed,
+  cancelled,
+}
+
+String _normalizeEnumValue(String value) =>
+    value.replaceAll('_', '').replaceAll('-', '').toLowerCase();
 
 String _enumName(dynamic value) => value.toString().split('.').last;
 
 T _parseEnum<T>(dynamic value, List<T> values) {
   if (value is int && value >= 0 && value < values.length) return values[value];
-  final name = value?.toString().toLowerCase();
-  return values.firstWhere((item) => _enumName(item).toLowerCase() == name,
-      orElse: () => values.first);
+  final targetName = value?.toString();
+  if (targetName == null || targetName.isEmpty) return values.first;
+
+  final normalizedTarget = _normalizeEnumValue(targetName);
+  return values.firstWhere(
+    (item) => _normalizeEnumValue(_enumName(item)) == normalizedTarget,
+    orElse: () => values.first,
+  );
 }
 
 Duration _parseDuration(dynamic value) {
