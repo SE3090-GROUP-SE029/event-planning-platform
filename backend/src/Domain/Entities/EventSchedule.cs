@@ -9,4 +9,5 @@ public class EventSchedule
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<TimelineActivity> Activities { get; set; } = new List<TimelineActivity>();
+    public ICollection<ScheduleConflict> Conflicts { get; set; } = new List<ScheduleConflict>();
 }
