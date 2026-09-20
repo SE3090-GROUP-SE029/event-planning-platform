@@ -10,13 +10,13 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   TextField,
   Typography,
-  Chip,
 } from '@mui/material';
 import { useAuthStore } from '../../../shared/store/authStore';
+import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
+import StatusBadge from '../../../shared/components/ui/StatusBadge';
 import {
   VENDOR_CATEGORIES,
   useCreateVendorProfile,
@@ -101,125 +101,71 @@ export default function VendorProfilePage() {
   const mutation = isEditing ? updateProfile : createProfile;
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 6, mb: 6 }}>
-        <Paper elevation={4} sx={{ p: 4, borderRadius: 3 }}>
-          <Typography variant="h4" fontWeight="bold" color="primary" gutterBottom>
-            {isEditing ? 'Edit vendor profile' : 'Create vendor profile'}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Business details shown in the vendor marketplace.
-          </Typography>
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#F7F3E9', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
+      <Container maxWidth="sm">
+        <SurfaceCard sx={{ p: 0, overflow: 'hidden' }}>
+          <Box sx={{ p: { xs: 3, sm: 4 } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+              <Box>
+                <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.04em', mb: 0.5 }}>
+                  {isEditing ? 'Edit vendor profile' : 'Create vendor profile'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Business details shown in the vendor marketplace.
+                </Typography>
+              </Box>
+              {isEditing && <StatusBadge status={profile.status} label={`Status: ${profile.status}`} />}
+            </Box>
 
-          {isEditing && (
-            <Chip
-              label={`Status: ${profile.status}`}
-              color={profile.status === 'APPROVED' ? 'success' : 'warning'}
-              sx={{ mb: 2 }}
-            />
-          )}
+            {isError && !String(error?.message || '').toLowerCase().includes('not found') && (
+              <Alert severity="error" sx={{ mb: 2, borderRadius: 3 }}>
+                {error.message}
+              </Alert>
+            )}
 
-          {isError && !String(error?.message || '').toLowerCase().includes('not found') && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error.message}
-            </Alert>
-          )}
+            {mutation.isError && (
+              <Alert severity="error" sx={{ mb: 2, borderRadius: 3 }}>
+                {mutation.error.message}
+              </Alert>
+            )}
 
-          {mutation.isError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {mutation.error.message}
-            </Alert>
-          )}
+            {mutation.isSuccess && (
+              <Alert severity="success" sx={{ mb: 2, borderRadius: 3 }}>
+                Vendor profile saved.
+              </Alert>
+            )}
 
-          {mutation.isSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Vendor profile saved.
-            </Alert>
-          )}
+            <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+              <TextField fullWidth label="Business name" margin="dense" {...register('businessName', { required: 'Business name is required' })} error={!!errors.businessName} helperText={errors.businessName?.message} />
 
-          <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-            <TextField
-              fullWidth
-              label="Business name"
-              margin="dense"
-              {...register('businessName', { required: 'Business name is required' })}
-              error={!!errors.businessName}
-              helperText={errors.businessName?.message}
-            />
+              <FormControl fullWidth margin="dense">
+                <InputLabel id="vendor-category-label">Category</InputLabel>
+                <Select labelId="vendor-category-label" label="Category" value={selectedCategory} onChange={(event) => setValue('category', event.target.value)}>
+                  {VENDOR_CATEGORIES.map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {category}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-            <FormControl fullWidth margin="dense">
-              <InputLabel id="vendor-category-label">Category</InputLabel>
-              <Select
-                labelId="vendor-category-label"
-                label="Category"
-                value={selectedCategory}
-                onChange={(event) => setValue('category', event.target.value)}
-              >
-                {VENDOR_CATEGORIES.map((category) => (
-                  <MenuItem key={category} value={category}>
-                    {category}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+              <TextField fullWidth label="Contact email" type="email" margin="dense" {...register('contactEmail', { required: 'Contact email is required', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email' } })} error={!!errors.contactEmail} helperText={errors.contactEmail?.message} />
 
-            <TextField
-              fullWidth
-              label="Contact email"
-              type="email"
-              margin="dense"
-              {...register('contactEmail', {
-                required: 'Contact email is required',
-                pattern: {
-                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                  message: 'Enter a valid email',
-                },
-              })}
-              error={!!errors.contactEmail}
-              helperText={errors.contactEmail?.message}
-            />
+              <TextField fullWidth label="Contact phone" margin="dense" {...register('contactPhone', { required: 'Contact phone is required' })} error={!!errors.contactPhone} helperText={errors.contactPhone?.message} />
 
-            <TextField
-              fullWidth
-              label="Contact phone"
-              margin="dense"
-              {...register('contactPhone', { required: 'Contact phone is required' })}
-              error={!!errors.contactPhone}
-              helperText={errors.contactPhone?.message}
-            />
+              <TextField fullWidth label="Description" margin="dense" multiline minRows={3} {...register('description')} />
 
-            <TextField
-              fullWidth
-              label="Description"
-              margin="dense"
-              multiline
-              minRows={3}
-              {...register('description')}
-            />
+              <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 3, borderRadius: 9999 }} disabled={mutation.isPending}>
+                {mutation.isPending ? <CircularProgress size={24} color="inherit" /> : isEditing ? 'Save changes' : 'Create profile'}
+              </Button>
 
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              sx={{ mt: 3 }}
-              disabled={mutation.isPending}
-            >
-              {mutation.isPending ? (
-                <CircularProgress size={24} color="inherit" />
-              ) : isEditing ? (
-                'Save changes'
-              ) : (
-                'Create profile'
-              )}
-            </Button>
-
-            <Button component={Link} to="/dashboard" fullWidth sx={{ mt: 1 }}>
-              Back to dashboard
-            </Button>
+              <Button component={Link} to="/dashboard" fullWidth variant="outlined" sx={{ mt: 1.5, borderRadius: 9999 }}>
+                Back to dashboard
+              </Button>
+            </Box>
           </Box>
-        </Paper>
-      </Box>
-    </Container>
+        </SurfaceCard>
+      </Container>
+    </Box>
   );
 }

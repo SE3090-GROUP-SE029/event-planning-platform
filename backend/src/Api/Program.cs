@@ -1,8 +1,12 @@
 using System.Text;
 using Application.Common.Interfaces;
 using Application.Services.Auth;
+using Application.Services.Events;
 using Application.Services.Test;
 using Application.Services.Vendors;
+using Application.Dtos.Events;
+using Application.Validators.Events;
+using FluentValidation;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
@@ -66,6 +70,10 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVendorService, VendorService>();
+builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddScoped<IAdminEventService, AdminEventService>();
+builder.Services.AddScoped<IEventRepository, EventRepository>();
+builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 
 builder.Services.AddAuthentication(options =>
     {

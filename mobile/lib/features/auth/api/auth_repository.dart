@@ -2,6 +2,7 @@ import 'auth_remote_datasource.dart';
 import '../models/auth_response_model.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
+import '../models/refresh_request_model.dart';
 
 class AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
@@ -18,5 +19,11 @@ class AuthRepository {
 
   Future<void> logout(String refreshToken) {
     return remoteDataSource.logout(refreshToken);
+  }
+
+  Future<AuthResponseModel> refresh(String refreshToken) {
+    return remoteDataSource.refresh(
+      RefreshRequestModel(refreshToken: refreshToken),
+    );
   }
 }

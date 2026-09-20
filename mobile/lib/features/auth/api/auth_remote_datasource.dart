@@ -3,11 +3,13 @@ import '../../../core/api/dio_client.dart';
 import '../models/auth_response_model.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
+import '../models/refresh_request_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<AuthResponseModel> login(LoginRequestModel request);
   Future<AuthResponseModel> register(RegisterRequestModel request);
   Future<void> logout(String refreshToken);
+  Future<AuthResponseModel> refresh(RefreshRequestModel request);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -48,6 +50,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         '/api/auth/logout',
         data: {'refreshToken': refreshToken},
       );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  @override
+  Future<AuthResponseModel> refresh(RefreshRequestModel request) async {
+    try {
+      final response = await dio.post(
+        '/api/auth/refresh',
+        data: request.toJson(),
+      );
+      return AuthResponseModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }

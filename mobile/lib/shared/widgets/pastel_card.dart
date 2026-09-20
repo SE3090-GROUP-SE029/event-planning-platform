@@ -1,48 +1,53 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_dimens.dart';
 
 class PastelCard extends StatelessWidget {
-  final Color backgroundColor;
   final Widget child;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
-  final double? width;
-  final double? height;
+  final Color? backgroundColor;
+  final Border? border;
+  final double? borderRadius;
+  final List<BoxShadow>? customShadow;
 
   const PastelCard({
     super.key,
-    required this.backgroundColor,
     required this.child,
-    this.padding = const EdgeInsets.all(20.0),
+    this.padding = const EdgeInsets.all(AppDimens.space20),
     this.onTap,
-    this.width,
-    this.height,
+    this.backgroundColor,
+    this.border,
+    this.borderRadius,
+    this.customShadow,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Ink(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          padding: padding,
-          child: child,
-        ),
+    final radius = BorderRadius.circular(borderRadius ?? AppDimens.radiusCard);
+
+    Widget content = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: backgroundColor ?? AppColors.surfacePure,
+        borderRadius: radius,
+        border: border ?? Border.all(color: AppColors.borderSubtle),
+        boxShadow: customShadow ?? AppDimens.cardShadow,
       ),
+      child: child,
     );
+
+    if (onTap != null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: content,
+        ),
+      );
+    }
+
+    return content;
   }
 }
