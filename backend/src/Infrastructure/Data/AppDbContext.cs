@@ -15,6 +15,10 @@ public class AppDbContext : DbContext
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<Event> Events => Set<Event>();
 
+    public DbSet<EventSchedule> EventSchedules => Set<EventSchedule>();
+    public DbSet<TimelineActivity> TimelineActivities => Set<TimelineActivity>();
+    public DbSet<ScheduleConflict> ScheduleConflicts => Set<ScheduleConflict>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
