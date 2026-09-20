@@ -75,6 +75,14 @@ cd mobile
 flutter pub get
 flutter run
 
+# Mobile API URL
+# Windows/Desktop: http://localhost:5207
+# Android emulator: http://10.0.2.2:5207
+# Physical device: http://<your-computer-LAN-IP>:5207
+#
+# Set the selected value in mobile/.env.local. The backend must be running
+# with `dotnet run` before using the mobile application.
+
 # AI (new terminal)
 cd agentic-ai
 python -m venv venv
