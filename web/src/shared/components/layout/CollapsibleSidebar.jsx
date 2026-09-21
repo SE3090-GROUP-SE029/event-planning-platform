@@ -3,6 +3,7 @@ import { Box, IconButton, Typography } from '@mui/material';
 import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import FaceIcon from '@mui/icons-material/Face';
+import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -11,6 +12,7 @@ const Icons = {
   Dashboard: () => <HomeFilledIcon />,
   Events: () => <EventAvailableIcon/>,
   Profile: () => <FaceIcon/>,
+  Services: () => <HandymanOutlinedIcon />,
   Logout: () => <MeetingRoomIcon/>,
   ChevronLeft: () => <ChevronLeftIcon/>,
   ChevronRight: () => <ChevronRightIcon/>,
@@ -20,6 +22,7 @@ export default function CollapsibleSidebar({
   activeTab = 'dashboard',
   showEvents = false,
   showVendorProfile = false,
+  showVendorServices = false,
   onSelectTab,
   onLogout,
 }) {
@@ -28,6 +31,7 @@ export default function CollapsibleSidebar({
     { id: 'dashboard', label: 'Dashboard', icon: Icons.Dashboard },
     ...(showEvents ? [{ id: 'events', label: 'Events', icon: Icons.Events }] : []),
     ...(showVendorProfile ? [{ id: 'vendor-profile', label: 'Vendor profile', icon: Icons.Profile }] : []),
+    ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
   ];
 
   return (

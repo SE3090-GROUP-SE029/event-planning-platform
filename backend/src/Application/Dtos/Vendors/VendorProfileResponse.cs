@@ -8,7 +8,10 @@ public class VendorProfileResponse
     public string Category { get; set; } = default!;
     public string ContactEmail { get; set; } = default!;
     public string ContactPhone { get; set; } = default!;
+    public string Address { get; set; } = default!;
     public string? Description { get; set; }
+    public string? ProfileImageUrl { get; set; }
+    public string? WebsiteUrl { get; set; }
     public string Status { get; set; } = default!;
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
