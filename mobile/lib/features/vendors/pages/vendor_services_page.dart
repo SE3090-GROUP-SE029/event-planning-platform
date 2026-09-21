@@ -114,13 +114,20 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
       } else {
         await _vendorApi.updateService(token, _editingId!, payload);
       }
+
       if (!mounted) return;
       _clearForm();
+
       final services = await _vendorApi.listMyServices(token);
+
+      // Required because the previous listMyServices call is another async gap.
+      if (!mounted) return;
+
       setState(() {
         _services = services;
         _saving = false;
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Service saved.'),
@@ -161,11 +168,13 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
 
     try {
       await _vendorApi.deleteService(token, serviceId);
       if (!mounted) return;
       final services = await _vendorApi.listMyServices(token);
+      if (!mounted) return;
       setState(() {
         _services = services;
         if (_editingId == serviceId) {

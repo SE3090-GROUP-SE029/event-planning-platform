@@ -180,7 +180,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       maxWidth: 1200,
       imageQuality: 85,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
 
     setState(() {
       _uploadingImage = true;
@@ -222,7 +222,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       maxWidth: 1600,
       imageQuality: 85,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
 
     setState(() {
       _uploadingGallery = true;
@@ -231,6 +231,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
 
     try {
       await _vendorApi.uploadGalleryImage(token, picked.path, picked.name);
+      if (!mounted) return;
       final gallery = await _vendorApi.listGalleryImages(token);
       if (!mounted) return;
       setState(() {
@@ -251,6 +252,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     if (token == null) return;
     try {
       await _vendorApi.deleteGalleryImage(token, imageId);
+      if (!mounted) return;
       final gallery = await _vendorApi.listGalleryImages(token);
       if (!mounted) return;
       setState(() => _gallery = gallery);
