@@ -11,10 +11,10 @@ public class RegistrationQuestionEndpointTests(RegistrationHostFixture fixture) 
 {
     private static readonly CancellationToken Ct = CancellationToken.None;
     private static string Path(Guid eventId) => $"/api/events/{eventId}/registration-form";
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body = null, string? owner = "planner", string role = "Planner")
+    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body = null, string? owner = RegistrationHostFixture.PlannerId, string role = "Planner")
     {
         using var request = new HttpRequestMessage(method, path);
-        if (owner is not null) request.Headers.Add("X-Test-Identity", owner);
+        if (owner is not null) request.Headers.Add("X-Test-Identity", RegistrationHostFixture.GuestOwnerGuid(owner).ToString());
         request.Headers.Add("X-Test-Role", role);
         if (body is not null) request.Content = JsonContent.Create(body);
         return await fixture.Client.SendAsync(request);
@@ -26,7 +26,7 @@ public class RegistrationQuestionEndpointTests(RegistrationHostFixture fixture) 
         fixture.Ai.Decision = new(AiDecision.ACCEPTED, 0.9, ["Requirements met."], [], "qwen3:8b", "guest-filtering-v2");
         await fixture.DrainAiAsync();
         var e = await fixture.CreateEventAsync();
-        await fixture.WithServiceAsync(s => s.CreateFormAsync(e.Id, "planner", new(RegistrationHostFixture.Now.AddHours(-1), RegistrationHostFixture.Now.AddDays(1), 1), Ct));
+        await fixture.WithServiceAsync(s => s.CreateFormAsync(e.Id, RegistrationHostFixture.PlannerId, new(RegistrationHostFixture.Now.AddHours(-1), RegistrationHostFixture.Now.AddDays(1), 1), Ct));
         return e.Id;
     }
 
@@ -39,7 +39,7 @@ public class RegistrationQuestionEndpointTests(RegistrationHostFixture fixture) 
     }
 
     private async Task<string> PublishAsync(Guid eventId)
-        => (await fixture.WithServiceAsync(s => s.PublishAsync(eventId, "planner", Ct))).PublicId!;
+        => (await fixture.WithServiceAsync(s => s.PublishAsync(eventId, RegistrationHostFixture.PlannerId, Ct))).PublicId!;
 
     [Fact]
     public async Task SuggestionsAreTransientAndOnlySelectedPublishedQuestionsBecomePublic()
@@ -48,7 +48,7 @@ public class RegistrationQuestionEndpointTests(RegistrationHostFixture fixture) 
         using var suggestions = await SendAsync(HttpMethod.Post, Path(eventId) + "/question-suggestions");
         Assert.Equal(HttpStatusCode.OK, suggestions.StatusCode);
         Assert.Single((await suggestions.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("questions").EnumerateArray());
-        var draft = await fixture.WithServiceAsync(s => s.GetFormAsync(eventId, "planner", Ct));
+        var draft = await fixture.WithServiceAsync(s => s.GetFormAsync(eventId, RegistrationHostFixture.PlannerId, Ct));
         Assert.Empty(draft.Questions);
         Assert.Null(draft.PublicId);
         Assert.Equal(draft.Event.EventName, fixture.Ai.QuestionContexts.Last().EventName);
@@ -150,7 +150,7 @@ public class RegistrationQuestionEndpointTests(RegistrationHostFixture fixture) 
         fixture.Ai.Failure = new AiAnalysisException("ai_unavailable");
         using var unavailable = await SendAsync(HttpMethod.Post, Path(eventId) + "/question-suggestions");
         Assert.Equal(HttpStatusCode.ServiceUnavailable, unavailable.StatusCode);
-        Assert.Empty((await fixture.WithServiceAsync(s => s.GetFormAsync(eventId, "planner", Ct))).Questions);
+        Assert.Empty((await fixture.WithServiceAsync(s => s.GetFormAsync(eventId, RegistrationHostFixture.PlannerId, Ct))).Questions);
         fixture.Ai.Failure = null;
     }
 

@@ -88,7 +88,7 @@ public class GuestAiReviewRepository(AppDbContext db, IGuestRegistrationReposito
         var submission = await db.RegistrationSubmissions.AsNoTracking().Where(r => r.Id == registrationId)
             .Select(r => new { r.EventId, r.RegistrationFormId, r.RegisteredAt,
                 Guest = new AiGuestContext(r.Guest.FullName, r.Guest.EmailAddress, r.Guest.Organisation, r.Guest.PhoneNumber),
-                Event = new AiEventContext(r.RegistrationForm.Event.EventName, r.RegistrationForm.Event.RequirementNotes) })
+                Event = new AiEventContext(r.RegistrationForm.Event.EventName, r.RegistrationForm.Event.Requirements) })
             .SingleAsync(ct);
         // Selection only, never eligibility rules. Include likely matches first, then recent prior submissions.
         var emailPrefix = submission.Guest.EmailAddress.Split('@')[0] + "@";

@@ -86,6 +86,10 @@ public class RegistrationHostFixture : IAsyncLifetime
 
     public AppDbContext CreateDb() => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(ConnectionString).Options);
 
+    public static Guid GuestOwnerGuid(string owner) =>
+        new Guid(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(owner)));
+    public static readonly string PlannerId = GuestOwnerGuid("planner").ToString();
+
     public async Task<Event> CreateEventAsync(string owner = "planner")
     {
         Clock.UtcNow = Now;
@@ -93,9 +97,9 @@ public class RegistrationHostFixture : IAsyncLifetime
         Email.ThrowOnSend = false;
         var eventDetails = new Event
         {
-            CreatedByUserId = owner, EventName = "Guest Management Integration Event", RequirementNotes = "Test description",
-            PreferredLocation = "Colombo", EventStartDate = Now.AddDays(10), EventEndDate = Now.AddDays(10).AddHours(3),
-            CreatedAt = Now, UpdatedAt = Now
+            OwnerId = GuestOwnerGuid(owner), EventName = "Guest Management Integration Event", Requirements = "Test description",
+            PreferredVenue = "Colombo", PreferredDate = Now.AddDays(10).UtcDateTime, EventDuration = TimeSpan.FromHours(3),
+            CreatedAt = Now.UtcDateTime, UpdatedAt = Now.UtcDateTime
         };
         await using var db = CreateDb();
         db.Events.Add(eventDetails);

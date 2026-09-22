@@ -38,8 +38,8 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
     private async Task<(Event Event, string PublicId)> PublishedAsync(int seats = 2, FormSettings? settings = null)
     {
         var eventDetails = await fixture.CreateEventAsync();
-        await fixture.WithServiceAsync(service => service.CreateFormAsync(eventDetails.Id, "planner", settings ?? Settings(seats), Ct));
-        var form = await fixture.WithServiceAsync(service => service.PublishAsync(eventDetails.Id, "planner", Ct));
+        await fixture.WithServiceAsync(service => service.CreateFormAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, settings ?? Settings(seats), Ct));
+        var form = await fixture.WithServiceAsync(service => service.PublishAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, Ct));
         return (eventDetails, form.PublicId!);
     }
 
@@ -62,15 +62,15 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
     public async Task CreateUpdatePublishAndAnonymousPublicAccess()
     {
         var eventDetails = await fixture.CreateEventAsync();
-        var created = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id), Settings(), "planner"), HttpStatusCode.Created);
+        var created = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id), Settings(), RegistrationHostFixture.PlannerId), HttpStatusCode.Created);
         Assert.Equal("DRAFT", created.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, created.GetProperty("publicId").ValueKind);
         Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(HttpMethod.Get, PublicPath(new RegistrationTokenGenerator().Generate()))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id), Settings(), "planner")).StatusCode);
-        var updated = await JsonAsync(await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id), Settings(3), "planner"));
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id), Settings(), RegistrationHostFixture.PlannerId)).StatusCode);
+        var updated = await JsonAsync(await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id), Settings(3), RegistrationHostFixture.PlannerId));
         Assert.Equal(3, updated.GetProperty("seatLimit").GetInt32());
-        var published = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/publish", planner: "planner"));
-        var repeated = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/publish", planner: "planner"));
+        var published = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/publish", planner: RegistrationHostFixture.PlannerId));
+        var repeated = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/publish", planner: RegistrationHostFixture.PlannerId));
         Assert.Equal(published.GetProperty("publicId").GetString(), repeated.GetProperty("publicId").GetString());
         var publicForm = await JsonAsync(await SendAsync(HttpMethod.Get, published.GetProperty("publicPath").GetString()!));
         Assert.Equal(eventDetails.EventName, publicForm.GetProperty("eventName").GetString());
@@ -201,11 +201,11 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         var first = await SubmitAsync(publicId, 1);
         var second = await SubmitAsync(publicId, 2);
         var third = await SubmitAsync(publicId, 3);
-        var page = await JsonAsync(await SendAsync(HttpMethod.Get, PlannerPath(eventDetails.Id) + "/registrations", planner: "planner"));
+        var page = await JsonAsync(await SendAsync(HttpMethod.Get, PlannerPath(eventDetails.Id) + "/registrations", planner: RegistrationHostFixture.PlannerId));
         var firstId = page.GetProperty("items")[0].GetProperty("id").GetInt64();
         var path = PlannerPath(eventDetails.Id) + $"/registrations/{firstId}/cancel";
-        await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: "planner"));
-        await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: "planner"));
+        await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: RegistrationHostFixture.PlannerId));
+        await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: RegistrationHostFixture.PlannerId));
         var firstStatus = await StatusAsync(first);
         var secondStatus = await StatusAsync(second);
         var thirdStatus = await StatusAsync(third);
@@ -215,9 +215,9 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         Assert.Equal("SENT", secondStatus.GetProperty("emailDeliveryStatus").GetString());
         Assert.Equal("WAITING_LIST", thirdStatus.GetProperty("status").GetString());
         var invalid = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/invitations/validate",
-            new { token = first.GetProperty("invitationToken").GetString() }, "planner"));
+            new { token = first.GetProperty("invitationToken").GetString() }, RegistrationHostFixture.PlannerId));
         var valid = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/invitations/validate",
-            new { token = secondStatus.GetProperty("invitationToken").GetString() }, "planner"));
+            new { token = secondStatus.GetProperty("invitationToken").GetString() }, RegistrationHostFixture.PlannerId));
         Assert.False(invalid.GetProperty("valid").GetBoolean());
         Assert.True(valid.GetProperty("valid").GetBoolean());
     }
@@ -229,12 +229,12 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         await SubmitAsync(publicId, 1);
         var second = await SubmitAsync(publicId, 2);
         var third = await SubmitAsync(publicId, 3);
-        await JsonAsync(await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 2 }, "planner"));
+        await JsonAsync(await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 2 }, RegistrationHostFixture.PlannerId));
         Assert.Equal("CONFIRMED", (await StatusAsync(second)).GetProperty("status").GetString());
         Assert.Equal("WAITING_LIST", (await StatusAsync(third)).GetProperty("status").GetString());
-        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 1 }, "planner")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 0 }, "planner")).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id), Settings(1), "planner")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 1 }, RegistrationHostFixture.PlannerId)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 0 }, RegistrationHostFixture.PlannerId)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id), Settings(1), RegistrationHostFixture.PlannerId)).StatusCode);
     }
 
     [Fact]
@@ -277,12 +277,12 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         foreach (var suffix in new[] { "", "/registrations", "/registrations/1" })
         {
             Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Get, path + suffix)).StatusCode);
-            Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(HttpMethod.Get, path + suffix, planner: "planner", role: "Guest")).StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(HttpMethod.Get, path + suffix, planner: "someone-else")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(HttpMethod.Get, path + suffix, planner: RegistrationHostFixture.PlannerId, role: "Guest")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await SendAsync(HttpMethod.Get, path + suffix, planner: RegistrationHostFixture.GuestOwnerGuid("someone-else").ToString())).StatusCode);
         }
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Post, path + "/publish")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Post, path + "/registrations/1/cancel")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(HttpMethod.Get, path + "/registrations?page=0", planner: "planner")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(HttpMethod.Get, path + "/registrations?page=0", planner: RegistrationHostFixture.PlannerId)).StatusCode);
     }
 
     [Fact]
@@ -293,14 +293,14 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         var receipt = await SubmitAsync(publicId, 1);
         Assert.Equal("CONFIRMED", receipt.GetProperty("status").GetString());
         Assert.Equal("FAILED", receipt.GetProperty("emailDeliveryStatus").GetString());
-        var list = await JsonAsync(await SendAsync(HttpMethod.Get, PlannerPath(eventDetails.Id) + "/registrations", planner: "planner"));
+        var list = await JsonAsync(await SendAsync(HttpMethod.Get, PlannerPath(eventDetails.Id) + "/registrations", planner: RegistrationHostFixture.PlannerId));
         var id = list.GetProperty("items")[0].GetProperty("id").GetInt64();
         fixture.Email.ThrowOnSend = false;
         var path = PlannerPath(eventDetails.Id) + $"/registrations/{id}/retry-invitation";
-        var retried = await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: "planner"));
+        var retried = await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: RegistrationHostFixture.PlannerId));
         Assert.Equal("SENT", retried.GetProperty("emailDeliveryStatus").GetString());
         Assert.Equal(2, retried.GetProperty("deliveryAttempts").GetInt32());
-        var repeated = await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: "planner"));
+        var repeated = await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: RegistrationHostFixture.PlannerId));
         Assert.Equal(2, repeated.GetProperty("deliveryAttempts").GetInt32());
         Assert.Equal(receipt.GetProperty("invitationToken").GetString(), (await StatusAsync(receipt)).GetProperty("invitationToken").GetString());
     }
@@ -324,7 +324,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         var status = await StatusAsync(receipt);
         Assert.Equal(JsonValueKind.Null, status.GetProperty("invitationToken").ValueKind);
         var response = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/invitations/validate",
-            new { token = receipt.GetProperty("invitationToken").GetString() }, "planner"));
+            new { token = receipt.GetProperty("invitationToken").GetString() }, RegistrationHostFixture.PlannerId));
         Assert.False(response.GetProperty("valid").GetBoolean());
     }
 

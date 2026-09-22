@@ -40,7 +40,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
         if (form.Status != RegistrationFormStatus.DRAFT) throw Error(409, "form_published", "Published questions cannot be changed.");
         try
         {
-            var result = await client.SuggestAsync(new AiEventContext(form.Event.EventName, form.Event.RequirementNotes), ct);
+            var result = await client.SuggestAsync(new AiEventContext(form.Event.EventName, form.Event.Requirements), ct);
             return new QuestionSuggestions(RegistrationValidator.ValidateQuestions(result.Questions));
         }
         catch (AiAnalysisException error)
@@ -143,7 +143,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
             var validatedAnswers = RegistrationValidator.ValidateAnswers(form, answers);
             var now = clock.GetUtcNow();
             if (now < form.OpensAt) throw Error(409, "registration_not_open", "Registration has not opened yet.");
-            if (now >= form.ClosesAt || now >= eventDetails.EventEndDate)
+            if (now >= form.ClosesAt || now >= new DateTimeOffset(eventDetails.PreferredDate + eventDetails.EventDuration, TimeSpan.Zero))
                 throw Error(409, "registration_closed", "Registration has closed.");
             var normalizedEmail = details.EmailAddress.ToUpperInvariant();
             if (await repository.EmailExistsAsync(eventDetails.Id, normalizedEmail, ct))
@@ -326,7 +326,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
     private async Task<List<long>> PromoteAsync(RegistrationForm form, Event eventDetails, CancellationToken ct)
     {
         var promoted = new List<long>();
-        if (form.Status != RegistrationFormStatus.PUBLISHED || clock.GetUtcNow() >= eventDetails.EventEndDate) return promoted;
+        if (form.Status != RegistrationFormStatus.PUBLISHED || clock.GetUtcNow() >= new DateTimeOffset(eventDetails.PreferredDate + eventDetails.EventDuration, TimeSpan.Zero)) return promoted;
         var available = form.SeatLimit - await repository.ConfirmedCountAsync(form.EventId, ct);
         if (available <= 0) return promoted;
         foreach (var registration in await repository.WaitingAsync(form.EventId, ct))
@@ -338,7 +338,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
             var invitation = new Invitation
             {
                 RegistrationSubmissionId = registration.Id, RegistrationSubmission = registration,
-                Token = await UniqueTokenAsync(ct), CreatedAt = now, TokenExpiresAt = eventDetails.EventEndDate
+                Token = await UniqueTokenAsync(ct), CreatedAt = now, TokenExpiresAt = new DateTimeOffset(eventDetails.PreferredDate + eventDetails.EventDuration, TimeSpan.Zero)
             };
             registration.Invitation = invitation;
             repository.AddInvitation(invitation);
@@ -382,8 +382,8 @@ public class RegistrationService(IGuestRegistrationRepository repository,
                 try
                 {
                     delivery = await emailSender.SendAsync(new InvitationEmail(registration.Guest.EmailAddress,
-                        registration.Guest.FullName, eventDetails.EventName, eventDetails.EventStartDate,
-                        eventDetails.PreferredLocation, invitation.Token, tokens.CreateQrPng(invitation.Token)), ct);
+                        registration.Guest.FullName, eventDetails.EventName, new DateTimeOffset(eventDetails.PreferredDate, TimeSpan.Zero),
+                        eventDetails.PreferredVenue, invitation.Token, tokens.CreateQrPng(invitation.Token)), ct);
                 }
                 catch (Exception) when (!ct.IsCancellationRequested)
                 {
@@ -429,7 +429,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
 
     private static void RequireOwner(Event eventDetails, string plannerId)
     {
-        if (string.IsNullOrWhiteSpace(plannerId) || eventDetails.CreatedByUserId != plannerId) throw NotFound();
+        if (string.IsNullOrWhiteSpace(plannerId) || eventDetails.OwnerId.ToString() != plannerId) throw NotFound();
     }
 
     private static RegistrationException NotFound() => Error(404, "not_found", "Registration resource not found.");

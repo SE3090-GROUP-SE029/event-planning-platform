@@ -21,9 +21,10 @@ public class PublicRegistrationsController(RegistrationService service, IRegistr
     {
         var form = await service.GetPublicFormAsync(publicId, ct);
         var now = clock.GetUtcNow();
-        return Ok(new PublicFormResponse(form.PublicId!, form.Event.EventName, form.Event.RequirementNotes,
-            form.Event.EventStartDate, form.Event.EventEndDate, form.Event.PreferredLocation, form.OpensAt,
-            form.ClosesAt, form.SeatLimit, now >= form.OpensAt && now < form.ClosesAt && now < form.Event.EventEndDate,
+        var eventEndDate = new DateTimeOffset(form.Event.PreferredDate + form.Event.EventDuration, TimeSpan.Zero);
+        return Ok(new PublicFormResponse(form.PublicId!, form.Event.EventName, form.Event.Requirements,
+            new DateTimeOffset(form.Event.PreferredDate, TimeSpan.Zero), eventEndDate, form.Event.PreferredVenue, form.OpensAt,
+            form.ClosesAt, form.SeatLimit, now >= form.OpensAt && now < form.ClosesAt && now < eventEndDate,
             ["fullName", "emailAddress"], ["organisation", "phoneNumber"], FormQuestionResponse.From(form)));
     }
 
