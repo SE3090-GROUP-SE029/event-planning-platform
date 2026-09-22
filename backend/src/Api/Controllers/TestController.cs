@@ -1,6 +1,5 @@
-using Api.Dtos.Requests;
-using Api.Dtos.Responses;
-using Application.TestSerivce;
+using Application.Dtos.Test;
+using Application.Services.Test;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
@@ -19,14 +18,14 @@ public class TestController : ControllerBase
     [HttpGet("ping")]
     public IActionResult Ping()
     {
-        return Ok(new { message = "pong", timestamp = DateTime.Now});
+        return Ok(new { message = "pong", timestamp = DateTime.UtcNow });
     }
 
     [HttpPost("message")]
     public async Task<IActionResult> CreateMessage([FromBody] CreateTestMessageRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Message)) 
-            return BadRequest(new { error = "Message cannot be empty"});
+            return BadRequest(new { error = "Message cannot be empty" });
         
         var msg = await _testService.CreateTestMessageAsync(request.Message);
         var response = new TestMessageResponse
@@ -39,6 +38,7 @@ public class TestController : ControllerBase
         return CreatedAtAction(nameof(GetMessage), new { id = msg.Id }, response);
     } 
 
+    [HttpGet("message/{id:int}")]
     public async Task<IActionResult> GetMessage(int id)
     {
         try
@@ -54,7 +54,7 @@ public class TestController : ControllerBase
         }
         catch
         {
-            return NotFound(new{ error = $"Message {id} not found" });
+            return NotFound(new { error = $"Message {id} not found" });
         }
     }
-}
+}
