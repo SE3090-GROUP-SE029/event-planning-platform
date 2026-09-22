@@ -6,5 +6,7 @@ public class CreateVendorProfileRequest
     public string Category { get; set; } = default!;
     public string ContactEmail { get; set; } = default!;
     public string ContactPhone { get; set; } = default!;
+    public string Address { get; set; } = default!;
     public string? Description { get; set; }
+    public string? WebsiteUrl { get; set; }
 }

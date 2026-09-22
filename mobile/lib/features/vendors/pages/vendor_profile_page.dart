@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -8,6 +9,7 @@ import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
 import '../../auth/widgets/custom_text_field.dart';
 import '../api/vendor_remote_datasource.dart';
+import '../models/vendor_gallery_image_model.dart';
 import '../models/vendor_profile_model.dart';
 
 const vendorCategories = [
@@ -31,12 +33,19 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   final _businessNameController = TextEditingController();
   final _contactEmailController = TextEditingController();
   final _contactPhoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _websiteController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _vendorApi = VendorRemoteDataSource();
+  final _imagePicker = ImagePicker();
 
   String _category = 'CATERING';
+  String? _profileImageUrl;
+  List<VendorGalleryImageModel> _gallery = [];
   bool _loading = true;
   bool _saving = false;
+  bool _uploadingImage = false;
+  bool _uploadingGallery = false;
   bool _hasProfile = false;
   String? _status;
   String? _error;
@@ -57,6 +66,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     _businessNameController.dispose();
     _contactEmailController.dispose();
     _contactPhoneController.dispose();
+    _addressController.dispose();
+    _websiteController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -78,12 +89,20 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         _businessNameController.text = profile.businessName;
         _contactEmailController.text = profile.contactEmail;
         _contactPhoneController.text = profile.contactPhone;
+        _addressController.text = profile.address;
+        _websiteController.text = profile.websiteUrl ?? '';
         _descriptionController.text = profile.description ?? '';
+        _profileImageUrl = profile.profileImageUrl;
         _category = vendorCategories.contains(profile.category)
             ? profile.category
             : 'CATERING';
         _status = profile.status;
         _hasProfile = true;
+        try {
+          _gallery = await _vendorApi.listGalleryImages(token);
+        } catch (_) {
+          _gallery = [];
+        }
       }
       setState(() {
         _loading = false;
@@ -110,9 +129,14 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       category: _category,
       contactEmail: _contactEmailController.text.trim(),
       contactPhone: _contactPhoneController.text.trim(),
+      address: _addressController.text.trim(),
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
+      profileImageUrl: _profileImageUrl,
+      websiteUrl: _websiteController.text.trim().isEmpty
+          ? null
+          : _websiteController.text.trim(),
       status: _status ?? '',
     );
 
@@ -130,6 +154,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         _saving = false;
         _hasProfile = true;
         _status = saved.status;
+        _profileImageUrl = saved.profileImageUrl;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -143,6 +168,97 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
         _saving = false;
         _error = e.toString();
       });
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final token = _auth?.accessToken;
+    if (token == null || !_hasProfile) return;
+
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _uploadingImage = true;
+      _error = null;
+    });
+
+    try {
+      final saved = await _vendorApi.uploadProfileImage(
+        token,
+        picked.path,
+        picked.name,
+      );
+      if (!mounted) return;
+      setState(() {
+        _uploadingImage = false;
+        _profileImageUrl = saved.profileImageUrl;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile image updated.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingImage = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  Future<void> _pickAndUploadGalleryImage() async {
+    final token = _auth?.accessToken;
+    if (token == null || !_hasProfile) return;
+
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      _uploadingGallery = true;
+      _error = null;
+    });
+
+    try {
+      await _vendorApi.uploadGalleryImage(token, picked.path, picked.name);
+      if (!mounted) return;
+      final gallery = await _vendorApi.listGalleryImages(token);
+      if (!mounted) return;
+      setState(() {
+        _gallery = gallery;
+        _uploadingGallery = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingGallery = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  Future<void> _deleteGalleryImage(String imageId) async {
+    final token = _auth?.accessToken;
+    if (token == null) return;
+    try {
+      await _vendorApi.deleteGalleryImage(token, imageId);
+      if (!mounted) return;
+      final gallery = await _vendorApi.listGalleryImages(token);
+      if (!mounted) return;
+      setState(() => _gallery = gallery);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString());
     }
   }
 
@@ -180,21 +296,40 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                         children: [
                           Row(
                             children: [
-                              Container(
-                                width: 68,
-                                height: 68,
-                                decoration: BoxDecoration(
-                                  color: AppColors.pastelGreenLight,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: const Color(0x30C4DDB8),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.storefront_rounded,
-                                  color: AppColors.pastelGreenText,
-                                  size: 34,
+                              GestureDetector(
+                                onTap: _hasProfile && !_uploadingImage
+                                    ? _pickAndUploadImage
+                                    : null,
+                                child: CircleAvatar(
+                                  radius: 34,
+                                  backgroundColor: AppColors.pastelGreenLight,
+                                  backgroundImage: VendorRemoteDataSource
+                                              .resolveImageUrl(
+                                                  _profileImageUrl) !=
+                                          null
+                                      ? NetworkImage(
+                                          VendorRemoteDataSource
+                                              .resolveImageUrl(
+                                                  _profileImageUrl)!,
+                                        )
+                                      : null,
+                                  child: _uploadingImage
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : (VendorRemoteDataSource.resolveImageUrl(
+                                                  _profileImageUrl) ==
+                                              null
+                                          ? const Icon(
+                                              Icons.storefront_rounded,
+                                              color: AppColors.pastelGreenText,
+                                              size: 34,
+                                            )
+                                          : null),
                                 ),
                               ),
                               const SizedBox(width: AppDimens.space16),
@@ -224,14 +359,13 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      _contactEmailController.text.isNotEmpty
-                                          ? _contactEmailController.text
-                                          : (_auth?.email ?? 'Verified vendor'),
+                                      _hasProfile
+                                          ? 'Tap logo to upload/change image'
+                                          : 'Save profile to upload a logo',
                                       style: const TextStyle(
                                         color: AppColors.textMuted,
                                         fontSize: 12,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
@@ -378,6 +512,31 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                           ),
                           const SizedBox(height: AppDimens.space16),
                           CustomTextField(
+                            label: 'Address',
+                            hint: '12 Flower Road, Colombo',
+                            controller: _addressController,
+                            prefixIcon: const Icon(
+                              Icons.location_on_outlined,
+                              color: AppColors.textSecondary,
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Required'
+                                    : null,
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          CustomTextField(
+                            label: 'Website / social link',
+                            hint: 'https://yourbusiness.com',
+                            controller: _websiteController,
+                            keyboardType: TextInputType.url,
+                            prefixIcon: const Icon(
+                              Icons.link_rounded,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          CustomTextField(
                             label: 'Description',
                             hint:
                                 'Tell clients about your services, experience, and specialties...',
@@ -410,6 +569,108 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                                 : 'Create profile'),
                       ),
                     ),
+
+                    if (_hasProfile) ...[
+                      const PastelSectionHeader(title: 'Business images'),
+                      PastelCard(
+                        padding: const EdgeInsets.all(AppDimens.space16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _uploadingGallery ||
+                                        _gallery.length >= 8
+                                    ? null
+                                    : _pickAndUploadGalleryImage,
+                                icon: _uploadingGallery
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.add_photo_alternate_outlined),
+                                label: Text(_uploadingGallery
+                                    ? 'Uploading…'
+                                    : 'Add image'),
+                              ),
+                            ),
+                            const SizedBox(height: AppDimens.space12),
+                            if (_gallery.isEmpty)
+                              const Text(
+                                'No business images yet.',
+                                style: TextStyle(color: AppColors.textSecondary),
+                              )
+                            else
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: _gallery.map((image) {
+                                  final url =
+                                      VendorRemoteDataSource.resolveImageUrl(
+                                          image.imageUrl);
+                                  return Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: url == null
+                                            ? Container(
+                                                width: 100,
+                                                height: 80,
+                                                color: AppColors.pastelGreenLight,
+                                              )
+                                            : Image.network(
+                                                url,
+                                                width: 100,
+                                                height: 80,
+                                                fit: BoxFit.cover,
+                                              ),
+                                      ),
+                                      Positioned(
+                                        top: 2,
+                                        right: 2,
+                                        child: InkWell(
+                                          onTap: () =>
+                                              _deleteGalleryImage(image.id),
+                                          child: Container(
+                                            decoration: const BoxDecoration(
+                                              color: Colors.white,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            padding: const EdgeInsets.all(2),
+                                            child: const Icon(
+                                              Icons.close,
+                                              size: 16,
+                                              color: AppColors.error,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppDimens.space12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.of(context).pushNamed(
+                              '/vendors/services',
+                              arguments: _auth,
+                            );
+                          },
+                          child: const Text('Manage services'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

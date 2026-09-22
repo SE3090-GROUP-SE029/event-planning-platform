@@ -6,6 +6,7 @@ import ProtectedRoute from '../shared/components/ProtectedRoute';
 import AdminEventManagementPage from '../features/adminEvents/pages/AdminEventManagementPage';
 import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetailsPage';
 import VendorProfilePage from '../features/vendors/pages/VendorProfilePage';
+import VendorServicesPage from '../features/vendors/pages/VendorServicesPage';
 
 export const router = createBrowserRouter([
   {
@@ -39,5 +40,9 @@ export const router = createBrowserRouter([
   {
     path: '/vendor/profile',
     element: <ProtectedRoute requiredRole="VENDOR"><VendorProfilePage /></ProtectedRoute>,
+  },
+  {
+    path: '/vendor/services',
+    element: <ProtectedRoute requiredRole="VENDOR"><VendorServicesPage /></ProtectedRoute>,
   },
 ]);

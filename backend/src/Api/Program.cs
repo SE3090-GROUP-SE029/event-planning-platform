@@ -10,8 +10,10 @@ using FluentValidation;
 using Infrastructure.Auth;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
+using Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -66,10 +68,20 @@ var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IVendorRepository, VendorRepository>();
+builder.Services.AddScoped<IVendorOfferingRepository, VendorOfferingRepository>();
+builder.Services.AddScoped<IVendorGalleryImageRepository, VendorGalleryImageRepository>();
+builder.Services.AddScoped<IVendorImageStorage>(_ =>
+{
+    var webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+    Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "vendors"));
+    return new LocalVendorImageStorage(webRoot);
+});
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVendorService, VendorService>();
+builder.Services.AddScoped<IVendorOfferingService, VendorOfferingService>();
+builder.Services.AddScoped<IVendorGalleryService, VendorGalleryService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
@@ -103,6 +115,11 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 2 * 1024 * 1024;
+    options.ValueLengthLimit = 2 * 1024 * 1024;
+});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -117,6 +134,14 @@ var app = builder.Build();
 
 app.UseCors("AllowAll");
 
+var webRootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "vendors"));
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(webRootPath),
+    RequestPath = ""
+});
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -128,7 +153,13 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// Avoid HTTPS redirects on the local http profile (causes browser "Network Error" on uploads).
+var httpsPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT");
+if (!string.IsNullOrWhiteSpace(httpsPort))
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

@@ -16,7 +16,10 @@ public class VendorConfiguration : IEntityTypeConfiguration<Vendor>
         builder.Property(v => v.Category).IsRequired();
         builder.Property(v => v.ContactEmail).IsRequired().HasMaxLength(256);
         builder.Property(v => v.ContactPhone).IsRequired().HasMaxLength(50);
+        builder.Property(v => v.Address).IsRequired().HasMaxLength(500);
         builder.Property(v => v.Description).HasMaxLength(2000);
+        builder.Property(v => v.ProfileImageUrl).HasMaxLength(500);
+        builder.Property(v => v.WebsiteUrl).HasMaxLength(500);
         builder.Property(v => v.Status).IsRequired();
         builder.Property(v => v.CreatedAt).IsRequired();
     }

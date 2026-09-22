@@ -13,6 +13,8 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles {get; set;} = default!;
     public DbSet<RefreshToken> RefreshTokens {get; set;} = default!;
     public DbSet<Vendor> Vendors => Set<Vendor>();
+    public DbSet<VendorOffering> VendorOfferings => Set<VendorOffering>();
+    public DbSet<VendorGalleryImage> VendorGalleryImages => Set<VendorGalleryImage>();
     public DbSet<Event> Events => Set<Event>();
 
     public DbSet<EventSchedule> EventSchedules => Set<EventSchedule>();
