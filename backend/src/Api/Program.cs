@@ -1,4 +1,5 @@
 using Application.Services;
+using Api.GuestManagement;
 using Application.TestSerivce;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddScoped<ITestService, TestSerivce>();
+builder.Services.AddGuestManagement(builder.Configuration);
 builder.Services.AddDbContext<AppDbContext>(options => 
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 

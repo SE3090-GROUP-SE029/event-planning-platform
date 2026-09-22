@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -13,6 +13,10 @@ from src.models.message_models import (
     PingRequest,
 )
 from src.services.backend_client import BackendClient
+from src.models.guest_review_models import GuestReviewRequest, GuestReviewResponse
+from src.services.guest_review_service import AnalysisError, GuestReviewService, get_guest_review_service
+from src.models.registration_question_models import QuestionSuggestionRequest, QuestionSuggestions
+from src.services.registration_question_service import RegistrationQuestionService, get_registration_question_service
 
 # Load environment variables
 load_dotenv()
@@ -37,7 +41,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Event Planning AI Service",
-    description="LangGraph-based AI service for event planning automation",
+    description="Event planning AI service with Google ADK guest review",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -55,6 +59,20 @@ app.add_middleware(
 # HEALTH CHECK & PING ENDPOINTS
 # ============================================================================
 
+@app.exception_handler(AnalysisError)
+async def analysis_error_handler(request: Request, exception: AnalysisError):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=exception.status_code, content={"code": exception.code})
+
+
+@app.post("/api/guest-reviews/analyze", response_model=GuestReviewResponse, tags=["Internal Guest Review"])
+async def analyze_guest(request: Request, context: GuestReviewRequest,
+                        service: GuestReviewService = Depends(get_guest_review_service)):
+    # Planner retrieval is exclusively through the protected ASP.NET API.
+    if request.client is None or request.client.host not in {"127.0.0.1", "::1"}:
+        raise HTTPException(status_code=403, detail="Local backend access required")
+    return await service.analyze(context)
+
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Health check endpoint"""
@@ -63,6 +81,14 @@ async def health_check():
         "service": "agentic-ai",
         "timestamp": datetime.utcnow(),
     }
+
+
+@app.post("/api/registration-questions/suggest", response_model=QuestionSuggestions, tags=["Internal Registration Questions"])
+async def suggest_questions(request: Request, context: QuestionSuggestionRequest,
+                            service: RegistrationQuestionService = Depends(get_registration_question_service)):
+    if request.client is None or request.client.host not in {"127.0.0.1", "::1"}:
+        raise HTTPException(status_code=403, detail="Local backend access required")
+    return await service.suggest(context)
 
 @app.post("/api/test/ping", response_model=PingResponse, tags=["Test"])
 async def ai_ping(request: PingRequest):
@@ -161,7 +187,7 @@ if __name__ == "__main__":
     port = int(os.getenv("AI_SERVICE_PORT", 8000))
     uvicorn.run(
         "src.main:app",
-        host="0.0.0.0",
+        host=os.getenv("AI_SERVICE_HOST", "127.0.0.1"),
         port=port,
         reload=True,
     )
