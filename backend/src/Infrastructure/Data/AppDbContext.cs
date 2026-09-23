@@ -26,6 +26,9 @@ public class AppDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens {get; set;} = default!;
     public DbSet<Vendor> Vendors => Set<Vendor>();
 
+    public DbSet<VendorOffering> VendorOfferings => Set<VendorOffering>();
+    public DbSet<VendorGalleryImage> VendorGalleryImages => Set<VendorGalleryImage>();
+
     // Dev Scheduling DbSets
     public DbSet<EventSchedule> EventSchedules => Set<EventSchedule>();
     public DbSet<TimelineActivity> TimelineActivities => Set<TimelineActivity>();

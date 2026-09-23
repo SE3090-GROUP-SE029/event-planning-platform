@@ -11,12 +11,17 @@ void main() {
       category: 'CATERING',
       contactEmail: 'hello@greenleaf.test',
       contactPhone: '0771234567',
+      address: '12 Flower Road, Colombo',
       description: 'Veg catering',
+      profileImageUrl: '/uploads/vendors/demo.jpg',
+      websiteUrl: 'https://greenleaf.test',
       status: 'PENDING',
     );
 
     expect(profile.toJson()['businessName'], 'Green Leaf Catering');
     expect(profile.toJson()['category'], 'CATERING');
+    expect(profile.toJson()['address'], '12 Flower Road, Colombo');
+    expect(profile.toJson()['websiteUrl'], 'https://greenleaf.test');
     expect(vendorCategories, contains('PHOTOGRAPHY'));
   });
 }

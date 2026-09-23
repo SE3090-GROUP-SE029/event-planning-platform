@@ -10,6 +10,7 @@ import '../../../shared/widgets/pastel_list_item.dart';
 import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../vendors/widgets/vendor_dashboard_overview.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -174,6 +175,9 @@ class DashboardPage extends ConsumerWidget {
               ),
             ),
 
+            if (isVendor && session != null)
+              VendorDashboardOverview(session: session),
+
             // Section: Workspace
             const PastelSectionHeader(title: 'Workspace'),
 
@@ -204,6 +208,15 @@ class DashboardPage extends ConsumerWidget {
                       showDivider: true,
                       onTap: () => Navigator.of(context)
                           .pushNamed('/vendors/profile', arguments: session),
+                    ),
+                    PastelListItem(
+                      icon: Icons.handyman_outlined,
+                      iconVariant: PastelIconVariant.blue,
+                      title: 'Vendor services',
+                      subtitle: 'Add, edit, and remove the services you offer',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/vendors/services', arguments: session),
                     ),
                   ],
                   PastelListItem(

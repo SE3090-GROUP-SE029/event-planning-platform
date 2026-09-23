@@ -5,7 +5,10 @@ class VendorProfileModel {
   final String category;
   final String contactEmail;
   final String contactPhone;
+  final String address;
   final String? description;
+  final String? profileImageUrl;
+  final String? websiteUrl;
   final String status;
 
   VendorProfileModel({
@@ -15,7 +18,10 @@ class VendorProfileModel {
     required this.category,
     required this.contactEmail,
     required this.contactPhone,
+    required this.address,
     required this.description,
+    required this.profileImageUrl,
+    required this.websiteUrl,
     required this.status,
   });
 
@@ -27,7 +33,10 @@ class VendorProfileModel {
       category: json['category'] as String? ?? '',
       contactEmail: json['contactEmail'] as String? ?? '',
       contactPhone: json['contactPhone'] as String? ?? '',
+      address: json['address'] as String? ?? '',
       description: json['description'] as String?,
+      profileImageUrl: json['profileImageUrl'] as String?,
+      websiteUrl: json['websiteUrl'] as String?,
       status: json['status'] as String? ?? '',
     );
   }
@@ -38,7 +47,9 @@ class VendorProfileModel {
       'category': category,
       'contactEmail': contactEmail,
       'contactPhone': contactPhone,
+      'address': address,
       'description': description,
+      'websiteUrl': websiteUrl,
     };
   }
 }
