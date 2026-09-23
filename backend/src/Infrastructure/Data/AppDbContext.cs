@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<VendorOffering> VendorOfferings => Set<VendorOffering>();
     public DbSet<VendorGalleryImage> VendorGalleryImages => Set<VendorGalleryImage>();
     public DbSet<Event> Events => Set<Event>();
+    public DbSet<EventPlanDraft> EventPlanDrafts => Set<EventPlanDraft>();
 
     public DbSet<EventSchedule> EventSchedules => Set<EventSchedule>();
     public DbSet<TimelineActivity> TimelineActivities => Set<TimelineActivity>();
