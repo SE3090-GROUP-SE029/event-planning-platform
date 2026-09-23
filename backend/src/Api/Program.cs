@@ -6,6 +6,7 @@ using Application.Services.Test;
 using Application.Services.Vendors;
 using Application.Dtos.Events;
 using Application.Validators.Events;
+using Api.GuestManagement;
 using FluentValidation;
 using Infrastructure.Auth;
 using Infrastructure.Data;
@@ -56,15 +57,22 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Test feature service (correct namespace and class name)
 builder.Services.AddScoped<ITestService, TestService>();
+
+// C4 Guest Management — AI, email, registration, invitation, QR services
+builder.Services.AddGuestManagement(builder.Configuration);
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
         npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
+// JWT configuration (required by dev authentication)
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
 
+// Dev repository and service registrations
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IVendorRepository, VendorRepository>();
@@ -87,6 +95,7 @@ builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 
+// JWT Bearer authentication (required by dev auth flow)
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -164,6 +173,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Admin user seeding on startup (skips gracefully when AdminSeed:Password is not configured)
+// NOTE: Requires human review — touches auth/user database state on application startup.
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
