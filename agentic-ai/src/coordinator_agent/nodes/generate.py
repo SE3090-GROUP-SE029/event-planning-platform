@@ -45,7 +45,11 @@ async def identify_service_categories(state: CoordinatorState) -> dict[str, list
     if len(categories) < 3:
         logger.warning("Fewer than three valid categories returned; adding defaults")
         categories.update(_default_categories(state.event))
-    return {"service_categories": sorted(categories)[:12]}
+    ordered = sorted(categories)[:12]
+    return {
+        "service_categories": ordered,
+        "target_vendor_types": [f"{category} provider" for category in ordered],
+    }
 
 
 async def generate_plan(state: CoordinatorState) -> dict[str, list[str]]:
