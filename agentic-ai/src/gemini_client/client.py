@@ -5,7 +5,7 @@ import json
 import logging
 import random
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, TypeVar
 
 from google import generativeai as genai
 from google.api_core.exceptions import GoogleAPIError, ResourceExhausted
@@ -23,7 +23,7 @@ from .exceptions import (
 from .structured_output import StructuredOutputValidator
 
 logger = logging.getLogger(__name__)
-ModelT = type[BaseModel]
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 class GeminiClient:
@@ -67,8 +67,8 @@ class GeminiClient:
         return None
 
     async def generate_plan(
-        self, event_data: dict[str, Any], schema: ModelT
-    ) -> BaseModel:
+        self, event_data: dict[str, Any], schema: type[ModelT]
+    ) -> ModelT:
         """Generate and validate a non-streaming structured plan."""
 
         prompt = self._build_prompt(event_data, schema)
@@ -76,8 +76,15 @@ class GeminiClient:
         response = await self._call_with_retry(prompt, schema)
         return self._parse_response(response, schema)
 
+    async def generate_with_prompt(self, prompt: str, schema: type[ModelT]) -> ModelT:
+        """Generate a structured response from an already-rendered prompt."""
+
+        self._check_token_limit(prompt)
+        response = await self._call_with_retry(prompt, schema)
+        return self._parse_response(response, schema)
+
     async def generate_plan_with_streaming(
-        self, event_data: dict[str, Any], schema: ModelT
+        self, event_data: dict[str, Any], schema: type[ModelT]
     ) -> AsyncIterator[str]:
         """Yield response text chunks for long-running operations."""
 
@@ -99,7 +106,7 @@ class GeminiClient:
             logger.warning("Gemini token counting failed; using estimate: %s", type(exc).__name__)
             return max(1, len(prompt) // 4)
 
-    def validate_response(self, response: Any, schema: ModelT) -> BaseModel:
+    def validate_response(self, response: Any, schema: type[ModelT]) -> ModelT:
         """Validate a parsed response against its requested Pydantic schema."""
 
         if isinstance(response, BaseModel):
@@ -114,7 +121,7 @@ class GeminiClient:
             ) from exc
 
     async def _call_with_retry(
-        self, prompt: str, schema: ModelT, stream: bool = False
+        self, prompt: str, schema: type[ModelT], stream: bool = False
     ) -> Any:
         generation_config = {
             "temperature": self.temperature,
@@ -144,7 +151,7 @@ class GeminiClient:
                 logger.warning("Gemini request retrying in %.2fs: %s", delay, type(exc).__name__)
                 await asyncio.sleep(delay)
 
-    def _parse_response(self, response: Any, schema: ModelT) -> BaseModel:
+    def _parse_response(self, response: Any, schema: type[ModelT]) -> ModelT:
         text = getattr(response, "text", None)
         if not text:
             raise GeminiResponseError("Gemini returned an empty response")
@@ -159,7 +166,7 @@ class GeminiClient:
             raise GeminiConfigurationError("Gemini model is not configured")
         return self.model
 
-    def _build_prompt(self, event_data: dict[str, Any], schema: ModelT) -> str:
+    def _build_prompt(self, event_data: dict[str, Any], schema: type[ModelT]) -> str:
         return PLAN_GENERATION_PROMPT.format(
             event_data=json.dumps(event_data, ensure_ascii=True, default=str),
             schema=json.dumps(schema.model_json_schema(), ensure_ascii=True),
