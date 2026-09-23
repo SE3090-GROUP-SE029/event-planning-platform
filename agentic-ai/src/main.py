@@ -13,9 +13,12 @@ from src.models.message_models import (
     PingRequest,
 )
 from src.services.backend_client import BackendClient
+from src.api.routes import router as coordinator_router
+from src.coordinator_agent.config import configure_logging
 
 # Load environment variables
 load_dotenv()
+configure_logging()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(coordinator_router)
 
 # ============================================================================
 # HEALTH CHECK & PING ENDPOINTS
