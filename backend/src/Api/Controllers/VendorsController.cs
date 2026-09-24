@@ -79,7 +79,7 @@ public class VendorsController : ControllerBase
     [HttpPost("me/profile-image")]
     [RequestSizeLimit(3 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 3 * 1024 * 1024)]
-    public async Task<ActionResult<VendorProfileResponse>> UploadProfileImage([FromForm] IFormFile? file)
+    public async Task<ActionResult<VendorProfileResponse>> UploadProfileImage(IFormFile? file)
     {
         try
         {
@@ -123,7 +123,7 @@ public class VendorsController : ControllerBase
     [HttpPost("me/images")]
     [RequestSizeLimit(3 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 3 * 1024 * 1024)]
-    public async Task<ActionResult<VendorGalleryImageResponse>> UploadGalleryImage([FromForm] IFormFile? file)
+    public async Task<ActionResult<VendorGalleryImageResponse>> UploadGalleryImage(IFormFile? file)
     {
         try
         {
