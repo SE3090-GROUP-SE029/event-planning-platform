@@ -70,6 +70,8 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IVendorRepository, VendorRepository>();
 builder.Services.AddScoped<IVendorOfferingRepository, VendorOfferingRepository>();
 builder.Services.AddScoped<IVendorGalleryImageRepository, VendorGalleryImageRepository>();
+builder.Services.AddScoped<IVendorAvailabilityRepository, VendorAvailabilityRepository>();
+builder.Services.AddScoped<IVendorMarketplaceRepository, VendorMarketplaceRepository>();
 builder.Services.AddScoped<IVendorImageStorage>(_ =>
 {
     var webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
@@ -82,6 +84,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVendorService, VendorService>();
 builder.Services.AddScoped<IVendorOfferingService, VendorOfferingService>();
 builder.Services.AddScoped<IVendorGalleryService, VendorGalleryService>();
+builder.Services.AddScoped<IVendorAvailabilityService, VendorAvailabilityService>();
+builder.Services.AddScoped<IVendorMarketplaceService, VendorMarketplaceService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
