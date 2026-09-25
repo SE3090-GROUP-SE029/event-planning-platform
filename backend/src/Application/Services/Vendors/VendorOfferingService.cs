@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Dtos.Vendors;
 using Domain.Entities;
+using Domain.Enums;
 
 namespace Application.Services.Vendors;
 
@@ -19,6 +20,7 @@ public class VendorOfferingService : IVendorOfferingService
     {
         var vendor = await RequireVendorAsync(userId);
         ValidateFields(request.ServiceName, request.Description);
+        var (price, pricingType) = NormalizePricing(request.Price, request.PricingType);
 
         var offering = new VendorOffering
         {
@@ -26,6 +28,8 @@ public class VendorOfferingService : IVendorOfferingService
             VendorId = vendor.Id,
             ServiceName = request.ServiceName.Trim(),
             Description = NormalizeDescription(request.Description),
+            Price = price,
+            PricingType = pricingType,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -46,9 +50,12 @@ public class VendorOfferingService : IVendorOfferingService
         var vendor = await RequireVendorAsync(userId);
         var offering = await RequireOwnedOfferingAsync(vendor.Id, offeringId);
         ValidateFields(request.ServiceName, request.Description);
+        var (price, pricingType) = NormalizePricing(request.Price, request.PricingType);
 
         offering.ServiceName = request.ServiceName.Trim();
         offering.Description = NormalizeDescription(request.Description);
+        offering.Price = price;
+        offering.PricingType = pricingType;
         offering.UpdatedAt = DateTime.UtcNow;
 
         await _offerings.SaveChangesAsync();
@@ -100,6 +107,39 @@ public class VendorOfferingService : IVendorOfferingService
         }
     }
 
+    private static (decimal? Price, PricingType? PricingType) NormalizePricing(decimal? price, string? pricingType)
+    {
+        var hasPrice = price.HasValue;
+        var hasType = !string.IsNullOrWhiteSpace(pricingType);
+
+        if (!hasPrice && !hasType)
+        {
+            return (null, null);
+        }
+
+        if (hasPrice && !hasType)
+        {
+            throw new ArgumentException("Pricing type is required when a price is set.");
+        }
+
+        if (!hasPrice && hasType)
+        {
+            throw new ArgumentException("Price is required when a pricing type is set. Omit both to clear pricing.");
+        }
+
+        if (price < 0)
+        {
+            throw new ArgumentException("Price must be zero or greater.");
+        }
+
+        if (!Enum.TryParse<PricingType>(pricingType!.Trim(), true, out var parsed))
+        {
+            throw new ArgumentException("Pricing type must be one of: FIXED, PER_PERSON, PER_HOUR, PER_DAY.");
+        }
+
+        return (decimal.Round(price!.Value, 2, MidpointRounding.AwayFromZero), parsed);
+    }
+
     private static string? NormalizeDescription(string? description)
     {
         if (string.IsNullOrWhiteSpace(description))
@@ -116,6 +156,8 @@ public class VendorOfferingService : IVendorOfferingService
         VendorId = offering.VendorId,
         ServiceName = offering.ServiceName,
         Description = offering.Description,
+        Price = offering.Price,
+        PricingType = offering.PricingType?.ToString(),
         CreatedAt = offering.CreatedAt,
         UpdatedAt = offering.UpdatedAt
     };

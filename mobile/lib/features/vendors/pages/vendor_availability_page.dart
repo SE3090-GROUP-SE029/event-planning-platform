@@ -5,34 +5,25 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
-import '../../auth/widgets/custom_text_field.dart';
 import '../api/vendor_remote_datasource.dart';
-import '../models/vendor_service_model.dart';
+import '../models/vendor_availability_model.dart';
 
-const _pricingTypes = [
-  ('FIXED', 'Fixed (LKR)'),
-  ('PER_PERSON', 'Per person (LKR)'),
-  ('PER_HOUR', 'Per hour (LKR)'),
-  ('PER_DAY', 'Per day (LKR)'),
-];
-
-class VendorServicesPage extends StatefulWidget {
-  const VendorServicesPage({super.key});
+class VendorAvailabilityPage extends StatefulWidget {
+  const VendorAvailabilityPage({super.key});
 
   @override
-  State<VendorServicesPage> createState() => _VendorServicesPageState();
+  State<VendorAvailabilityPage> createState() => _VendorAvailabilityPageState();
 }
 
-class _VendorServicesPageState extends State<VendorServicesPage> {
+class _VendorAvailabilityPageState extends State<VendorAvailabilityPage> {
   final _formKey = GlobalKey<FormState>();
-  final _serviceNameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
   final _vendorApi = VendorRemoteDataSource();
 
-  List<VendorServiceModel> _services = [];
+  List<VendorAvailabilityModel> _periods = [];
   String? _editingId;
-  String? _pricingType;
+  DateTime? _startLocal;
+  DateTime? _endLocal;
+  bool _isAvailable = true;
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -44,19 +35,11 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_loading) {
-      _loadServices();
+      _loadPeriods();
     }
   }
 
-  @override
-  void dispose() {
-    _serviceNameController.dispose();
-    _descriptionController.dispose();
-    _priceController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadServices() async {
+  Future<void> _loadPeriods() async {
     final token = _auth?.accessToken;
     if (token == null || token.isEmpty) {
       setState(() {
@@ -67,10 +50,10 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
     }
 
     try {
-      final services = await _vendorApi.listMyServices(token);
+      final periods = await _vendorApi.listMyAvailability(token);
       if (!mounted) return;
       setState(() {
-        _services = services;
+        _periods = periods;
         _loading = false;
         _error = null;
       });
@@ -83,32 +66,66 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
     }
   }
 
-  void _startEdit(VendorServiceModel service) {
+  void _startEdit(VendorAvailabilityModel period) {
     setState(() {
-      _editingId = service.id;
-      _serviceNameController.text = service.serviceName;
-      _descriptionController.text = service.description ?? '';
-      _priceController.text =
-          service.price == null ? '' : service.price!.toStringAsFixed(2);
-      _pricingType = service.pricingType;
+      _editingId = period.id;
+      _startLocal = period.startDateTime.toLocal();
+      _endLocal = period.endDateTime.toLocal();
+      _isAvailable = period.isAvailable;
     });
   }
 
   void _clearForm() {
     setState(() {
       _editingId = null;
-      _serviceNameController.clear();
-      _descriptionController.clear();
-      _priceController.clear();
-      _pricingType = null;
+      _startLocal = null;
+      _endLocal = null;
+      _isAvailable = true;
     });
   }
 
-  void _clearPriceFields() {
+  Future<void> _pickDateTime({required bool isStart}) async {
+    final now = DateTime.now();
+    final initial = (isStart ? _startLocal : _endLocal) ?? now;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return;
+
+    final selected = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+
     setState(() {
-      _priceController.clear();
-      _pricingType = null;
+      if (isStart) {
+        _startLocal = selected;
+      } else {
+        _endLocal = selected;
+      }
     });
+  }
+
+  String _formatLocal(DateTime? value) {
+    if (value == null) return 'Select date/time';
+    final y = value.year.toString().padLeft(4, '0');
+    final m = value.month.toString().padLeft(2, '0');
+    final d = value.day.toString().padLeft(2, '0');
+    final h = value.hour.toString().padLeft(2, '0');
+    final min = value.minute.toString().padLeft(2, '0');
+    return '$y-$m-$d $h:$min';
   }
 
   Future<void> _save() async {
@@ -116,32 +133,21 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
     final token = _auth?.accessToken;
     if (token == null) return;
 
-    final rawPrice = _priceController.text.trim();
-    double? price;
-    String? pricingType;
-
-    if (rawPrice.isNotEmpty) {
-      price = double.tryParse(rawPrice);
-      if (price == null || price < 0) {
-        setState(() => _error = 'Enter a valid price of Rs. 0 or more');
-        return;
-      }
-      if (_pricingType == null || _pricingType!.isEmpty) {
-        setState(() => _error = 'Select a pricing type when setting a price');
-        return;
-      }
-      pricingType = _pricingType;
+    if (_startLocal == null || _endLocal == null) {
+      setState(() => _error = 'Start and end date/times are required.');
+      return;
+    }
+    if (!_startLocal!.isBefore(_endLocal!)) {
+      setState(() => _error = 'Start date/time must be before end date/time.');
+      return;
     }
 
-    final payload = VendorServiceModel(
+    final payload = VendorAvailabilityModel(
       id: _editingId ?? '',
       vendorId: '',
-      serviceName: _serviceNameController.text.trim(),
-      description: _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
-      price: price,
-      pricingType: pricingType,
+      startDateTime: _startLocal!.toUtc(),
+      endDateTime: _endLocal!.toUtc(),
+      isAvailable: _isAvailable,
     );
 
     setState(() {
@@ -151,27 +157,23 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
 
     try {
       if (_editingId == null) {
-        await _vendorApi.createService(token, payload);
+        await _vendorApi.createAvailability(token, payload);
       } else {
-        await _vendorApi.updateService(token, _editingId!, payload);
+        await _vendorApi.updateAvailability(token, _editingId!, payload);
       }
 
       if (!mounted) return;
       _clearForm();
-
-      final services = await _vendorApi.listMyServices(token);
-
-      // Required because the previous listMyServices call is another async gap.
+      final periods = await _vendorApi.listMyAvailability(token);
       if (!mounted) return;
-
       setState(() {
-        _services = services;
+        _periods = periods;
         _saving = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Service saved.'),
+          content: Text('Availability saved.'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -184,17 +186,15 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
     }
   }
 
-  Future<void> _delete(String serviceId) async {
+  Future<void> _delete(String id) async {
     final token = _auth?.accessToken;
     if (token == null) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete service?'),
-        content: const Text(
-          'This removes the service from your vendor catalog.',
-        ),
+        title: const Text('Delete availability?'),
+        content: const Text('This removes the period from your calendar.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -212,13 +212,13 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
     if (!mounted) return;
 
     try {
-      await _vendorApi.deleteService(token, serviceId);
+      await _vendorApi.deleteAvailability(token, id);
       if (!mounted) return;
-      final services = await _vendorApi.listMyServices(token);
+      final periods = await _vendorApi.listMyAvailability(token);
       if (!mounted) return;
       setState(() {
-        _services = services;
-        if (_editingId == serviceId) {
+        _periods = periods;
+        if (_editingId == id) {
           _clearForm();
         }
       });
@@ -233,7 +233,7 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
     return Scaffold(
       backgroundColor: AppColors.canvas,
       appBar: AppBar(
-        title: const Text('Vendor services'),
+        title: const Text('Vendor availability'),
       ),
       body: _loading
           ? const Center(
@@ -272,63 +272,56 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                     const SizedBox(height: AppDimens.space16),
                   ],
                   PastelSectionHeader(
-                    title: _editingId == null ? 'Add service' : 'Edit service',
+                    title: _editingId == null
+                        ? 'Add availability'
+                        : 'Edit availability',
                   ),
                   PastelCard(
                     padding: const EdgeInsets.all(AppDimens.space20),
                     child: Form(
                       key: _formKey,
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          CustomTextField(
-                            label: 'Service name',
-                            hint: 'Wedding Photography',
-                            controller: _serviceNameController,
-                            validator: (value) =>
-                                value == null || value.trim().isEmpty
-                                    ? 'Required'
-                                    : null,
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Start date/time'),
+                            subtitle: Text(_formatLocal(_startLocal)),
+                            trailing: const Icon(Icons.schedule_outlined),
+                            onTap: () => _pickDateTime(isStart: true),
                           ),
-                          const SizedBox(height: AppDimens.space16),
-                          CustomTextField(
-                            label: 'Description',
-                            hint: 'Full-day wedding photography service',
-                            controller: _descriptionController,
-                            maxLines: 3,
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('End date/time'),
+                            subtitle: Text(_formatLocal(_endLocal)),
+                            trailing: const Icon(Icons.schedule_outlined),
+                            onTap: () => _pickDateTime(isStart: false),
                           ),
-                          const SizedBox(height: AppDimens.space16),
-                          CustomTextField(
-                            label: 'Price (Rs. / LKR)',
-                            hint: '85000.00',
-                            controller: _priceController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
+                          const SizedBox(height: AppDimens.space8),
+                          const Text(
+                            'Status',
+                            style: TextStyle(fontWeight: FontWeight.w700),
                           ),
-                          const SizedBox(height: AppDimens.space16),
-                          DropdownButtonFormField<String>(
-                            value: _pricingType ?? '',
-                            decoration: const InputDecoration(
-                              labelText: 'Pricing type',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: '',
-                                child: Text('None'),
-                              ),
-                              ..._pricingTypes.map(
-                                (option) => DropdownMenuItem<String>(
-                                  value: option.$1,
-                                  child: Text(option.$2),
-                                ),
-                              ),
-                            ],
+                          RadioListTile<bool>(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Available'),
+                            value: true,
+                            groupValue: _isAvailable,
                             onChanged: (value) {
-                              setState(() {
-                                _pricingType =
-                                    (value == null || value.isEmpty) ? null : value;
-                              });
+                              if (value != null) {
+                                setState(() => _isAvailable = value);
+                              }
+                            },
+                          ),
+                          RadioListTile<bool>(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Unavailable'),
+                            value: false,
+                            groupValue: _isAvailable,
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _isAvailable = value);
+                              }
                             },
                           ),
                           const SizedBox(height: AppDimens.space16),
@@ -337,9 +330,11 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                             height: 48,
                             child: ElevatedButton(
                               onPressed: _saving ? null : _save,
-                              child: Text(_editingId == null
-                                  ? 'Add service'
-                                  : 'Save changes'),
+                              child: Text(
+                                _editingId == null
+                                    ? 'Add period'
+                                    : 'Save changes',
+                              ),
                             ),
                           ),
                           if (_editingId != null) ...[
@@ -348,24 +343,22 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                               onPressed: _clearForm,
                               child: const Text('Cancel edit'),
                             ),
-                            TextButton(
-                              onPressed: _clearPriceFields,
-                              child: const Text('Clear price'),
-                            ),
                           ],
                         ],
                       ),
                     ),
                   ),
-                  const PastelSectionHeader(title: 'Your services'),
-                  if (_services.isEmpty)
+                  const PastelSectionHeader(title: 'Your availability'),
+                  if (_periods.isEmpty)
                     const PastelCard(
                       padding: EdgeInsets.all(AppDimens.space20),
-                      child: Text('No services yet. Add your first service.'),
+                      child: Text(
+                        'No periods yet. Dates without an available period stay not bookable.',
+                      ),
                     )
                   else
-                    ..._services.map(
-                      (service) => Padding(
+                    ..._periods.map(
+                      (period) => Padding(
                         padding:
                             const EdgeInsets.only(bottom: AppDimens.space12),
                         child: PastelCard(
@@ -378,7 +371,9 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      service.serviceName,
+                                      period.isAvailable
+                                          ? 'Available'
+                                          : 'Unavailable',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 16,
@@ -386,27 +381,20 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      service.description ?? 'No description',
+                                      period.displayRange,
                                       style: const TextStyle(
                                         color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      service.displayPrice,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                               IconButton(
-                                onPressed: () => _startEdit(service),
+                                onPressed: () => _startEdit(period),
                                 icon: const Icon(Icons.edit_outlined),
                               ),
                               IconButton(
-                                onPressed: () => _delete(service.id),
+                                onPressed: () => _delete(period.id),
                                 icon: const Icon(Icons.delete_outline),
                                 color: AppColors.error,
                               ),

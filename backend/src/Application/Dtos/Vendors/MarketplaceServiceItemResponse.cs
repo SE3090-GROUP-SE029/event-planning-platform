@@ -1,7 +1,8 @@
 namespace Application.Dtos.Vendors;
 
-public class CreateVendorOfferingRequest
+public class MarketplaceServiceItemResponse
 {
+    public Guid Id { get; set; }
     public string ServiceName { get; set; } = default!;
     public string? Description { get; set; }
     public decimal? Price { get; set; }

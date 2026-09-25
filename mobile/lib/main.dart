@@ -9,6 +9,9 @@ import 'features/dashboard/pages/dashboard_page.dart';
 import 'features/events/pages/event_details_page.dart';
 import 'features/events/pages/event_form_page.dart';
 import 'features/events/pages/event_list_page.dart';
+import 'features/vendors/pages/vendor_availability_page.dart';
+import 'features/vendors/pages/vendor_marketplace_detail_page.dart';
+import 'features/vendors/pages/vendor_marketplace_page.dart';
 import 'features/vendors/pages/vendor_profile_page.dart';
 import 'features/vendors/pages/vendor_services_page.dart';
 
@@ -44,6 +47,10 @@ class MyApp extends StatelessWidget {
         '/events/edit': (context) => const EventFormPage(isEditing: true),
         '/vendors/profile': (context) => const VendorProfilePage(),
         '/vendors/services': (context) => const VendorServicesPage(),
+        '/vendors/availability': (context) => const VendorAvailabilityPage(),
+        '/marketplace': (context) => const VendorMarketplacePage(),
+        '/marketplace/details': (context) =>
+            const VendorMarketplaceDetailPage(),
       },
     );
   }

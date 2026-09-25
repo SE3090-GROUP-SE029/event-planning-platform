@@ -15,15 +15,18 @@ public class VendorsController : ControllerBase
     private readonly IVendorService _vendorService;
     private readonly IVendorOfferingService _offeringService;
     private readonly IVendorGalleryService _galleryService;
+    private readonly IVendorAvailabilityService _availabilityService;
 
     public VendorsController(
         IVendorService vendorService,
         IVendorOfferingService offeringService,
-        IVendorGalleryService galleryService)
+        IVendorGalleryService galleryService,
+        IVendorAvailabilityService availabilityService)
     {
         _vendorService = vendorService;
         _offeringService = offeringService;
         _galleryService = galleryService;
+        _availabilityService = availabilityService;
     }
 
     [HttpPost]
@@ -232,6 +235,78 @@ public class VendorsController : ControllerBase
         try
         {
             await _offeringService.DeleteAsync(GetCurrentUserId(), id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    [HttpGet("me/availability")]
+    public async Task<ActionResult<IReadOnlyList<VendorAvailabilityResponse>>> ListMyAvailability()
+    {
+        try
+        {
+            var result = await _availabilityService.ListMineAsync(GetCurrentUserId());
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("me/availability")]
+    public async Task<ActionResult<VendorAvailabilityResponse>> CreateAvailability(CreateVendorAvailabilityRequest request)
+    {
+        try
+        {
+            var result = await _availabilityService.CreateAsync(GetCurrentUserId(), request);
+            return CreatedAtAction(nameof(ListMyAvailability), value: result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("me/availability/{id:guid}")]
+    public async Task<ActionResult<VendorAvailabilityResponse>> UpdateAvailability(Guid id, UpdateVendorAvailabilityRequest request)
+    {
+        try
+        {
+            var result = await _availabilityService.UpdateAsync(GetCurrentUserId(), id, request);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    [HttpDelete("me/availability/{id:guid}")]
+    public async Task<IActionResult> DeleteAvailability(Guid id)
+    {
+        try
+        {
+            await _availabilityService.DeleteAsync(GetCurrentUserId(), id);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

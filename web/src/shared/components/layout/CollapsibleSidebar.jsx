@@ -4,6 +4,8 @@ import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import FaceIcon from '@mui/icons-material/Face';
 import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
+import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -11,8 +13,10 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 const Icons = {
   Dashboard: () => <HomeFilledIcon />,
   Events: () => <EventAvailableIcon/>,
+  Marketplace: () => <StorefrontOutlinedIcon />,
   Profile: () => <FaceIcon/>,
   Services: () => <HandymanOutlinedIcon />,
+  Availability: () => <ScheduleOutlinedIcon />,
   Logout: () => <MeetingRoomIcon/>,
   ChevronLeft: () => <ChevronLeftIcon/>,
   ChevronRight: () => <ChevronRightIcon/>,
@@ -21,8 +25,10 @@ const Icons = {
 export default function CollapsibleSidebar({
   activeTab = 'dashboard',
   showEvents = false,
+  showMarketplace = false,
   showVendorProfile = false,
   showVendorServices = false,
+  showVendorAvailability = false,
   onSelectTab,
   onLogout,
 }) {
@@ -30,8 +36,10 @@ export default function CollapsibleSidebar({
   const items = [
     { id: 'dashboard', label: 'Dashboard', icon: Icons.Dashboard },
     ...(showEvents ? [{ id: 'events', label: 'Events', icon: Icons.Events }] : []),
+    ...(showMarketplace ? [{ id: 'marketplace', label: 'Marketplace', icon: Icons.Marketplace }] : []),
     ...(showVendorProfile ? [{ id: 'vendor-profile', label: 'Vendor profile', icon: Icons.Profile }] : []),
     ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
+    ...(showVendorAvailability ? [{ id: 'vendor-availability', label: 'Availability', icon: Icons.Availability }] : []),
   ];
 
   return (
