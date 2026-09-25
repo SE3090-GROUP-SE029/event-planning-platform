@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -99,11 +99,14 @@ export default function VendorServicesPage() {
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm({ defaultValues: emptyForm });
 
-  const selectedPricingType = watch('pricingType');
+  const selectedPricingType = useWatch({
+    control,
+    name: 'pricingType',
+  });
 
   useEffect(() => {
     if (!editingId) {

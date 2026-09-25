@@ -302,27 +302,27 @@ class _VendorAvailabilityPageState extends State<VendorAvailabilityPage> {
                             'Status',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
-                          RadioListTile<bool>(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Available'),
-                            value: true,
+                          RadioGroup<bool>(
                             groupValue: _isAvailable,
                             onChanged: (value) {
                               if (value != null) {
                                 setState(() => _isAvailable = value);
                               }
                             },
-                          ),
-                          RadioListTile<bool>(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Unavailable'),
-                            value: false,
-                            groupValue: _isAvailable,
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _isAvailable = value);
-                              }
-                            },
+                            child: Column(
+                              children: const [
+                                RadioListTile<bool>(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text('Available'),
+                                  value: true,
+                                ),
+                                RadioListTile<bool>(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text('Unavailable'),
+                                  value: false,
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: AppDimens.space16),
                           SizedBox(

@@ -150,7 +150,8 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
                         ),
                         const SizedBox(height: AppDimens.space12),
                         DropdownButtonFormField<String>(
-                          value: _category ?? '',
+                          key: ValueKey(_category ?? ''),
+                          initialValue: _category ?? '',
                           decoration: const InputDecoration(
                             labelText: 'Category',
                             border: OutlineInputBorder(),
@@ -176,7 +177,8 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
                         ),
                         const SizedBox(height: AppDimens.space12),
                         DropdownButtonFormField<String>(
-                          value: _sortBy,
+                          key: ValueKey(_sortBy),
+                          initialValue: _sortBy,
                           decoration: const InputDecoration(
                             labelText: 'Sort by',
                             border: OutlineInputBorder(),

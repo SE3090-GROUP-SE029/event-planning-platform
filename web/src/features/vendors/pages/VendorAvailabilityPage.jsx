@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -81,11 +81,14 @@ export default function VendorAvailabilityPage() {
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm({ defaultValues: emptyForm });
 
-  const isAvailableValue = watch('isAvailable');
+  const isAvailableValue = useWatch({
+    control,
+    name: 'isAvailable',
+  });
 
   useEffect(() => {
     if (!editingId) {
@@ -113,7 +116,7 @@ export default function VendorAvailabilityPage() {
         endDateTime: toUtcIso(values.endDateTime),
         isAvailable: values.isAvailable === 'true',
       };
-    } catch (err) {
+    } catch {
       return;
     }
 

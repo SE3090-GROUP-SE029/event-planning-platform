@@ -307,7 +307,8 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                           ),
                           const SizedBox(height: AppDimens.space16),
                           DropdownButtonFormField<String>(
-                            value: _pricingType ?? '',
+                            key: ValueKey(_pricingType ?? ''),
+                            initialValue: _pricingType ?? '',
                             decoration: const InputDecoration(
                               labelText: 'Pricing type',
                               border: OutlineInputBorder(),

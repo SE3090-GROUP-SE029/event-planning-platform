@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Alert,
@@ -23,7 +23,7 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm({
@@ -40,8 +40,14 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const { mutate: registerUser, isPending } = useRegister();
   const authError = useAuthStore((state) => state.error);
-  const password = watch('password');
-  const selectedRole = watch('role');
+  const password = useWatch({
+    control,
+    name: 'password',
+  });
+  const selectedRole = useWatch({
+    control,
+    name: 'role',
+  });
 
   const onSubmit = (data) => {
     const payload = { ...data };
