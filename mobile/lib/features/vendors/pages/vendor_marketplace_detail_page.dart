@@ -125,7 +125,7 @@ class _VendorMarketplaceDetailPageState
                                     height: 120,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) =>
+                                    errorBuilder: (context, error, stackTrace) =>
                                         const SizedBox.shrink(),
                                   ),
                                 ),
@@ -180,7 +180,7 @@ class _VendorMarketplaceDetailPageState
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: vendor.images.length,
-                              separatorBuilder: (_, _) =>
+                              separatorBuilder: (context, index) =>
                                   const SizedBox(width: 10),
                               itemBuilder: (context, index) {
                                 final imageUrl =
@@ -196,7 +196,8 @@ class _VendorMarketplaceDetailPageState
                                     width: 140,
                                     height: 110,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => Container(
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
                                       width: 140,
                                       height: 110,
                                       color: AppColors.surfacePure,

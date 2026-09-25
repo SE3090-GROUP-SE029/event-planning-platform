@@ -309,8 +309,8 @@ class _VendorAvailabilityPageState extends State<VendorAvailabilityPage> {
                                 setState(() => _isAvailable = value);
                               }
                             },
-                            child: Column(
-                              children: const [
+                            child: const Column(
+                              children: [
                                 RadioListTile<bool>(
                                   contentPadding: EdgeInsets.zero,
                                   title: Text('Available'),

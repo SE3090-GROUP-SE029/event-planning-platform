@@ -32,7 +32,7 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
   List<MarketplaceVendorSummary> _items = [];
   String? _category;
   String _sortBy = 'businessName';
-  String _sortOrder = 'asc';
+  final String _sortOrder = 'asc';
   int _page = 1;
   int _totalPages = 0;
   bool _loading = true;
