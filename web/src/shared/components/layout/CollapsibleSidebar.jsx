@@ -9,6 +9,7 @@ import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
@@ -22,6 +23,7 @@ const Icons = {
   Profile: () => <FaceIcon />,
   Services: () => <HandymanOutlinedIcon />,
   Availability: () => <ScheduleOutlinedIcon />,
+  Plans: () => <AssignmentOutlinedIcon />,
   VendorQuotations: () => <RequestQuoteOutlinedIcon />,
   Logout: () => <MeetingRoomIcon />,
   ChevronLeft: () => <ChevronLeftIcon />,
@@ -38,6 +40,7 @@ export default function CollapsibleSidebar({
   showVendorServices = false,
   showVendorAvailability = false,
   showVendorQuotations = false,
+  showPlanMonitoring = false,
   onSelectTab,
   onLogout,
 }) {
@@ -52,6 +55,7 @@ export default function CollapsibleSidebar({
     ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
     ...(showVendorAvailability ? [{ id: 'vendor-availability', label: 'Availability', icon: Icons.Availability }] : []),
     ...(showVendorQuotations ? [{ id: 'vendor-quotations', label: 'Quotation requests', icon: Icons.VendorQuotations }] : []),
+    ...(showPlanMonitoring ? [{ id: 'plans', label: 'Plan monitoring', icon: Icons.Plans }] : []),
   ];
 
   return (

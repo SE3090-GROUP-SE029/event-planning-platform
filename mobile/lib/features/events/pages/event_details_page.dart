@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -9,20 +10,36 @@ import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
 import '../api/event_remote_datasource.dart';
 import '../models/event_model.dart';
+import '../../plans/api/plan_remote_datasource.dart';
+import '../../plans/models/plan_model.dart';
 
 class EventDetailsPage extends StatefulWidget {
-  const EventDetailsPage({super.key});
+  final EventRemoteDataSource? eventApi;
+  final PlanRemoteDataSource? planApi;
+
+  const EventDetailsPage({super.key, this.eventApi, this.planApi});
 
   @override
   State<EventDetailsPage> createState() => _EventDetailsPageState();
 }
 
 class _EventDetailsPageState extends State<EventDetailsPage> {
-  final _api = EventRemoteDataSource();
+  late final _api = widget.eventApi ?? EventRemoteDataSource();
+  late final _planApi = widget.planApi ?? PlanRemoteDataSource();
   EventModel? _event;
+  EventPlan? _existingPlan;
   AuthResponseModel? _auth;
   String? _error;
+  String? _planError;
   bool _loading = true;
+  bool _plansLoading = false;
+  bool _generatingPlan = false;
+
+  bool get _canManagePlan =>
+      _auth != null &&
+      _event != null &&
+      !_auth!.roles.contains('ADMIN') &&
+      _event!.ownerId == _auth!.userId;
 
   @override
   void didChangeDependencies() {
@@ -31,7 +48,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       final args = ModalRoute.of(context)?.settings.arguments as Map?;
       _auth = args?['auth'] as AuthResponseModel?;
       _event = args?['event'] as EventModel?;
-      _load();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
     }
   }
 
@@ -43,6 +62,10 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       });
       return;
     }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final result = await _api.get(_auth!.accessToken, _event!.id);
       if (mounted) {
@@ -58,7 +81,100 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
           _loading = false;
         });
       }
+      return;
     }
+    await _loadPlans();
+  }
+
+  Future<void> _loadPlans() async {
+    final auth = _auth;
+    final event = _event;
+    if (auth == null || event == null) return;
+    setState(() {
+      _plansLoading = true;
+      _planError = null;
+    });
+    try {
+      final plans = await _planApi.listForEvent(auth.accessToken, event.id);
+      if (mounted) {
+        setState(() {
+          _existingPlan = plans.isEmpty ? null : plans.first;
+          _plansLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _planError = 'Could not check for an existing AI plan. Please retry.';
+          _plansLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _generatePlan() async {
+    final auth = _auth;
+    final event = _event;
+    if (auth == null ||
+        event == null ||
+        _generatingPlan ||
+        _existingPlan != null) {
+      return;
+    }
+    setState(() {
+      _generatingPlan = true;
+      _planError = null;
+    });
+    late final EventPlan plan;
+    try {
+      plan = await _planApi.generate(auth.accessToken, event.id);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _generatingPlan = false;
+          _planError = _planGenerationError(error);
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _existingPlan = plan;
+      _generatingPlan = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Your AI plan is ready for review.'),
+        backgroundColor: AppColors.success,
+      ),
+    );
+    await Navigator.pushNamed(context, '/plans/review', arguments: plan.id);
+  }
+
+  String _planGenerationError(Object error) {
+    if (error is DioException) {
+      final response = error.response;
+      final responseData = response?.data;
+      if (responseData is Map<String, dynamic>) {
+        final message = responseData['message'] ??
+            responseData['detail'] ??
+            responseData['error'];
+        if (message is String && message.trim().isNotEmpty) {
+          return message;
+        }
+      }
+      if (response?.statusCode == 504 ||
+          error.type == DioExceptionType.receiveTimeout) {
+        return 'Plan generation timed out. Please retry.';
+      }
+      if (response?.statusCode == 502 || response?.statusCode == 503) {
+        return 'The AI planning service is temporarily unavailable. Please retry.';
+      }
+      if (error.type == DioExceptionType.connectionTimeout) {
+        return 'Could not connect to the planning service. Check your connection and retry.';
+      }
+    }
+    return 'We could not generate the AI plan. Please try again.';
   }
 
   Future<void> _delete() async {
@@ -345,9 +461,68 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           ],
                         ),
                       ),
+
+                      if (_canManagePlan) ...[
+                        const PastelSectionHeader(title: 'AI event plan'),
+                        PastelCard(
+                          padding: const EdgeInsets.all(AppDimens.space20),
+                          child: _buildPlanAction(),
+                        ),
+                      ],
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildPlanAction() {
+    if (_plansLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.obsidianBlack),
+        ),
+      );
+    }
+    final planError = _planError;
+    if (planError != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(planError, style: const TextStyle(color: AppColors.error)),
+          TextButton(onPressed: _loadPlans, child: const Text('Retry')),
+        ],
+      );
+    }
+    final plan = _existingPlan;
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _generatingPlan
+            ? null
+            : plan != null
+                ? () => Navigator.pushNamed(
+                      context,
+                      '/plans/review',
+                      arguments: plan.id,
+                    )
+                : _generatePlan,
+        icon: _generatingPlan
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(plan != null
+                ? Icons.assignment_outlined
+                : Icons.auto_awesome),
+        label: Text(
+          _generatingPlan
+              ? 'Generating AI plan...'
+              : plan != null
+                  ? 'View AI Plan'
+                  : 'Generate AI Plan',
+        ),
+      ),
     );
   }
 

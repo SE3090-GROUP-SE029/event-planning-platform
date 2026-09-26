@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
 import os
+import asyncio
 from dotenv import load_dotenv
 
 from src.models.message_models import (
@@ -13,9 +14,14 @@ from src.models.message_models import (
     PingRequest,
 )
 from src.services.backend_client import BackendClient
+from src.api.routes import router as coordinator_router
+from src.coordinator_agent.config import configure_logging, get_settings
+from src.gemini_client.client import configure_gemini
+from src.gemini_client.exceptions import GeminiConfigurationError
 
 # Load environment variables
 load_dotenv()
+configure_logging()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -28,8 +34,16 @@ backend_client: BackendClient = None
 async def lifespan(app: FastAPI):
     """Manage app startup/shutdown"""
     global backend_client
+    try:
+        await asyncio.to_thread(configure_gemini)
+    except GeminiConfigurationError:
+        logger.exception(
+            "Gemini startup validation failed for model %s",
+            get_settings().gemini_model,
+        )
+        raise
     backend_client = BackendClient()
-    logger.info("🚀 AI Service started")
+    logger.info("AI Service started with Gemini model %s", get_settings().gemini_model)
     yield
     await backend_client.close()
     logger.info("🛑 AI Service stopped")
@@ -50,6 +64,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(coordinator_router)
 
 # ============================================================================
 # HEALTH CHECK & PING ENDPOINTS

@@ -78,6 +78,105 @@ namespace Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Domain.Entities.EventPlanDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ApprovedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BudgetAllocation")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventSnapshot")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastAuditAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PlanCompletenessScore")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PlannerDecisionAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PlannerRemarks")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("ProposedTimeline")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Rationale")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<Guid?>("RejectedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ServiceCategories")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("TargetVendorTypes")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ValidationSummary")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedById");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("RejectedById");
+
+                    b.HasIndex("EventId", "Status");
+
+                    b.HasIndex("EventId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("EventPlanDrafts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EventPlanDrafts_PlanCompletenessScore_Range", "\"PlanCompletenessScore\" BETWEEN 0 AND 100");
+
+                            t.HasCheckConstraint("CK_EventPlanDrafts_Version_Positive", "\"Version\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("Domain.Entities.EventSchedule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -567,6 +666,117 @@ namespace Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domain.Entities.EventPlanDraft", b =>
+                {
+                    b.HasOne("Domain.Entities.User", "ApprovedBy")
+                        .WithMany("ApprovedEventPlanDrafts")
+                        .HasForeignKey("ApprovedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Entities.User", "CreatedBy")
+                        .WithMany("CreatedEventPlanDrafts")
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Event", "Event")
+                        .WithMany("EventPlanDrafts")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.User", "RejectedBy")
+                        .WithMany("RejectedEventPlanDrafts")
+                        .HasForeignKey("RejectedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.OwnsMany("Domain.Entities.IdentifiedRisk", "IdentifiedRisks", b1 =>
+                        {
+                            b1.Property<Guid>("EventPlanDraftId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer");
+
+                            b1.Property<DateTime>("DetectedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("Recommendation")
+                                .IsRequired()
+                                .HasMaxLength(1000)
+                                .HasColumnType("character varying(1000)");
+
+                            b1.Property<string>("Risk")
+                                .IsRequired()
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)");
+
+                            b1.Property<string>("Severity")
+                                .IsRequired()
+                                .HasMaxLength(16)
+                                .HasColumnType("character varying(16)");
+
+                            b1.HasKey("EventPlanDraftId", "Id");
+
+                            b1.ToTable("EventPlanDrafts");
+
+                            b1.ToJson("IdentifiedRisks");
+
+                            b1.WithOwner()
+                                .HasForeignKey("EventPlanDraftId");
+                        });
+
+                    b.OwnsMany("Domain.Entities.MissingRequirement", "MissingRequirements", b1 =>
+                        {
+                            b1.Property<Guid>("EventPlanDraftId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer");
+
+                            b1.Property<string>("Category")
+                                .IsRequired()
+                                .HasMaxLength(32)
+                                .HasColumnType("character varying(32)");
+
+                            b1.Property<DateTime>("IdentifiedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("Reason")
+                                .IsRequired()
+                                .HasMaxLength(1000)
+                                .HasColumnType("character varying(1000)");
+
+                            b1.Property<string>("Requirement")
+                                .IsRequired()
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)");
+
+                            b1.HasKey("EventPlanDraftId", "Id");
+
+                            b1.ToTable("EventPlanDrafts");
+
+                            b1.ToJson("MissingRequirements");
+
+                            b1.WithOwner()
+                                .HasForeignKey("EventPlanDraftId");
+                        });
+
+                    b.Navigation("ApprovedBy");
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("Event");
+
+                    b.Navigation("IdentifiedRisks");
+
+                    b.Navigation("MissingRequirements");
+
+                    b.Navigation("RejectedBy");
+                });
+
             modelBuilder.Entity("Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Domain.Entities.User", "User")
@@ -646,6 +856,11 @@ namespace Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domain.Entities.Event", b =>
+                {
+                    b.Navigation("EventPlanDrafts");
+                });
+
             modelBuilder.Entity("Domain.Entities.EventSchedule", b =>
                 {
                     b.Navigation("Activities");
@@ -660,7 +875,13 @@ namespace Infrastructure.Data.Migrations
 
             modelBuilder.Entity("Domain.Entities.User", b =>
                 {
+                    b.Navigation("ApprovedEventPlanDrafts");
+
+                    b.Navigation("CreatedEventPlanDrafts");
+
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("RejectedEventPlanDrafts");
 
                     b.Navigation("UserRoles");
                 });

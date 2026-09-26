@@ -209,6 +209,7 @@ export default function DashboardPage() {
           activeTab="dashboard"
           showEvents={isAdmin}
           showSchedule={true}
+          showPlanMonitoring={isAdmin}
           showMarketplace={showMarketplace}
           showMyQuotations={isEventPlanner}
           showVendorProfile={isVendor}
@@ -222,6 +223,7 @@ export default function DashboardPage() {
               const eventId = prompt('Enter Event ID to open schedule:');
               if (eventId?.trim()) navigate(`/events/${eventId.trim()}/schedule`);
             }
+            if (tab === 'plans') navigate('/admin/plans');
             if (tab === 'marketplace') navigate('/marketplace');
             if (tab === 'my-quotations') navigate('/quotations/mine');
             if (tab === 'vendor-profile') navigate('/vendor/profile');
@@ -274,6 +276,23 @@ export default function DashboardPage() {
           )}
 
           {isVendor && <VendorDashboardOverview />}
+          {isEventPlanner && !isAdmin && (
+            <SurfaceCard sx={{ p: 3, maxWidth: 720 }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>
+                Plan your events
+              </Typography>
+              <Typography color="text.secondary" sx={{ mb: 2 }}>
+                Generate and review AI plans for events you own.
+              </Typography>
+              <Button
+                variant="contained"
+                sx={{ borderRadius: 9999 }}
+                onClick={() => navigate('/my-events')}
+              >
+                My events &amp; plans
+              </Button>
+            </SurfaceCard>
+          )}
         </Box>
       </Box>
     </Box>

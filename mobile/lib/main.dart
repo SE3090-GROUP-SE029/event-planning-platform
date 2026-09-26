@@ -18,6 +18,7 @@ import 'features/quotations/pages/my_quotations_page.dart';
 import 'features/quotations/pages/request_quotation_page.dart';
 import 'features/quotations/pages/vendor_quotation_detail_page.dart';
 import 'features/quotations/pages/vendor_quotations_page.dart';
+import 'features/plans/pages/plan_review_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +62,9 @@ class MyApp extends StatelessWidget {
         '/marketplace/request-quotation': (context) =>
             const RequestQuotationPage(),
         '/quotations/mine': (context) => const MyQuotationsPage(),
+        '/plans/review': (context) => PlanReviewPage(
+              planId: ModalRoute.of(context)!.settings.arguments as String,
+            ),
       },
     );
   }
