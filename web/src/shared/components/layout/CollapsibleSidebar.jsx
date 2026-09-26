@@ -5,6 +5,7 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import FaceIcon from '@mui/icons-material/Face';
 import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
@@ -13,6 +14,7 @@ const Icons = {
   Events: () => <EventAvailableIcon/>,
   Profile: () => <FaceIcon/>,
   Services: () => <HandymanOutlinedIcon />,
+  Plans: () => <AssignmentOutlinedIcon />,
   Logout: () => <MeetingRoomIcon/>,
   ChevronLeft: () => <ChevronLeftIcon/>,
   ChevronRight: () => <ChevronRightIcon/>,
@@ -23,6 +25,7 @@ export default function CollapsibleSidebar({
   showEvents = false,
   showVendorProfile = false,
   showVendorServices = false,
+  showPlanMonitoring = false,
   onSelectTab,
   onLogout,
 }) {
@@ -32,6 +35,7 @@ export default function CollapsibleSidebar({
     ...(showEvents ? [{ id: 'events', label: 'Events', icon: Icons.Events }] : []),
     ...(showVendorProfile ? [{ id: 'vendor-profile', label: 'Vendor profile', icon: Icons.Profile }] : []),
     ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
+    ...(showPlanMonitoring ? [{ id: 'plans', label: 'Plan monitoring', icon: Icons.Plans }] : []),
   ];
 
   return (

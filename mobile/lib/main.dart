@@ -11,6 +11,7 @@ import 'features/events/pages/event_form_page.dart';
 import 'features/events/pages/event_list_page.dart';
 import 'features/vendors/pages/vendor_profile_page.dart';
 import 'features/vendors/pages/vendor_services_page.dart';
+import 'features/plans/pages/plan_review_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,9 @@ class MyApp extends StatelessWidget {
         '/events/edit': (context) => const EventFormPage(isEditing: true),
         '/vendors/profile': (context) => const VendorProfilePage(),
         '/vendors/services': (context) => const VendorServicesPage(),
+        '/plans/review': (context) => PlanReviewPage(
+              planId: ModalRoute.of(context)!.settings.arguments as String,
+            ),
       },
     );
   }

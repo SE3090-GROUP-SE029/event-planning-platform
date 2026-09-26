@@ -196,11 +196,13 @@ export default function DashboardPage() {
         <CollapsibleSidebar
           activeTab="dashboard"
           showEvents={isAdmin}
+          showPlanMonitoring={isAdmin}
           showVendorProfile={isVendor}
           showVendorServices={isVendor}
           onSelectTab={(tab) => {
             if (tab === 'dashboard') navigate('/dashboard');
             if (tab === 'events') navigate('/admin/events');
+            if (tab === 'plans') navigate('/admin/plans');
             if (tab === 'vendor-profile') navigate('/vendor/profile');
             if (tab === 'vendor-services') navigate('/vendor/services');
           }}

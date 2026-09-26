@@ -7,6 +7,8 @@ import AdminEventManagementPage from '../features/adminEvents/pages/AdminEventMa
 import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetailsPage';
 import VendorProfilePage from '../features/vendors/pages/VendorProfilePage';
 import VendorServicesPage from '../features/vendors/pages/VendorServicesPage';
+import AdminPlanDashboardPage from '../features/adminPlans/pages/AdminPlanDashboardPage';
+import AdminPlanDetailsPage from '../features/adminPlans/pages/AdminPlanDetailsPage';
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +38,14 @@ export const router = createBrowserRouter([
   {
     path: '/admin/events/:id',
     element: <ProtectedRoute requiredRole="ADMIN"><AdminEventDetailsPage /></ProtectedRoute>,
+  },
+  {
+    path: '/admin/plans',
+    element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDashboardPage /></ProtectedRoute>,
+  },
+  {
+    path: '/admin/plans/:id',
+    element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDetailsPage /></ProtectedRoute>,
   },
   {
     path: '/vendor/profile',
