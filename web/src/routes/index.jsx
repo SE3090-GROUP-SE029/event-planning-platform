@@ -7,6 +7,9 @@ import AdminEventManagementPage from '../features/adminEvents/pages/AdminEventMa
 import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetailsPage';
 import VendorProfilePage from '../features/vendors/pages/VendorProfilePage';
 import VendorServicesPage from '../features/vendors/pages/VendorServicesPage';
+import VendorAvailabilityPage from '../features/vendors/pages/VendorAvailabilityPage';
+import VendorMarketplacePage from '../features/vendors/pages/VendorMarketplacePage';
+import VendorMarketplaceDetailPage from '../features/vendors/pages/VendorMarketplaceDetailPage';
 import AdminPlanDashboardPage from '../features/adminPlans/pages/AdminPlanDashboardPage';
 import AdminPlanDetailsPage from '../features/adminPlans/pages/AdminPlanDetailsPage';
 
@@ -48,11 +51,23 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDetailsPage /></ProtectedRoute>,
   },
   {
+    path: '/marketplace',
+    element: <ProtectedRoute><VendorMarketplacePage /></ProtectedRoute>,
+  },
+  {
+    path: '/marketplace/:vendorId',
+    element: <ProtectedRoute><VendorMarketplaceDetailPage /></ProtectedRoute>,
+  },
+  {
     path: '/vendor/profile',
     element: <ProtectedRoute requiredRole="VENDOR"><VendorProfilePage /></ProtectedRoute>,
   },
   {
     path: '/vendor/services',
     element: <ProtectedRoute requiredRole="VENDOR"><VendorServicesPage /></ProtectedRoute>,
+  },
+  {
+    path: '/vendor/availability',
+    element: <ProtectedRoute requiredRole="VENDOR"><VendorAvailabilityPage /></ProtectedRoute>,
   },
 ]);

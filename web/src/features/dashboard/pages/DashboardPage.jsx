@@ -184,6 +184,8 @@ export default function DashboardPage() {
   const roles = user?.roles || [];
   const isAdmin = roles.includes('ADMIN');
   const isVendor = roles.includes('VENDOR');
+  const isEventPlanner = roles.includes('EVENT_PLANNER');
+  const showMarketplace = isEventPlanner || isAdmin;
 
   const handleLogout = () => {
     logout();
@@ -197,14 +199,18 @@ export default function DashboardPage() {
           activeTab="dashboard"
           showEvents={isAdmin}
           showPlanMonitoring={isAdmin}
+          showMarketplace={showMarketplace}
           showVendorProfile={isVendor}
           showVendorServices={isVendor}
+          showVendorAvailability={isVendor}
           onSelectTab={(tab) => {
             if (tab === 'dashboard') navigate('/dashboard');
             if (tab === 'events') navigate('/admin/events');
             if (tab === 'plans') navigate('/admin/plans');
+            if (tab === 'marketplace') navigate('/marketplace');
             if (tab === 'vendor-profile') navigate('/vendor/profile');
             if (tab === 'vendor-services') navigate('/vendor/services');
+            if (tab === 'vendor-availability') navigate('/vendor/availability');
           }}
           onLogout={handleLogout}
         />
