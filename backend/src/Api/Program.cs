@@ -1,10 +1,11 @@
 using System.Text;
 using Application.Common.Interfaces;
+using Application.Dtos.Events;
 using Application.Services.Auth;
 using Application.Services.Events;
+using Application.Services.Scheduling;
 using Application.Services.Test;
 using Application.Services.Vendors;
-using Application.Dtos.Events;
 using Application.Validators.Events;
 using FluentValidation;
 using Infrastructure.Auth;
@@ -90,6 +91,11 @@ builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
+
+// Component 3: Scheduling Registrations
+builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
+builder.Services.AddScoped<ConflictDetectionService>();
+builder.Services.AddScoped<ScheduleService>();
 
 builder.Services.AddAuthentication(options =>
     {
