@@ -1,5 +1,5 @@
-using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 using Application.Dtos.Plans;
 using Application.Services.Planning;
 using Domain.Entities;
@@ -33,34 +33,102 @@ public sealed class AgenticAiClient(
             }
         };
 
-        for (var attempt = 1; attempt <= 3; attempt++)
+        using var response = await client.PostAsJsonAsync(
+            configuration["AgenticAI:GeneratePath"] ?? "/api/coordinator/generate",
+            request,
+            cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning(
+                "Agentic AI returned HTTP {StatusCode} for event {EventId}",
+                (int)response.StatusCode,
+                eventEntity.Id);
+            response.EnsureSuccessStatusCode();
+        }
+
+        var output = await response.Content.ReadFromJsonAsync<AgenticAiPlanResponse>(
+            cancellationToken)
+            ?? throw new InvalidOperationException("Agentic AI returned an empty response.");
+        return output.ToCoordinatorPlanResponse();
+    }
+
+    private sealed record AgenticAiPlanResponse
+    {
+        [JsonPropertyName("service_categories")]
+        public List<string> ServiceCategories { get; init; } = [];
+
+        [JsonPropertyName("budget_allocation")]
+        public List<AgenticAiBudgetAllocation> BudgetAllocation { get; init; } = [];
+
+        [JsonPropertyName("target_vendor_types")]
+        public List<string> TargetVendorTypes { get; init; } = [];
+
+        [JsonPropertyName("proposed_timeline")]
+        public List<AgenticAiTimelinePhase> ProposedTimeline { get; init; } = [];
+
+        [JsonPropertyName("rationale")]
+        public string? Rationale { get; init; }
+
+        [JsonPropertyName("identified_risks")]
+        public List<RiskDto> IdentifiedRisks { get; init; } = [];
+
+        [JsonPropertyName("missing_requirements")]
+        public List<MissingRequirementDto> MissingRequirements { get; init; } = [];
+
+        [JsonPropertyName("plan_completeness_score")]
+        public int PlanCompletenessScore { get; init; }
+
+        [JsonPropertyName("validation_summary")]
+        public string? ValidationSummary { get; init; }
+
+        public CoordinatorPlanResponse ToCoordinatorPlanResponse()
         {
             try
             {
-                using var response = await client.PostAsJsonAsync(
-                    configuration["AgenticAI:GeneratePath"] ?? "/api/coordinator/generate",
-                    request,
-                    cancellationToken);
-                if (response.IsSuccessStatusCode)
+                return new CoordinatorPlanResponse
                 {
-                    return await response.Content.ReadFromJsonAsync<CoordinatorPlanResponse>(
-                        cancellationToken)
-                        ?? throw new InvalidOperationException("Agentic AI returned an empty response.");
-                }
-
-                if (response.StatusCode is not (HttpStatusCode.RequestTimeout or
-                    HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable))
-                    response.EnsureSuccessStatusCode();
+                    ServiceCategories = ServiceCategories,
+                    BudgetAllocation = BudgetAllocation.ToDictionary(
+                        item => item.Category,
+                        item => item.Amount,
+                        StringComparer.OrdinalIgnoreCase),
+                    TargetVendorTypes = TargetVendorTypes,
+                    ProposedTimeline = ProposedTimeline.ToDictionary(
+                        item => item.PhaseName,
+                        item => $"{item.Timing}: {item.Description}"),
+                    Rationale = Rationale,
+                    IdentifiedRisks = IdentifiedRisks,
+                    MissingRequirements = MissingRequirements,
+                    PlanCompletenessScore = PlanCompletenessScore,
+                    ValidationSummary = ValidationSummary
+                };
             }
-            catch (HttpRequestException) when (attempt < 3)
+            catch (ArgumentException ex)
             {
-                logger.LogWarning("Agentic AI request failed on attempt {Attempt}", attempt);
+                throw new InvalidOperationException(
+                    "Agentic AI returned duplicate budget categories or timeline phases.", ex);
             }
-
-            if (attempt < 3)
-                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)), cancellationToken);
         }
+    }
 
-        throw new HttpRequestException("Agentic AI service was unavailable after three attempts.");
+    private sealed record AgenticAiBudgetAllocation
+    {
+        [JsonPropertyName("category")]
+        public string Category { get; init; } = string.Empty;
+
+        [JsonPropertyName("amount")]
+        public decimal Amount { get; init; }
+    }
+
+    private sealed record AgenticAiTimelinePhase
+    {
+        [JsonPropertyName("phase_name")]
+        public string PhaseName { get; init; } = string.Empty;
+
+        [JsonPropertyName("timing")]
+        public string Timing { get; init; } = string.Empty;
+
+        [JsonPropertyName("description")]
+        public string Description { get; init; } = string.Empty;
     }
 }

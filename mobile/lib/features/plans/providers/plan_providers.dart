@@ -32,7 +32,7 @@ class PlanController extends ChangeNotifier {
     try {
       plan = await api.get(token, planId);
       fromCache = false;
-      await _cache();
+      await _cache(planId);
     } catch (exception) {
       final cached = await SharedPreferences.getInstance();
       final value = cached.getString('plan_$planId');
@@ -56,8 +56,8 @@ class PlanController extends ChangeNotifier {
         () => api.reject(token, planId, remarks, severity),
       );
 
-  Future<bool> regenerate() => _submit(
-        () => api.regenerate(token, plan?.eventId ?? ''),
+  Future<bool> regenerate(String reason) => _submit(
+        () => api.regenerate(token, plan?.eventId ?? '', reason: reason),
       );
 
   Future<bool> _submit(Future<EventPlan> Function() action) async {
@@ -68,7 +68,7 @@ class PlanController extends ChangeNotifier {
     try {
       plan = await action();
       fromCache = false;
-      await _cache();
+      await _cache(plan?.id);
       return true;
     } catch (_) {
       error = 'The request failed. Please try again.';
@@ -79,10 +79,10 @@ class PlanController extends ChangeNotifier {
     }
   }
 
-  Future<void> _cache() async {
+  Future<void> _cache(String? key) async {
     final current = plan;
-    if (current == null) return;
+    if (current == null || key == null || key.isEmpty) return;
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString('plan_$planId', jsonEncode(current.toJson()));
+    await preferences.setString('plan_$key', jsonEncode(current.toJson()));
   }
 }

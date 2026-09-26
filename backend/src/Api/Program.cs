@@ -104,7 +104,7 @@ builder.Services.AddHttpClient("AgenticAI", client =>
     client.BaseAddress = new Uri(
         builder.Configuration["AgenticAI:BaseUrl"] ?? "http://localhost:8000");
     client.Timeout = TimeSpan.FromSeconds(
-        builder.Configuration.GetValue("AgenticAI:TimeoutSeconds", 60));
+        builder.Configuration.GetValue("AgenticAI:TimeoutSeconds", 250));
 });
 builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 

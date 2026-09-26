@@ -12,6 +12,8 @@ import VendorMarketplacePage from '../features/vendors/pages/VendorMarketplacePa
 import VendorMarketplaceDetailPage from '../features/vendors/pages/VendorMarketplaceDetailPage';
 import AdminPlanDashboardPage from '../features/adminPlans/pages/AdminPlanDashboardPage';
 import AdminPlanDetailsPage from '../features/adminPlans/pages/AdminPlanDetailsPage';
+import MyEventsPage from '../features/ownerEvents/pages/MyEventsPage';
+import OwnerPlanReviewPage from '../features/ownerEvents/pages/OwnerPlanReviewPage';
 
 export const router = createBrowserRouter([
   {
@@ -49,6 +51,14 @@ export const router = createBrowserRouter([
   {
     path: '/admin/plans/:id',
     element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDetailsPage /></ProtectedRoute>,
+  },
+  {
+    path: '/my-events',
+    element: <ProtectedRoute requiredRole="EVENT_PLANNER"><MyEventsPage /></ProtectedRoute>,
+  },
+  {
+    path: '/my-events/plans/:id',
+    element: <ProtectedRoute requiredRole="EVENT_PLANNER"><OwnerPlanReviewPage /></ProtectedRoute>,
   },
   {
     path: '/marketplace',

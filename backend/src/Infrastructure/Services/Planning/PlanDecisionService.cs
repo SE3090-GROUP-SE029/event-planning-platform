@@ -61,7 +61,7 @@ public sealed class PlanDecisionService(
     {
         var plan = await planRepository.GetByIdAsync(planId, cancellationToken)
             ?? throw new KeyNotFoundException("Plan not found.");
-        if (!currentUser.IsAdmin && currentUser.UserId != plan.Event.OwnerId)
+        if (currentUser.IsAdmin || currentUser.UserId != plan.Event.OwnerId)
             throw new UnauthorizedAccessException("You are not authorized to decide on this plan.");
         return plan;
     }

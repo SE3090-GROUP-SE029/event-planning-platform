@@ -21,12 +21,19 @@ public sealed class PlanGenerationService(
 {
     public async Task<EventPlanDraft> GeneratePlanAsync(
         Guid eventId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool regenerate = false)
     {
         logger.LogInformation("Generating plan for event {EventId}", eventId);
         var eventEntity = await eventRepository.GetByIdAsync(eventId)
             ?? throw new KeyNotFoundException("Event not found.");
         EnsureAuthorized(eventEntity);
+
+        var existingPlans = await planRepository.ListAsync(eventId, null, null, cancellationToken);
+        if (existingPlans.Count > 0 && !regenerate)
+            throw new InvalidOperationException("A plan already exists. Review it or explicitly regenerate it.");
+        if (regenerate && existingPlans.FirstOrDefault()?.Status != PlanStatus.Rejected)
+            throw new InvalidOperationException("Only a rejected plan can be regenerated.");
 
         var response = await aiClient.GeneratePlanAsync(eventEntity, cancellationToken);
         var validation = validator.ValidateCoordinatorPlan(response, eventEntity);
@@ -35,7 +42,9 @@ public sealed class PlanGenerationService(
                 $"Generated plan failed validation: {string.Join("; ", validation.Errors)}");
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var version = await planRepository.GetNextVersionAsync(eventId, cancellationToken);
+        var version = regenerate
+            ? await CreateNextVersionAsync(eventId, existingPlans[0].Id, cancellationToken)
+            : await planRepository.GetNextVersionAsync(eventId, cancellationToken);
         var now = DateTime.UtcNow;
         var plan = new EventPlanDraft
         {
@@ -82,10 +91,18 @@ public sealed class PlanGenerationService(
         Guid? planIdToSupersede = null,
         CancellationToken cancellationToken = default)
     {
+        var eventEntity = await eventRepository.GetByIdAsync(eventId)
+            ?? throw new KeyNotFoundException("Event not found.");
+        EnsureAuthorized(eventEntity);
+
         if (planIdToSupersede.HasValue)
         {
             var oldPlan = await planRepository.GetByIdAsync(planIdToSupersede.Value, cancellationToken)
                 ?? throw new KeyNotFoundException("Plan to supersede was not found.");
+            if (oldPlan.EventId != eventId)
+                throw new InvalidOperationException("The plan to supersede belongs to a different event.");
+            if (oldPlan.Status != PlanStatus.Rejected)
+                throw new InvalidOperationException("Only a rejected plan can be superseded by regeneration.");
             oldPlan.Status = PlanStatus.Superseded;
             oldPlan.UpdatedAt = DateTime.UtcNow;
         }
@@ -94,7 +111,7 @@ public sealed class PlanGenerationService(
 
     private void EnsureAuthorized(Event eventEntity)
     {
-        if (!currentUser.IsAdmin && currentUser.UserId != eventEntity.OwnerId)
+        if (currentUser.IsAdmin || currentUser.UserId != eventEntity.OwnerId)
             throw new UnauthorizedAccessException("You are not authorized to plan this event.");
     }
 }

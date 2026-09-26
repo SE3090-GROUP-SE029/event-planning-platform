@@ -31,15 +31,16 @@ class _PlanReviewPageState extends ConsumerState<PlanReviewPage> {
     if (session == null) {
       return const Scaffold(body: Center(child: Text('Please sign in to review plans.')));
     }
+    final isAdmin = session.roles.contains('ADMIN');
     final controller = ref.watch(
         planProvider((token: session.accessToken, planId: widget.planId)));
     return Scaffold(
       appBar: AppBar(title: const Text('Plan review')),
-      body: _body(context, controller),
+      body: _body(context, controller, isAdmin),
     );
   }
 
-  Widget _body(BuildContext context, PlanController controller) {
+  Widget _body(BuildContext context, PlanController controller, bool isAdmin) {
     if (controller.loading && controller.plan == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -99,7 +100,7 @@ class _PlanReviewPageState extends ConsumerState<PlanReviewPage> {
           child: Text(controller.error!, style: const TextStyle(color: AppColors.error)),
         ),
         const SizedBox(height: 18),
-        if (plan.status == PlanStatus.pendingPlannerReview)
+        if (!isAdmin && plan.status == PlanStatus.pendingPlannerReview)
           Row(children: [
             Expanded(child: OutlinedButton(
               onPressed: controller.submitting ? null : () => _reject(context, controller),
@@ -113,9 +114,11 @@ class _PlanReviewPageState extends ConsumerState<PlanReviewPage> {
                   : const Text('Approve'),
             )),
           ]),
-        if (plan.status == PlanStatus.rejected)
+        if (!isAdmin && plan.status == PlanStatus.rejected)
           FilledButton.icon(
-            onPressed: controller.submitting ? null : controller.regenerate,
+            onPressed: controller.submitting
+                ? null
+                : () => _regenerate(context, controller),
             icon: const Icon(Icons.refresh),
             label: const Text('Regenerate plan'),
           ),
@@ -185,6 +188,49 @@ class _PlanReviewPageState extends ConsumerState<PlanReviewPage> {
     if (!mounted || result == null) return;
     if (result.$1.trim().length < 20) return;
     if (await controller.reject(result.$1.trim(), result.$2)) _message('Plan rejected.');
+  }
+
+  Future<void> _regenerate(
+      BuildContext context, PlanController controller) async {
+    final reasonController = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Regenerate plan'),
+        content: TextField(
+          controller: reasonController,
+          autofocus: true,
+          maxLength: 500,
+          decoration: const InputDecoration(
+            labelText: 'Reason for regeneration',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = reasonController.text.trim();
+              if (value.isNotEmpty) Navigator.pop(dialogContext, value);
+            },
+            child: const Text('Regenerate'),
+          ),
+        ],
+      ),
+    );
+    reasonController.dispose();
+    if (!mounted || reason == null) return;
+    if (!await controller.regenerate(reason) || !mounted) return;
+    final newPlanId = controller.plan?.id;
+    if (newPlanId != null && newPlanId.isNotEmpty) {
+      Navigator.pushReplacementNamed(
+        context,
+        '/plans/review',
+        arguments: newPlanId,
+      );
+    }
   }
 
   Future<String?> _notesDialog(BuildContext context, String title, String hint) async {

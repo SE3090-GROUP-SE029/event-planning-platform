@@ -12,8 +12,13 @@ from ..state import CoordinatorState
 logger = logging.getLogger(__name__)
 
 
+class BudgetAllocationItem(BaseModel):
+    category: str = Field(..., min_length=1)
+    amount: float = Field(..., gt=0)
+
+
 class BudgetOutput(BaseModel):
-    allocation: dict[str, float] = Field(default_factory=dict)
+    allocation: list[BudgetAllocationItem] = Field(default_factory=list)
 
 def _rebalance(allocation: dict[str, float], budget: float) -> dict[str, float]:
     positive = {key: value for key, value in allocation.items() if value > 0}
@@ -34,11 +39,17 @@ async def allocate_budget(state: CoordinatorState) -> dict[str, dict[str, float]
         guest_count=state.event.get("guest_count", "unknown"),
     )
     result = await GeminiClient().generate_with_prompt(prompt, BudgetOutput)
+    requested_allocations: dict[str, float] = {}
+    for item in result.allocation:
+        category = item.category.strip()
+        if category in requested_allocations:
+            raise ValueError(f"duplicate budget allocation category: {category}")
+        requested_allocations[category] = float(item.amount)
     allocation = {
-        category: float(result.allocation.get(category, 0))
+        category: requested_allocations.get(category, 0)
         for category in state.service_categories
     }
-    allocation["Contingency"] = float(result.allocation.get("Contingency", 0))
+    allocation["Contingency"] = requested_allocations.get("Contingency", 0)
     allocation = _rebalance(allocation, budget)
     if any(value <= 0 for value in allocation.values()):
         raise ValueError("budget allocation must assign a positive amount to every category")
