@@ -20,6 +20,7 @@ class _VendorMarketplaceDetailPageState
     extends State<VendorMarketplaceDetailPage> {
   final _vendorApi = VendorRemoteDataSource();
   MarketplaceVendorDetail? _vendor;
+  AuthResponseModel? _auth;
   bool _loading = true;
   String? _error;
 
@@ -35,11 +36,13 @@ class _VendorMarketplaceDetailPageState
     final args = ModalRoute.of(context)?.settings.arguments;
     String? token;
     String? vendorId;
+    AuthResponseModel? auth;
 
     if (args is Map) {
-      final auth = args['auth'];
-      if (auth is AuthResponseModel) {
-        token = auth.accessToken;
+      final authArg = args['auth'];
+      if (authArg is AuthResponseModel) {
+        auth = authArg;
+        token = authArg.accessToken;
       }
       vendorId = args['vendorId']?.toString();
     }
@@ -56,6 +59,7 @@ class _VendorMarketplaceDetailPageState
       final vendor = await _vendorApi.getMarketplaceVendor(token, vendorId);
       if (!mounted) return;
       setState(() {
+        _auth = auth;
         _vendor = vendor;
         _loading = false;
         _error = null;
@@ -162,6 +166,25 @@ class _VendorMarketplaceDetailPageState
                                   vendor.websiteUrl!,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                              if (_auth != null &&
+                                  _auth!.roles.contains('EVENT_PLANNER')) ...[
+                                const SizedBox(height: AppDimens.space14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: vendor.services.isEmpty
+                                        ? null
+                                        : () => Navigator.of(context).pushNamed(
+                                              '/marketplace/request-quotation',
+                                              arguments: {
+                                                'auth': _auth,
+                                                'vendorId': vendor.id,
+                                              },
+                                            ),
+                                    child: const Text('Request quotation'),
                                   ),
                                 ),
                               ],

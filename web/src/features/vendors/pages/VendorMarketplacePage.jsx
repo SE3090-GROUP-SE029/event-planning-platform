@@ -48,6 +48,7 @@ export default function VendorMarketplacePage() {
   const logout = useAuthStore((state) => state.logout);
   const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
   const isAdmin = useAuthStore((state) => state.hasRole('ADMIN'));
+  const isEventPlanner = useAuthStore((state) => state.hasRole('EVENT_PLANNER'));
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -78,16 +79,20 @@ export default function VendorMarketplacePage() {
           activeTab="marketplace"
           showEvents={isAdmin}
           showMarketplace
+          showMyQuotations={isEventPlanner}
           showVendorProfile={isVendor}
           showVendorServices={isVendor}
           showVendorAvailability={isVendor}
+          showVendorQuotations={isVendor}
           onSelectTab={(tab) => {
             if (tab === 'dashboard') navigate('/dashboard');
             if (tab === 'events') navigate('/admin/events');
             if (tab === 'marketplace') navigate('/marketplace');
+            if (tab === 'my-quotations') navigate('/quotations/mine');
             if (tab === 'vendor-profile') navigate('/vendor/profile');
             if (tab === 'vendor-services') navigate('/vendor/services');
             if (tab === 'vendor-availability') navigate('/vendor/availability');
+            if (tab === 'vendor-quotations') navigate('/vendor/quotations');
           }}
           onLogout={handleLogout}
         />
