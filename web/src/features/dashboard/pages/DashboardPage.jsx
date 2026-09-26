@@ -1,6 +1,8 @@
-import { Avatar, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import React, { useState } from 'react';
+import { Avatar, Box, Button, CircularProgress, Stack, TextField, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { useAuthStore } from '../../../shared/store/authStore';
 import CollapsibleSidebar from '../../../shared/components/layout/CollapsibleSidebar';
 import TopSearchNavbar from '../../../shared/components/layout/TopSearchNavbar';
@@ -184,10 +186,18 @@ export default function DashboardPage() {
   const roles = user?.roles || [];
   const isAdmin = roles.includes('ADMIN');
   const isVendor = roles.includes('VENDOR');
+  const [scheduleEventId, setScheduleEventId] = useState('');
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleOpenSchedule = (e) => {
+    e.preventDefault();
+    if (scheduleEventId.trim()) {
+      navigate(`/events/${scheduleEventId.trim()}/schedule`);
+    }
   };
 
   return (
@@ -196,11 +206,16 @@ export default function DashboardPage() {
         <CollapsibleSidebar
           activeTab="dashboard"
           showEvents={isAdmin}
+          showSchedule={true}
           showVendorProfile={isVendor}
           showVendorServices={isVendor}
           onSelectTab={(tab) => {
             if (tab === 'dashboard') navigate('/dashboard');
             if (tab === 'events') navigate('/admin/events');
+            if (tab === 'schedule') {
+              const eventId = prompt('Enter Event ID to open schedule:');
+              if (eventId?.trim()) navigate(`/events/${eventId.trim()}/schedule`);
+            }
             if (tab === 'vendor-profile') navigate('/vendor/profile');
             if (tab === 'vendor-services') navigate('/vendor/services');
           }}
@@ -220,6 +235,33 @@ export default function DashboardPage() {
                 : 'Use the available workspace tools to manage your active event planning tasks.'}
             </Typography>
           </Box>
+
+          {!isVendor && (
+            <SurfaceCard sx={{ p: 3, maxWidth: 580, mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <CalendarMonthIcon sx={{ color: '#19191C' }} />
+                <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                  Event Schedule Builder
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enter an Event ID to view its timeline, detect conflicts, and manage activities.
+              </Typography>
+              <Box component="form" onSubmit={handleOpenSchedule} sx={{ display: 'flex', gap: 1.5 }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Enter Event ID (e.g. GUID)"
+                  value={scheduleEventId}
+                  onChange={(e) => setScheduleEventId(e.target.value)}
+                  sx={{ bgcolor: '#FFFFFF', borderRadius: 2 }}
+                />
+                <Button variant="contained" type="submit" sx={{ borderRadius: 9999, px: 3, whiteSpace: 'nowrap' }}>
+                  Open Schedule
+                </Button>
+              </Box>
+            </SurfaceCard>
+          )}
 
           {isVendor && <VendorDashboardOverview />}
         </Box>

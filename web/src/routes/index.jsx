@@ -7,6 +7,7 @@ import AdminEventManagementPage from '../features/adminEvents/pages/AdminEventMa
 import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetailsPage';
 import VendorProfilePage from '../features/vendors/pages/VendorProfilePage';
 import VendorServicesPage from '../features/vendors/pages/VendorServicesPage';
+import { ScheduleBuilderPage } from '../features/scheduling/pages/ScheduleBuilderPage';
 
 export const router = createBrowserRouter([
   {
@@ -45,4 +46,8 @@ export const router = createBrowserRouter([
     path: '/vendor/services',
     element: <ProtectedRoute requiredRole="VENDOR"><VendorServicesPage /></ProtectedRoute>,
   },
+  {
+  path: '/events/:eventId/schedule',
+  element: <ScheduleBuilderPage />
+  }
 ]);

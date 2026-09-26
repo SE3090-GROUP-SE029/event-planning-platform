@@ -7,20 +7,23 @@ import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 
 const Icons = {
   Dashboard: () => <HomeFilledIcon />,
-  Events: () => <EventAvailableIcon/>,
-  Profile: () => <FaceIcon/>,
+  Events: () => <EventAvailableIcon />,
+  Schedule: () => <CalendarMonthIcon />,
+  Profile: () => <FaceIcon />,
   Services: () => <HandymanOutlinedIcon />,
-  Logout: () => <MeetingRoomIcon/>,
-  ChevronLeft: () => <ChevronLeftIcon/>,
-  ChevronRight: () => <ChevronRightIcon/>,
+  Logout: () => <MeetingRoomIcon />,
+  ChevronLeft: () => <ChevronLeftIcon />,
+  ChevronRight: () => <ChevronRightIcon />,
 };
 
 export default function CollapsibleSidebar({
   activeTab = 'dashboard',
   showEvents = false,
+  showSchedule = true,
   showVendorProfile = false,
   showVendorServices = false,
   onSelectTab,
@@ -30,6 +33,7 @@ export default function CollapsibleSidebar({
   const items = [
     { id: 'dashboard', label: 'Dashboard', icon: Icons.Dashboard },
     ...(showEvents ? [{ id: 'events', label: 'Events', icon: Icons.Events }] : []),
+    ...(showSchedule ? [{ id: 'schedule', label: 'Schedule', icon: Icons.Schedule }] : []),
     ...(showVendorProfile ? [{ id: 'vendor-profile', label: 'Vendor profile', icon: Icons.Profile }] : []),
     ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
   ];
@@ -141,7 +145,9 @@ export default function CollapsibleSidebar({
               >
                 <Box sx={{ fontSize: 18, lineHeight: 1 }}>{<Icon />}</Box>
                 {!collapsed && (
-                  <Typography sx={{ color: isActive ? '#FFFFFF' : '#AEAEB2',  fontSize: 13.5, fontWeight: isActive ? 700 : 500 }}>{item.label}</Typography>
+                  <Typography sx={{ color: isActive ? '#FFFFFF' : '#AEAEB2', fontSize: 13.5, fontWeight: isActive ? 700 : 500 }}>
+                    {item.label}
+                  </Typography>
                 )}
               </Box>
             );
@@ -166,7 +172,7 @@ export default function CollapsibleSidebar({
         }}
       >
         <Icons.Logout />
-        {!collapsed && <Typography sx={{color: '#AEAEB2', fontSize: 13.5, fontWeight: 500 }}>Sign out</Typography>}
+        {!collapsed && <Typography sx={{ color: '#AEAEB2', fontSize: 13.5, fontWeight: 500 }}>Sign out</Typography>}
       </Box>
     </Box>
   );
