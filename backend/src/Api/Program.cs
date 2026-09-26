@@ -144,7 +144,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("VendorOnly", p => p.RequireRole("VENDOR"));
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
+
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 2 * 1024 * 1024;
@@ -159,7 +165,6 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader();
     });
 });
-
 var app = builder.Build();
 
 app.UseCors("AllowAll");
