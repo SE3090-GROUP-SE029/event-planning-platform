@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { scheduleApi } from '../api/scheduleApi';
 import { ConflictAlertBanner } from '../components/ConflictAlertBanner';
@@ -54,9 +54,34 @@ export const ScheduleBuilderPage = () => {
   };
 
   useEffect(() => {
-    if (eventId) {
-      loadSchedule();
-    }
+    if (!eventId) return;
+
+    let cancelled = false;
+
+    const fetchSchedule = async () => {
+      try {
+        setLoading(true);
+        const data = await scheduleApi.getScheduleByEventId(eventId);
+        if (!cancelled) {
+          setSchedule(data);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err?.response?.data?.message || 'Failed to load event schedule.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSchedule();
+
+    return () => {
+      cancelled = true;
+    };
   }, [eventId]);
 
   const handleAddActivity = async (payload) => {

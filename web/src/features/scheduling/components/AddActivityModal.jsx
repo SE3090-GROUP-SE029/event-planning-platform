@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 export const AddActivityModal = ({ isOpen, onClose, onAddActivity }) => {
   const [title, setTitle] = useState('');

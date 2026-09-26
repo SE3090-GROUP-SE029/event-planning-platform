@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export const ConflictAlertBanner = ({ conflicts = [] }) => {
   if (!conflicts || conflicts.length === 0) return null;
