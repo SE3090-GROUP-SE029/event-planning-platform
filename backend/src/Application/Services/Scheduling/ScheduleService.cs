@@ -1,4 +1,5 @@
 using Domain.Entities;
+using Domain.Enums;
 
 namespace Application.Services.Scheduling;
 
@@ -43,7 +44,7 @@ public class ScheduleService
             StartTime = startTime,
             EndTime = endTime,
             AssignedVendorId = vendorId,
-            Status = "Scheduled"
+            Status = ActivityStatus.SCHEDULED.ToString()
         };
 
         activity = await _scheduleRepository.AddActivityAsync(activity, cancellationToken);
@@ -57,5 +58,13 @@ public class ScheduleService
         }
 
         return activity;
+    }
+
+    public async Task<TimelineActivity?> UpdateActivityStatusAsync(
+        Guid activityId, 
+        ActivityStatus status, 
+        CancellationToken cancellationToken = default)
+    {
+        return await _scheduleRepository.UpdateActivityStatusAsync(activityId, status, cancellationToken);
     }
 }

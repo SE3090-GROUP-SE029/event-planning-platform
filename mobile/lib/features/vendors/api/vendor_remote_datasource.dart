@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/api/dio_client.dart';
+import '../models/marketplace_vendor_model.dart';
+import '../models/vendor_availability_model.dart';
 import '../models/vendor_gallery_image_model.dart';
 import '../models/vendor_profile_model.dart';
 import '../models/vendor_service_model.dart';
@@ -212,6 +214,122 @@ class VendorRemoteDataSource {
       await dio.delete(
         '/api/vendors/me/services/$serviceId',
         options: _auth(accessToken),
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<VendorAvailabilityModel>> listMyAvailability(
+    String accessToken,
+  ) async {
+    try {
+      final response = await dio.get(
+        '/api/vendors/me/availability',
+        options: _auth(accessToken),
+      );
+      final data = response.data as List<dynamic>;
+      return data
+          .map((item) =>
+              VendorAvailabilityModel.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<VendorAvailabilityModel> createAvailability(
+    String accessToken,
+    VendorAvailabilityModel availability,
+  ) async {
+    try {
+      final response = await dio.post(
+        '/api/vendors/me/availability',
+        data: availability.toJson(),
+        options: _auth(accessToken),
+      );
+      return VendorAvailabilityModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<VendorAvailabilityModel> updateAvailability(
+    String accessToken,
+    String availabilityId,
+    VendorAvailabilityModel availability,
+  ) async {
+    try {
+      final response = await dio.put(
+        '/api/vendors/me/availability/$availabilityId',
+        data: availability.toJson(),
+        options: _auth(accessToken),
+      );
+      return VendorAvailabilityModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<void> deleteAvailability(
+    String accessToken,
+    String availabilityId,
+  ) async {
+    try {
+      await dio.delete(
+        '/api/vendors/me/availability/$availabilityId',
+        options: _auth(accessToken),
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<MarketplaceVendorListResult> listMarketplace(
+    String accessToken, {
+    String? search,
+    String? category,
+    String sortBy = 'businessName',
+    String sortOrder = 'asc',
+    int page = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      final response = await dio.get(
+        '/api/vendors/marketplace',
+        queryParameters: {
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (category != null && category.isNotEmpty) 'category': category,
+          'sortBy': sortBy,
+          'sortOrder': sortOrder,
+          'page': page,
+          'pageSize': pageSize,
+        },
+        options: _auth(accessToken),
+      );
+      return MarketplaceVendorListResult.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<MarketplaceVendorDetail> getMarketplaceVendor(
+    String accessToken,
+    String vendorId,
+  ) async {
+    try {
+      final response = await dio.get(
+        '/api/vendors/marketplace/$vendorId',
+        options: _auth(accessToken),
+      );
+      return MarketplaceVendorDetail.fromJson(
+        response.data as Map<String, dynamic>,
       );
     } on DioException catch (e) {
       throw _handleError(e);

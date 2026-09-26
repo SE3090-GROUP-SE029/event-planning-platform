@@ -1,10 +1,14 @@
 using System.Text;
 using Application.Common.Interfaces;
+using Application.Dtos.Events;
 using Application.Services.Auth;
 using Application.Services.Events;
+using Application.Services.Quotations;
+using Application.Services.Scheduling;
 using Application.Services.Test;
 using Application.Services.Vendors;
-using Application.Dtos.Events;
+using Application.Services.Planning;
+using Application.Services.Validation;
 using Application.Validators.Events;
 using Api.GuestManagement;
 using FluentValidation;
@@ -18,6 +22,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Infrastructure.Services.Planning;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -78,6 +83,9 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IVendorRepository, VendorRepository>();
 builder.Services.AddScoped<IVendorOfferingRepository, VendorOfferingRepository>();
 builder.Services.AddScoped<IVendorGalleryImageRepository, VendorGalleryImageRepository>();
+builder.Services.AddScoped<IVendorAvailabilityRepository, VendorAvailabilityRepository>();
+builder.Services.AddScoped<IVendorMarketplaceRepository, VendorMarketplaceRepository>();
+builder.Services.AddScoped<IQuotationRepository, QuotationRepository>();
 builder.Services.AddScoped<IVendorImageStorage>(_ =>
 {
     var webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
@@ -90,12 +98,39 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVendorService, VendorService>();
 builder.Services.AddScoped<IVendorOfferingService, VendorOfferingService>();
 builder.Services.AddScoped<IVendorGalleryService, VendorGalleryService>();
+builder.Services.AddScoped<IVendorAvailabilityService, VendorAvailabilityService>();
+builder.Services.AddScoped<IVendorMarketplaceService, VendorMarketplaceService>();
+builder.Services.AddScoped<IQuotationService, QuotationService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
+builder.Services.AddScoped<IEventPlanDraftRepository, EventPlanDraftRepository>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICoordinatorPlanValidationService, CoordinatorPlanValidationService>();
+builder.Services.AddScoped<IPlanGenerationService, PlanGenerationService>();
+builder.Services.AddScoped<IPlanDecisionService, PlanDecisionService>();
+builder.Services.AddScoped<IAgenticAiClient, AgenticAiClient>();
+builder.Services.AddHttpClient("AgenticAI", client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["AgenticAI:BaseUrl"] ?? "http://localhost:8000");
+    client.Timeout = TimeSpan.FromSeconds(
+        builder.Configuration.GetValue("AgenticAI:TimeoutSeconds", 250));
+});
 builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 
-// JWT Bearer authentication (required by dev auth flow)
+// Component 3: Scheduling Registrations
+builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
+builder.Services.AddScoped<ConflictDetectionService>();
+builder.Services.AddScoped<ScheduleService>();
+
+// Component 3: Scheduling Registrations
+builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
+builder.Services.AddScoped<ConflictDetectionService>();
+builder.Services.AddScoped<ScheduleService>();
+
+
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -123,7 +158,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("VendorOnly", p => p.RequireRole("VENDOR"));
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
+
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 2 * 1024 * 1024;
@@ -138,7 +179,6 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader();
     });
 });
-
 var app = builder.Build();
 
 app.UseCors("AllowAll");

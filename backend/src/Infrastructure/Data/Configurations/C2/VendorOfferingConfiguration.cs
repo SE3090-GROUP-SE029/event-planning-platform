@@ -13,6 +13,8 @@ public class VendorOfferingConfiguration : IEntityTypeConfiguration<VendorOfferi
         builder.Property(o => o.VendorId).IsRequired();
         builder.Property(o => o.ServiceName).IsRequired().HasMaxLength(200);
         builder.Property(o => o.Description).HasMaxLength(2000);
+        builder.Property(o => o.Price).HasPrecision(18, 2);
+        builder.Property(o => o.PricingType);
         builder.Property(o => o.CreatedAt).IsRequired();
 
         builder.HasIndex(o => o.VendorId);

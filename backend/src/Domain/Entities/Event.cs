@@ -16,4 +16,5 @@ public class Event
     public EventStatus Status { get; set; } = EventStatus.DRAFT;
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public ICollection<EventPlanDraft> EventPlanDrafts { get; set; } = [];
 }

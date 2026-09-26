@@ -1,5 +1,6 @@
 using Application.Services.Scheduling;
 using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -47,5 +48,20 @@ public class ScheduleRepository : IScheduleRepository
     {
         _context.ScheduleConflicts.AddRange(conflicts);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<TimelineActivity?> UpdateActivityStatusAsync(Guid activityId, ActivityStatus status, CancellationToken cancellationToken = default)
+    {
+        var activity = await _context.TimelineActivities.FirstOrDefaultAsync(a => a.Id == activityId, cancellationToken);
+        if (activity == null)
+        {
+            return null;
+        }
+
+        activity.Status = status.ToString();
+        activity.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return activity;
     }
 }

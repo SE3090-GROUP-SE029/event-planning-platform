@@ -13,4 +13,5 @@ public class TimelineActivity
     public Guid? AssignedVendorId { get; set; }
     public string Status { get; set; } = "Scheduled";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
 }

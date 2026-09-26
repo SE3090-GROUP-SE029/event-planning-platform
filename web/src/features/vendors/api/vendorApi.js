@@ -173,3 +173,86 @@ export function useDeleteVendorService() {
     },
   });
 }
+
+export async function listMyVendorAvailability() {
+  const response = await apiClient.get('/api/vendors/me/availability');
+  return response.data;
+}
+
+export function useMyVendorAvailability(enabled = true) {
+  return useQuery({
+    queryKey: ['vendor-availability', 'me'],
+    queryFn: listMyVendorAvailability,
+    enabled,
+  });
+}
+
+export function useCreateVendorAvailability() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload) => {
+      const response = await apiClient.post('/api/vendors/me/availability', payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-availability', 'me'] });
+    },
+  });
+}
+
+export function useUpdateVendorAvailability() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }) => {
+      const response = await apiClient.put(`/api/vendors/me/availability/${id}`, payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-availability', 'me'] });
+    },
+  });
+}
+
+export function useDeleteVendorAvailability() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => {
+      await apiClient.delete(`/api/vendors/me/availability/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-availability', 'me'] });
+    },
+  });
+}
+
+export async function listVendorMarketplace(params = {}) {
+  const response = await apiClient.get('/api/vendors/marketplace', {
+    params: {
+      search: params.search || undefined,
+      category: params.category || undefined,
+      sortBy: params.sortBy || 'businessName',
+      sortOrder: params.sortOrder || 'asc',
+      page: params.page || 1,
+      pageSize: params.pageSize || 10,
+    },
+  });
+  return response.data;
+}
+
+export function useVendorMarketplace(params) {
+  return useQuery({
+    queryKey: ['vendor-marketplace', params],
+    queryFn: () => listVendorMarketplace(params),
+  });
+}
+
+export function useVendorMarketplaceDetail(vendorId) {
+  return useQuery({
+    queryKey: ['vendor-marketplace', vendorId],
+    queryFn: async () => {
+      const response = await apiClient.get(`/api/vendors/marketplace/${vendorId}`);
+      return response.data;
+    },
+    enabled: Boolean(vendorId),
+  });
+}

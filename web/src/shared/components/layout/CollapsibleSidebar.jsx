@@ -4,25 +4,43 @@ import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import FaceIcon from '@mui/icons-material/Face';
 import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
+import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 
 const Icons = {
   Dashboard: () => <HomeFilledIcon />,
-  Events: () => <EventAvailableIcon/>,
-  Profile: () => <FaceIcon/>,
+  Events: () => <EventAvailableIcon />,
+  Schedule: () => <CalendarMonthIcon />,
+  Marketplace: () => <StorefrontOutlinedIcon />,
+  MyQuotations: () => <ReceiptLongOutlinedIcon />,
+  Profile: () => <FaceIcon />,
   Services: () => <HandymanOutlinedIcon />,
-  Logout: () => <MeetingRoomIcon/>,
-  ChevronLeft: () => <ChevronLeftIcon/>,
-  ChevronRight: () => <ChevronRightIcon/>,
+  Availability: () => <ScheduleOutlinedIcon />,
+  Plans: () => <AssignmentOutlinedIcon />,
+  VendorQuotations: () => <RequestQuoteOutlinedIcon />,
+  Logout: () => <MeetingRoomIcon />,
+  ChevronLeft: () => <ChevronLeftIcon />,
+  ChevronRight: () => <ChevronRightIcon />,
 };
 
 export default function CollapsibleSidebar({
   activeTab = 'dashboard',
   showEvents = false,
+  showSchedule = true,
+  showMarketplace = false,
+  showMyQuotations = false,
   showVendorProfile = false,
   showVendorServices = false,
+  showVendorAvailability = false,
+  showVendorQuotations = false,
+  showPlanMonitoring = false,
   onSelectTab,
   onLogout,
 }) {
@@ -30,8 +48,14 @@ export default function CollapsibleSidebar({
   const items = [
     { id: 'dashboard', label: 'Dashboard', icon: Icons.Dashboard },
     ...(showEvents ? [{ id: 'events', label: 'Events', icon: Icons.Events }] : []),
+    ...(showSchedule ? [{ id: 'schedule', label: 'Schedule', icon: Icons.Schedule }] : []),
+    ...(showMarketplace ? [{ id: 'marketplace', label: 'Marketplace', icon: Icons.Marketplace }] : []),
+    ...(showMyQuotations ? [{ id: 'my-quotations', label: 'My quotations', icon: Icons.MyQuotations }] : []),
     ...(showVendorProfile ? [{ id: 'vendor-profile', label: 'Vendor profile', icon: Icons.Profile }] : []),
     ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
+    ...(showVendorAvailability ? [{ id: 'vendor-availability', label: 'Availability', icon: Icons.Availability }] : []),
+    ...(showVendorQuotations ? [{ id: 'vendor-quotations', label: 'Quotation requests', icon: Icons.VendorQuotations }] : []),
+    ...(showPlanMonitoring ? [{ id: 'plans', label: 'Plan monitoring', icon: Icons.Plans }] : []),
   ];
 
   return (
@@ -141,7 +165,9 @@ export default function CollapsibleSidebar({
               >
                 <Box sx={{ fontSize: 18, lineHeight: 1 }}>{<Icon />}</Box>
                 {!collapsed && (
-                  <Typography sx={{ color: isActive ? '#FFFFFF' : '#AEAEB2',  fontSize: 13.5, fontWeight: isActive ? 700 : 500 }}>{item.label}</Typography>
+                  <Typography sx={{ color: isActive ? '#FFFFFF' : '#AEAEB2', fontSize: 13.5, fontWeight: isActive ? 700 : 500 }}>
+                    {item.label}
+                  </Typography>
                 )}
               </Box>
             );
@@ -166,7 +192,7 @@ export default function CollapsibleSidebar({
         }}
       >
         <Icons.Logout />
-        {!collapsed && <Typography sx={{color: '#AEAEB2', fontSize: 13.5, fontWeight: 500 }}>Sign out</Typography>}
+        {!collapsed && <Typography sx={{ color: '#AEAEB2', fontSize: 13.5, fontWeight: 500 }}>Sign out</Typography>}
       </Box>
     </Box>
   );

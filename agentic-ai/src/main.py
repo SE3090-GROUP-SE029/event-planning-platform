@@ -1,10 +1,15 @@
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import logging
 import os
+from pathlib import Path
 from dotenv import load_dotenv
+
+os.environ["LANGGRAPH_STRICT_MSGPACK"] = "true"
+
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from src.models.message_models import (
     PingResponse,
@@ -13,6 +18,10 @@ from src.models.message_models import (
     PingRequest,
 )
 from src.services.backend_client import BackendClient
+from src.api.routes import router as coordinator_router
+from src.coordinator_agent.config import configure_logging, get_settings
+from src.gemini_client.client import configure_gemini
+from src.gemini_client.exceptions import GeminiConfigurationError
 from src.models.guest_review_models import GuestReviewRequest, GuestReviewResponse
 from src.services.guest_review_service import AnalysisError, GuestReviewService, get_guest_review_service
 from src.models.registration_question_models import QuestionSuggestionRequest, QuestionSuggestions
@@ -20,23 +29,70 @@ from src.services.registration_question_service import RegistrationQuestionServi
 
 # Load environment variables
 load_dotenv()
+configure_logging()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Global backend client
-backend_client: BackendClient = None
+backend_client: BackendClient | None = None
+
+
+async def _prune_expired_checkpoints(checkpointer: AsyncSqliteSaver, ttl_hours: int) -> int:
+    """Delete incomplete workflow checkpoints older than the configured retention period."""
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=ttl_hours)
+    expired_threads: set[str] = set()
+    async for checkpoint in checkpointer.alist(None):
+        timestamp = checkpoint.checkpoint.get("ts")
+        thread_id = checkpoint.config.get("configurable", {}).get("thread_id")
+        if not timestamp or not thread_id:
+            continue
+        created_at = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+        if created_at < cutoff:
+            expired_threads.add(thread_id)
+    for thread_id in expired_threads:
+        await checkpointer.adelete_thread(thread_id)
+    return len(expired_threads)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage app startup/shutdown"""
     global backend_client
-    backend_client = BackendClient()
-    logger.info("🚀 AI Service started")
-    yield
-    await backend_client.close()
-    logger.info("🛑 AI Service stopped")
+    try:
+        configure_gemini()
+    except GeminiConfigurationError:
+        logger.exception(
+            "Gemini configuration validation failed for model %s",
+            get_settings().gemini_model,
+        )
+        raise
+    settings = get_settings()
+    checkpoint_path = Path(settings.coordinator_checkpoint_db_path).expanduser()
+    if str(checkpoint_path) != ":memory:":
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    async with AsyncSqliteSaver.from_conn_string(str(checkpoint_path)) as checkpointer:
+        await checkpointer.setup()
+        expired_count = await _prune_expired_checkpoints(
+            checkpointer, settings.coordinator_checkpoint_ttl_hours
+        )
+        app.state.coordinator_checkpointer = checkpointer
+        backend_client = BackendClient()
+        logger.info(
+            "AI Service started with model=%s fallback_models=%d "
+            "configured_api_keys=%d expired_checkpoints_removed=%d",
+            settings.gemini_model,
+            len(settings.get_gemini_models()) - 1,
+            len(settings.get_gemini_api_keys()),
+            expired_count,
+        )
+        try:
+            yield
+        finally:
+            await backend_client.close()
+            logger.info("AI Service stopped")
 
 # Create FastAPI app
 app = FastAPI(
@@ -54,6 +110,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(coordinator_router)
 
 # ============================================================================
 # HEALTH CHECK & PING ENDPOINTS
@@ -112,6 +169,8 @@ async def backend_ping():
     Calls backend's /api/test/ping endpoint and returns the result.
     """
     try:
+        if backend_client is None:
+            raise RuntimeError("Backend client is not initialized")
         backend_response = await backend_client.ping()
         return {
             "message": "Backend connection verified",
@@ -138,6 +197,8 @@ async def ai_propose_message(request: MessageRequest):
     This demonstrates bidirectional backend↔AI communication.
     """
     try:
+        if backend_client is None:
+            raise RuntimeError("Backend client is not initialized")
         logger.info(f"🤖 AI proposing message: '{request.message}'")
         result = await backend_client.create_message(request.message)
         logger.info(f"✅ Backend accepted AI proposal (ID: {result.id})")
@@ -156,6 +217,8 @@ async def ai_retrieve_message(message_id: int):
     Demonstrates AI querying the backend for existing data.
     """
     try:
+        if backend_client is None:
+            raise RuntimeError("Backend client is not initialized")
         logger.info(f"🤖 AI retrieving message ID: {message_id}")
         result = await backend_client.get_message(message_id)
         logger.info(f"✅ AI retrieved message: {result.message}")

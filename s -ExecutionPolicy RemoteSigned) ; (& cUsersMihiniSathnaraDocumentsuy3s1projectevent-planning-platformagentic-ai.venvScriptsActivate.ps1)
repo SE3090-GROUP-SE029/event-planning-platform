@@ -1,0 +1,376 @@
+[33mcommit 6a503038cb5ea407ac9f6f37a2f01a27ad42e213[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/cordinator-agentic-ai[m[33m)[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Sep 23 10:20:16 2026 +0530
+
+    feat: add data models and entities for coordinator agent
+
+[33mcommit 2b0355133aa46c61ff550cf002f2f742cb073c64[m[33m ([m[1;31morigin/dev[m[33m, [m[1;32mdev[m[33m)[m
+Merge: 7afc2ca d09d90e
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Tue Sep 22 14:26:11 2026 +0530
+
+    Merge pull request #58 from SE3090-GROUP-SE029/feature/vendor_profile
+    
+    feat(c2): add vendor services, profile image, and gallery dashboard
+
+[33mcommit d09d90e3530d14231e36760666d04f54949b6d94[m[33m ([m[1;31morigin/feature/vendor_profile[m[33m)[m
+Author: Nidurshan11 <Nithurshan11@users.noreply.github.com>
+Date:   Mon Sep 21 20:56:23 2026 +0530
+
+    fix(mobile): check mounted after async gaps in vendor pages
+    
+    Co-authored-by: Cursor <cursoragent@cursor.com>
+
+[33mcommit cd2552cedd6a1720ca11c9e7d6598b2ccc5d8bc6[m
+Author: Nidurshan11 <Nithurshan11@users.noreply.github.com>
+Date:   Mon Sep 21 20:50:01 2026 +0530
+
+    feat(c2): add vendor services, profile image, and gallery dashboard
+    
+    Extend C2 vendor marketplace with address/website fields, service CRUD, local image uploads, gallery management, and vendor dashboard overview on web and mobile.
+    
+    Co-authored-by: Cursor <cursoragent@cursor.com>
+
+[33mcommit 7afc2caba3e20809a246d14e0eb7ca59f031946c[m
+Merge: 2efb594 7ea7351
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Mon Sep 21 08:46:45 2026 +0530
+
+    Merge pull request #54 from SE3090-GROUP-SE029/feature/46-scheduling
+    
+    Feature/46 scheduling
+
+[33mcommit 7ea735185a2bbd6bc953af0610ada20379d67eb4[m[33m ([m[1;31morigin/feature/46-scheduling[m[33m)[m
+Author: Mathushayan <velmuruganmathushayan@gmail.com>
+Date:   Mon Sep 21 00:20:47 2026 +0530
+
+    feat(c3): implement IScheduleRepository, ScheduleRepository, and ConflictDetectionService
+
+[33mcommit 76e74423f2ed3fa0f9f0bbe1ce4b6fe5f3572e57[m
+Author: Mathushayan <velmuruganmathushayan@gmail.com>
+Date:   Sun Sep 20 23:55:02 2026 +0530
+
+    feat(c3): add EF Core configurations and migrations for scheduling tables
+
+[33mcommit 7c9357ccff9529ea228331bce2db80a61d4d9240[m
+Author: Mathushayan <velmuruganmathushayan@gmail.com>
+Date:   Sun Sep 20 15:56:34 2026 +0530
+
+    feat(c3): register TimelineActivity entity in DbContext
+
+[33mcommit 4e33765a4d8e7d81d84b6895760ae0696fc63a9e[m
+Merge: 40218cf 2efb594
+Author: Mathushayan <velmuruganmathushayan@gmail.com>
+Date:   Sun Sep 20 15:46:22 2026 +0530
+
+    Merge dev into feature/46-scheduling
+
+[33mcommit 40218cfd07cd52a563cf2788766812e97d46e779[m
+Author: Mathushayan <velmuruganmathushayan@gmail.com>
+Date:   Sun Sep 20 14:13:27 2026 +0530
+
+    feat(c3): add ScheduleConflict domain entity
+
+[33mcommit 2efb594000dad30c35922e30900561db73a136ac[m
+Merge: 645f07d b1753ef
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sun Sep 20 10:31:00 2026 +0530
+
+    Merge pull request #53 from SE3090-GROUP-SE029/chore/update-ci-workflow
+    
+    chore: update pull request template and dev ci workflow
+
+[33mcommit b1753ef63ceb27aa8339eef0316347d93a3d6e2c[m[33m ([m[1;31morigin/chore/update-ci-workflow[m[33m, [m[1;32mchore/update-ci-workflow[m[33m)[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sun Sep 20 10:28:25 2026 +0530
+
+    chore: update pull request template and dev ci workflow
+
+[33mcommit 645f07dc1aed5c1cf447e898472adcf5bfc45b83[m
+Merge: ccb39a9 e5e0d6e
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sun Sep 20 10:19:21 2026 +0530
+
+    Merge pull request #52 from SE3090-GROUP-SE029/feature/create-event
+    
+    feat: implement event management and UI/UX improvements across web and mobile
+
+[33mcommit e5e0d6ee5157586686a6908f17a97144d02a0e3f[m[33m ([m[1;31morigin/feature/create-event[m[33m, [m[1;32mfeature/create-event[m[33m)[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sun Sep 20 10:10:54 2026 +0530
+
+    fix: improve UI and UX across web and mobile applications
+
+[33mcommit eff6629082f5dceaa0354a67117c7fe3f0bcb90e[m
+Author: Mathushayan <velmuruganmathushayan@gmail.com>
+Date:   Sat Sep 19 16:42:13 2026 +0530
+
+    feat(c3): add initial EventSchedule and TimelineActivity domain entities
+
+[33mcommit e74df6bfef8278d5e7959634be192bd1b7ac8e01[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 19 13:16:21 2026 +0530
+
+    core: change readme
+
+[33mcommit 2bdaead813d519caf1bbbba97e069421cae59200[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 19 11:59:57 2026 +0530
+
+    refactor: remove the mock pages and screens from web and mobile
+
+[33mcommit 4d05098d45d2be3ef71edf1dc61f8db0bd07fe68[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 19 11:37:59 2026 +0530
+
+    feat: add admin dashboard for event viewing and update backend
+
+[33mcommit 7475b28d5b1102394176c9c3a0b0b4c7a46217be[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 19 11:13:43 2026 +0530
+
+    refactor: convert the flutter project to Riverpod and remove bloc safely
+
+[33mcommit 81ac74d10253e11b0dfe16e6eb6c0ea828481fa0[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 19 10:59:08 2026 +0530
+
+    feat: add event section for mobile app users
+
+[33mcommit 9d066ab45efd62fd2fe1c3976559ef847c5b52c5[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 19 10:45:22 2026 +0530
+
+    feat: add event crud apis
+
+[33mcommit 51438b9dc7819239f597886962383d6b208b6bb8[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 19 10:28:15 2026 +0530
+
+    feat: add unit tests for event
+
+[33mcommit b0f62658600b42d0d4c9be0070e2a631f861aa92[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 19 10:25:57 2026 +0530
+
+    feat: add event domain model
+
+[33mcommit ccb39a978709742fc0d9bb75d681d499abee41e2[m
+Merge: 0e552ff cbc6ae9
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Thu Sep 17 21:40:53 2026 +0530
+
+    Merge pull request #45 from SE3090-GROUP-SE029/feature/44-vendor-profile
+    
+    feat(vendors): add C2 vendor profile across backend, web, and mobile
+
+[33mcommit cbc6ae9b14871f6ec8e6d9a4b4499a1cb6410ef2[m[33m ([m[1;31morigin/feature/44-vendor-profile[m[33m)[m
+Author: Nidurshan11 <Nithurshan11@users.noreply.github.com>
+Date:   Thu Sep 17 20:49:32 2026 +0530
+
+    fix(ci): create .env.local for flutter-test and name failing jobs
+    
+    EOF
+    
+    Co-authored-by: Cursor <cursoragent@cursor.com>
+
+[33mcommit 577d6d6c9f68a7a487e55403d3a40e9fc8f77c51[m
+Author: Nidurshan11 <Nithurshan11@users.noreply.github.com>
+Date:   Thu Sep 17 20:42:29 2026 +0530
+
+    fix(ci): register Vendors DbSet and unblock PR CI failures
+    
+    EOF
+    
+    Co-authored-by: Cursor <cursoragent@cursor.com>
+
+[33mcommit 860a66e300aa4d8001980553bfde4e7198c2f09c[m
+Author: Nidurshan11 <Nithurshan11@users.noreply.github.com>
+Date:   Thu Sep 17 20:25:56 2026 +0530
+
+    feat(vendors): add C2 vendor profile across backend, web, and mobile
+    
+    EOF
+    
+    Co-authored-by: Cursor <cursoragent@cursor.com>
+
+[33mcommit 0e552ffa96370cc331a80b22185f41acb43d08c1[m
+Merge: 5f88c16 1426cc1
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Sep 16 21:44:10 2026 +0530
+
+    Merge pull request #43 from SE3090-GROUP-SE029/feature/42-redesign-flutter-and-web-screens
+    
+    feat: implement new design across React and Flutter applications
+
+[33mcommit 1426cc1eed13bf3e328a9e45f127e9e108034174[m[33m ([m[1;31morigin/feature/42-redesign-flutter-and-web-screens[m[33m, [m[1;32mfeature/42-redesign-flutter-and-web-screens[m[33m)[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Sep 16 21:41:41 2026 +0530
+
+    fix: remove depricated withOpacity() call
+
+[33mcommit 3c2eb7fa2113c38108c09ad76f709d693e6232ff[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Sep 16 21:29:35 2026 +0530
+
+    feat: implement new design across React and Flutter applications
+
+[33mcommit 5f88c16fe998b3dd848fa54020dad44b3618d0b7[m
+Merge: 8f2c2d6 c04e938
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Tue Sep 15 00:04:47 2026 +0530
+
+    Merge pull request #41 from SE3090-GROUP-SE029/feature/40-authentication-authorization
+    
+    Feature/40 authentication authorization
+
+[33mcommit c04e938c8cdb2002c16495f5dd3aa22ed6cb2912[m[33m ([m[1;31morigin/feature/40-authentication-authorization[m[33m, [m[1;32mfeature/40-authentication-authorization[m[33m)[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Mon Sep 14 23:53:50 2026 +0530
+
+    feat: Add authentication and authorization
+
+[33mcommit 42e28d8d5341f4181e086c93aa129f487c971d5d[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sat Sep 12 11:35:59 2026 +0530
+
+    feat: add authentication, authorization and RBAC
+
+[33mcommit 8f2c2d6da764d553e6a32987c139ea2a2cd673d6[m
+Merge: fde7d60 f989b77
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Mon Sep 7 09:55:40 2026 +0530
+
+    Merge pull request #39 from SE3090-GROUP-SE029/feature/test-feature
+    
+    core: add contributing.md file and remove dependabot.yml
+
+[33mcommit f989b77064ca982dbc26a9a4b993c06e6d1ea4a5[m[33m ([m[1;31morigin/feature/test-feature[m[33m, [m[1;32mfeature/test-feature[m[33m)[m
+Merge: b301ed6 fde7d60
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Mon Sep 7 09:42:45 2026 +0530
+
+    Merge remote-tracking branch 'origin/dev' into feature/test-feature
+
+[33mcommit b301ed6d10373b9590027da3c0b103153c6e3656[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Mon Sep 7 09:34:30 2026 +0530
+
+    core: remove dependabot.yml file
+
+[33mcommit 1efe94d45f7183d6ec3a7cf92dbd38886cf54d3d[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Mon Sep 7 09:27:17 2026 +0530
+
+    core: add contributing.md file
+
+[33mcommit ff5ca7c4f259fa6d258d2af7d801cad9b0125dbb[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Fri Aug 21 22:05:45 2026 +0530
+
+    core:add entity files
+
+[33mcommit fde7d60b93dd4df4f75fb19e1e32b11f567e8890[m
+Merge: e8f20f7 f2c0ac1
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Thu Aug 20 09:18:57 2026 +0530
+
+    Merge pull request #26 from SE3090-GROUP-SE029/feature/test-feature
+    
+    fix: update dev-intergration.yml migration check path
+
+[33mcommit f2c0ac1d2c5709abbd43cfb3558670af4d1c7e54[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Thu Aug 20 09:14:20 2026 +0530
+
+    fix: update dev-intergration.yml migration check path
+
+[33mcommit e8f20f7b1d6ddcf45cde52197923ae48c61c0892[m
+Merge: 4c6b8da 335ff40
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Thu Aug 20 09:10:15 2026 +0530
+
+    Merge pull request #25 from SE3090-GROUP-SE029/feature/test-feature
+    
+    fix: update dev-intergration.yml
+
+[33mcommit 335ff404cb1f1ec43d8d482999b763c3372b53fa[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Thu Aug 20 09:08:41 2026 +0530
+
+    fix: update dev-intergration.yml
+
+[33mcommit 4c6b8dae8972540a4582eca9a2f8ab93d46adb0d[m
+Merge: 40e44a9 bbe09d4
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Aug 19 22:55:03 2026 +0530
+
+    Merge pull request #13 from SE3090-GROUP-SE029/feature/test-feature
+    
+    chore: Add a test end to end workflow
+
+[33mcommit bbe09d4b6bdcc0a951ce71b6001a5d8aa4533bf5[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Aug 19 22:01:03 2026 +0530
+
+    fix: add test to mobile and web
+
+[33mcommit 328577ee0052addd3706f7ab0516af5befcbe497[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Aug 19 21:44:10 2026 +0530
+
+    fix: update mobile test_screen functions
+
+[33mcommit 56faf0885dff63776ee32b3d5df79e1e5a572281[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Aug 19 21:22:28 2026 +0530
+
+    fix: mobile test_screen
+
+[33mcommit a99f96942df79729b5029d76cd6285ad9241d402[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Aug 19 21:04:26 2026 +0530
+
+    fix: update the tests and pr-ci workflow
+
+[33mcommit 386c480c9bcad1bce6ef3494fc42e6c7f970ca10[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Aug 19 17:09:51 2026 +0530
+
+    fix: update the pr-ci.yml file
+
+[33mcommit d311ed51bd4b6d6cf0f163ce95a1647ffdb417e6[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Aug 19 16:42:34 2026 +0530
+
+    fix: resolve issues in pr-ci workflow
+
+[33mcommit f5f40795e2c5dc1043177345e054b4a2f6a807b5[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Wed Aug 19 16:12:19 2026 +0530
+
+    chore: Add test end to end workflow
+
+[33mcommit 40e44a9292d28ad214f39ec288d07b6e72f34f73[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sun Aug 16 21:52:17 2026 +0530
+
+    core: add github workflow files
+
+[33mcommit bb57f253ba364e9dd7f3ff1b7e17f5d779bdfd6e[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sun Aug 16 09:54:19 2026 +0530
+
+    chore: add folder structure for web, mobile and backend
+
+[33mcommit 243a944317ab72760e998c523add685a063d79c9[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Sun Aug 16 09:52:51 2026 +0530
+
+    chore: add initial folder structure
+
+[33mcommit 3d23970f8b6f9224b878db74391d08b564cbc764[m
+Author: MihiniSathnara <smihinis@gmail.com>
+Date:   Thu Aug 13 22:51:06 2026 +0530
+
+    Initial commit

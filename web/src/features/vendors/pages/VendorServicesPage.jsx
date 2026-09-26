@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -10,7 +10,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
   TextField,
   Typography,
@@ -28,7 +32,55 @@ import {
   useUpdateVendorService,
 } from '../api/vendorApi';
 
-const emptyForm = { serviceName: '', description: '' };
+const PRICING_TYPES = [
+  { value: 'FIXED', label: 'Fixed (LKR)' },
+  { value: 'PER_PERSON', label: 'Per person (LKR)' },
+  { value: 'PER_HOUR', label: 'Per hour (LKR)' },
+  { value: 'PER_DAY', label: 'Per day (LKR)' },
+];
+
+const emptyForm = { serviceName: '', description: '', price: '', pricingType: '' };
+
+function formatServicePrice(price, pricingType) {
+  if (price == null || price === '') {
+    return 'Price not set';
+  }
+
+  const amount = Number(price);
+  if (Number.isNaN(amount)) {
+    return 'Price not set';
+  }
+
+  const formatted = `Rs. ${amount.toLocaleString('en-LK', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} LKR`;
+
+  switch (pricingType) {
+    case 'PER_PERSON':
+      return `${formatted} · per person`;
+    case 'PER_HOUR':
+      return `${formatted} · per hour`;
+    case 'PER_DAY':
+      return `${formatted} · per day`;
+    case 'FIXED':
+      return `${formatted} · fixed`;
+    default:
+      return formatted;
+  }
+}
+
+function toPricePayload(price, pricingType) {
+  const trimmedPrice = typeof price === 'string' ? price.trim() : price;
+  if (trimmedPrice === '' || trimmedPrice == null) {
+    return { price: null, pricingType: null };
+  }
+
+  return {
+    price: Number(trimmedPrice),
+    pricingType: pricingType || null,
+  };
+}
 
 export default function VendorServicesPage() {
   const navigate = useNavigate();
@@ -46,8 +98,15 @@ export default function VendorServicesPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    control,
     formState: { errors },
   } = useForm({ defaultValues: emptyForm });
+
+  const selectedPricingType = useWatch({
+    control,
+    name: 'pricingType',
+  });
 
   useEffect(() => {
     if (!editingId) {
@@ -60,6 +119,8 @@ export default function VendorServicesPage() {
       reset({
         serviceName: current.serviceName ?? '',
         description: current.description ?? '',
+        price: current.price == null ? '' : String(current.price),
+        pricingType: current.pricingType ?? '',
       });
     }
   }, [editingId, services, reset]);
@@ -67,9 +128,11 @@ export default function VendorServicesPage() {
   const mutation = editingId ? updateService : createService;
 
   const onSubmit = (values) => {
+    const pricing = toPricePayload(values.price, values.pricingType);
     const payload = {
       serviceName: values.serviceName.trim(),
       description: values.description?.trim() || null,
+      ...pricing,
     };
 
     if (editingId) {
@@ -146,6 +209,48 @@ export default function VendorServicesPage() {
             helperText={errors.serviceName?.message}
           />
           <TextField fullWidth label="Description" margin="dense" multiline minRows={3} {...register('description')} />
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 0.5 }}>
+            <TextField
+              fullWidth
+              label="Price (Rs. / LKR)"
+              margin="dense"
+              type="number"
+              inputProps={{ min: 0, step: '0.01' }}
+              {...register('price', {
+                validate: (value) => {
+                  if (value === '' || value == null) return true;
+                  const amount = Number(value);
+                  if (Number.isNaN(amount) || amount < 0) {
+                    return 'Enter a valid price of Rs. 0 or more';
+                  }
+                  if (!selectedPricingType) {
+                    return 'Select a pricing type when setting a price';
+                  }
+                  return true;
+                },
+              })}
+              error={!!errors.price}
+              helperText={errors.price?.message || 'Leave blank to clear pricing'}
+            />
+            <FormControl fullWidth margin="dense">
+              <InputLabel id="pricing-type-label">Pricing type</InputLabel>
+              <Select
+                labelId="pricing-type-label"
+                label="Pricing type"
+                value={selectedPricingType || ''}
+                onChange={(event) => setValue('pricingType', event.target.value, { shouldValidate: true })}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {PRICING_TYPES.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
             <Button type="submit" variant="contained" sx={{ borderRadius: 9999 }} disabled={mutation.isPending}>
               {mutation.isPending ? <CircularProgress size={22} color="inherit" /> : editingId ? 'Save changes' : 'Add service'}
@@ -161,6 +266,19 @@ export default function VendorServicesPage() {
                 }}
               >
                 Cancel edit
+              </Button>
+            )}
+            {editingId && (
+              <Button
+                type="button"
+                variant="text"
+                sx={{ borderRadius: 9999 }}
+                onClick={() => {
+                  setValue('price', '');
+                  setValue('pricingType', '');
+                }}
+              >
+                Clear price
               </Button>
             )}
           </Stack>
@@ -183,6 +301,9 @@ export default function VendorServicesPage() {
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                   {service.description || 'No description'}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1, fontWeight: 600 }}>
+                  {formatServicePrice(service.price, service.pricingType)}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={0.5}>

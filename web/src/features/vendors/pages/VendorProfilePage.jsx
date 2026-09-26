@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import {
   Alert,
   Avatar,
@@ -49,7 +49,7 @@ export default function VendorProfilePage() {
     register,
     handleSubmit,
     reset,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm({
@@ -64,7 +64,10 @@ export default function VendorProfilePage() {
     },
   });
 
-  const selectedCategory = watch('category');
+  const selectedCategory = useWatch({
+    control,
+    name: 'category',
+  });
   const imageUrl = resolveVendorImageUrl(profile?.profileImageUrl);
 
   useEffect(() => {

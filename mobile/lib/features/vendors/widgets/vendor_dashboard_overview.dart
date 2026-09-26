@@ -194,6 +194,17 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
                   ),
                 ],
               ),
+              const SizedBox(height: AppDimens.space8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pushNamed(
+                    '/vendors/quotations',
+                    arguments: widget.session,
+                  ),
+                  child: const Text('Quotation requests'),
+                ),
+              ),
             ],
           ),
         ),

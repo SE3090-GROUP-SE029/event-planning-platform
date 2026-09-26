@@ -1,3 +1,5 @@
+using Domain.Enums;
+
 namespace Domain.Entities;
 
 /// <summary>
@@ -10,6 +12,8 @@ public class VendorOffering
     public Guid VendorId { get; set; }
     public string ServiceName { get; set; } = default!;
     public string? Description { get; set; }
+    public decimal? Price { get; set; }
+    public PricingType? PricingType { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
