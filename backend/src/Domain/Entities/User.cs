@@ -12,4 +12,7 @@ public class User
     public bool IsActive {get; set;} = true;
     public ICollection<UserRole> UserRoles { get; set; } = [];
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
+    public ICollection<EventPlanDraft> CreatedEventPlanDrafts { get; set; } = [];
+    public ICollection<EventPlanDraft> ApprovedEventPlanDrafts { get; set; } = [];
+    public ICollection<EventPlanDraft> RejectedEventPlanDrafts { get; set; } = [];
 }

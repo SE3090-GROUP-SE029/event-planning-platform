@@ -7,6 +7,8 @@ using Application.Services.Quotations;
 using Application.Services.Scheduling;
 using Application.Services.Test;
 using Application.Services.Vendors;
+using Application.Services.Planning;
+using Application.Services.Validation;
 using Application.Validators.Events;
 using FluentValidation;
 using Infrastructure.Auth;
@@ -19,6 +21,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Infrastructure.Services.Planning;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -93,6 +96,20 @@ builder.Services.AddScoped<IQuotationService, QuotationService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
+builder.Services.AddScoped<IEventPlanDraftRepository, EventPlanDraftRepository>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICoordinatorPlanValidationService, CoordinatorPlanValidationService>();
+builder.Services.AddScoped<IPlanGenerationService, PlanGenerationService>();
+builder.Services.AddScoped<IPlanDecisionService, PlanDecisionService>();
+builder.Services.AddScoped<IAgenticAiClient, AgenticAiClient>();
+builder.Services.AddHttpClient("AgenticAI", client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["AgenticAI:BaseUrl"] ?? "http://localhost:8000");
+    client.Timeout = TimeSpan.FromSeconds(
+        builder.Configuration.GetValue("AgenticAI:TimeoutSeconds", 250));
+});
 builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 
 // Component 3: Scheduling Registrations
