@@ -6,6 +6,8 @@ import FaceIcon from '@mui/icons-material/Face';
 import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -14,9 +16,11 @@ const Icons = {
   Dashboard: () => <HomeFilledIcon />,
   Events: () => <EventAvailableIcon/>,
   Marketplace: () => <StorefrontOutlinedIcon />,
+  MyQuotations: () => <ReceiptLongOutlinedIcon />,
   Profile: () => <FaceIcon/>,
   Services: () => <HandymanOutlinedIcon />,
   Availability: () => <ScheduleOutlinedIcon />,
+  VendorQuotations: () => <RequestQuoteOutlinedIcon />,
   Logout: () => <MeetingRoomIcon/>,
   ChevronLeft: () => <ChevronLeftIcon/>,
   ChevronRight: () => <ChevronRightIcon/>,
@@ -26,9 +30,11 @@ export default function CollapsibleSidebar({
   activeTab = 'dashboard',
   showEvents = false,
   showMarketplace = false,
+  showMyQuotations = false,
   showVendorProfile = false,
   showVendorServices = false,
   showVendorAvailability = false,
+  showVendorQuotations = false,
   onSelectTab,
   onLogout,
 }) {
@@ -37,9 +43,11 @@ export default function CollapsibleSidebar({
     { id: 'dashboard', label: 'Dashboard', icon: Icons.Dashboard },
     ...(showEvents ? [{ id: 'events', label: 'Events', icon: Icons.Events }] : []),
     ...(showMarketplace ? [{ id: 'marketplace', label: 'Marketplace', icon: Icons.Marketplace }] : []),
+    ...(showMyQuotations ? [{ id: 'my-quotations', label: 'My quotations', icon: Icons.MyQuotations }] : []),
     ...(showVendorProfile ? [{ id: 'vendor-profile', label: 'Vendor profile', icon: Icons.Profile }] : []),
     ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
     ...(showVendorAvailability ? [{ id: 'vendor-availability', label: 'Availability', icon: Icons.Availability }] : []),
+    ...(showVendorQuotations ? [{ id: 'vendor-quotations', label: 'Quotation requests', icon: Icons.VendorQuotations }] : []),
   ];
 
   return (

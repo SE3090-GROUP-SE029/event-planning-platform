@@ -14,6 +14,10 @@ backend/.vs/
 backend/.vscode/
 *.csproj.user
 
+# Runtime vendor uploads (keep folder via .gitkeep)
+backend/src/Api/wwwroot/uploads/vendors/*
+!backend/src/Api/wwwroot/uploads/vendors/.gitkeep
+
 # Node / React
 node_modules/
 web/build/
