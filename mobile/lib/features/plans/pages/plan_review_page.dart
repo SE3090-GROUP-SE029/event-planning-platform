@@ -222,7 +222,8 @@ class _PlanReviewPageState extends ConsumerState<PlanReviewPage> {
     );
     reasonController.dispose();
     if (!mounted || reason == null) return;
-    if (!await controller.regenerate(reason) || !mounted) return;
+    if (!await controller.regenerate(reason)) return;
+    if (!context.mounted) {return;}
     final newPlanId = controller.plan?.id;
     if (newPlanId != null && newPlanId.isNotEmpty) {
       Navigator.pushReplacementNamed(

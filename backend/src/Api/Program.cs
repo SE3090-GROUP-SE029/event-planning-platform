@@ -9,7 +9,6 @@ using Application.Services.Test;
 using Application.Services.Vendors;
 using Application.Services.Planning;
 using Application.Services.Validation;
-using Application.Dtos.Events;
 using Application.Validators.Events;
 using FluentValidation;
 using Infrastructure.Auth;

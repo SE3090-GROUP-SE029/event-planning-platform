@@ -74,7 +74,8 @@ public sealed class PlanGenerationServiceTests
         using var db = CreateDb();
         var aiClient = new TestAgenticAiClient();
         var planRepository = new TestEventPlanDraftRepository();
-        var service = CreateService(db, eventEntity, null, false, aiClient, planRepository);
+        var userId = Guid.NewGuid();
+        var service = CreateService(db, eventEntity, userId, false, aiClient, planRepository);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             service.GeneratePlanAsync(eventEntity.Id));
