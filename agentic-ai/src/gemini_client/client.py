@@ -1,19 +1,30 @@
-"""Async Gemini client with retries and Pydantic structured-output validation."""
+"""Async Gemini client with bounded retry, model/key fallback, and output caching."""
 
 import asyncio
+import hashlib
 import json
 import logging
-import random
+import threading
+import time
+from collections import OrderedDict
 from collections.abc import AsyncIterator
+from functools import lru_cache
 from typing import Any, TypeVar
 
 from google import generativeai as genai
+from google.ai.generativelanguage_v1beta.services.generative_service.async_client import (
+    GenerativeServiceAsyncClient,
+)
+from google.api_core.client_options import ClientOptions
 from google.api_core.exceptions import (
     DeadlineExceeded,
     GoogleAPIError,
     InternalServerError,
+    NotFound,
+    PermissionDenied,
     ResourceExhausted,
     ServiceUnavailable,
+    Unauthenticated,
 )
 from pydantic import BaseModel, ValidationError
 
@@ -23,15 +34,102 @@ from src.coordinator_agent.prompts import PLAN_GENERATION_PROMPT
 from .exceptions import (
     GeminiClientError,
     GeminiConfigurationError,
+    GeminiInvalidCredentialsError,
+    GeminiInvalidModelError,
+    GeminiNetworkError,
+    GeminiQuotaError,
     GeminiResponseError,
-    GeminiTokenLimitError,
+    GeminiRateLimitError,
     GeminiTimeoutError,
+    GeminiTokenLimitError,
 )
 from .schema import pydantic_to_gemini_schema
 from .structured_output import StructuredOutputValidator
 
 logger = logging.getLogger(__name__)
 ModelT = TypeVar("ModelT", bound=BaseModel)
+_RETRYABLE_ERRORS = (ServiceUnavailable, DeadlineExceeded, InternalServerError)
+_RESPONSE_CACHE_TTL_SECONDS = 900
+_RESPONSE_CACHE_MAX_ENTRIES = 512
+_response_cache: OrderedDict[str, tuple[float, str]] = OrderedDict()
+_response_cache_lock = threading.Lock()
+
+
+@lru_cache(maxsize=128)
+def _configured_model(model_name: str, api_key: str) -> Any:
+    """Build a model with key-bound clients, avoiding the SDK's global key state."""
+
+    model: Any = genai.GenerativeModel(model_name)
+    model._async_client = GenerativeServiceAsyncClient(
+        client_options=ClientOptions(api_key=api_key)
+    )
+    return model
+
+
+def _mask_api_key(api_key: str) -> str:
+    return f"****{api_key[-4:]}" if len(api_key) > 4 else "****"
+
+
+def _estimated_tokens(text: str) -> int:
+    return max(1, len(text) // 4)
+
+
+def _response_cache_key(
+    prompt: str, schema: type[BaseModel], model_names: tuple[str, ...]
+) -> str:
+    payload = json.dumps(
+        {
+            "prompt": prompt,
+            "schema": pydantic_to_gemini_schema(schema),
+            "models": model_names,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _get_cached_response(cache_key: str) -> str | None:
+    now = time.monotonic()
+    with _response_cache_lock:
+        expired = [
+            key for key, (expires_at, _) in _response_cache.items() if expires_at <= now
+        ]
+        for key in expired:
+            del _response_cache[key]
+        cached = _response_cache.get(cache_key)
+        if cached is None:
+            return None
+        _response_cache.move_to_end(cache_key)
+        return cached[1]
+
+
+def _cache_response(cache_key: str, response_json: str) -> None:
+    with _response_cache_lock:
+        _response_cache[cache_key] = (
+            time.monotonic() + _RESPONSE_CACHE_TTL_SECONDS,
+            response_json,
+        )
+        _response_cache.move_to_end(cache_key)
+        while len(_response_cache) > _RESPONSE_CACHE_MAX_ENTRIES:
+            _response_cache.popitem(last=False)
+
+
+def _is_rate_limit(exc: ResourceExhausted) -> bool:
+    error_info = getattr(exc, "error_info", None)
+    reason = str(getattr(error_info, "reason", "") or "").casefold()
+    details = " ".join(str(item) for item in getattr(exc, "details", ())).casefold()
+    message = f"{exc} {reason} {details}".casefold()
+    return any(
+        marker in message
+        for marker in (
+            "rate limit",
+            "too many requests",
+            "rate_limit",
+            "per minute",
+            "requests per",
+        )
+    )
 
 
 class GeminiClient:
@@ -51,14 +149,28 @@ class GeminiClient:
         model: Any | None = None,
     ) -> None:
         settings = get_settings()
-        key = api_key if api_key is not None else settings.gemini_api_key
-        if not key and model is None:
-            raise GeminiConfigurationError("GEMINI_API_KEY is required")
-        self.api_key = key
-        self.model_name = model_name or settings.gemini_model
+        self.api_keys = (
+            (api_key,)
+            if api_key
+            else settings.get_gemini_api_keys()
+        )
+        self.model_names = (
+            (model_name or settings.gemini_model,)
+            if model is not None
+            else (model_name,) if model_name else settings.get_gemini_models()
+        )
+        if not self.api_keys and model is None:
+            raise GeminiConfigurationError("At least one Gemini API key is required")
         self.max_retries = max_retries if max_retries is not None else settings.gemini_max_retries
         self.retry_delay = (
-            retry_delay if retry_delay is not None else settings.gemini_retry_delay_seconds
+            retry_delay
+            if retry_delay is not None
+            else settings.gemini_retry_delay_seconds
+        )
+        self.retry_max_delay = (
+            settings.gemini_retry_max_delay_seconds
+            if retry_delay is None
+            else max(settings.gemini_retry_max_delay_seconds, retry_delay)
         )
         self.timeout = timeout if timeout is not None else settings.gemini_timeout_seconds
         self.temperature = temperature
@@ -67,9 +179,6 @@ class GeminiClient:
         self.max_input_tokens = max_input_tokens
         self.model = model
         self.validator = StructuredOutputValidator()
-        if self.model is None:
-            genai.configure(api_key=key)
-            self.model = genai.GenerativeModel(self.model_name)
 
     async def __aenter__(self) -> "GeminiClient":
         return self
@@ -83,62 +192,56 @@ class GeminiClient:
         """Generate and validate a non-streaming structured plan."""
 
         prompt = self._build_prompt(event_data, schema)
-        token_count = await self._check_token_limit(prompt)
-        response = await self._call_with_retry(prompt, schema, token_count=token_count)
-        return self._parse_response(response, schema)
+        return await self.generate_with_prompt(prompt, schema, node_name="generate_plan")
 
-    async def generate_with_prompt(self, prompt: str, schema: type[ModelT]) -> ModelT:
+    async def generate_with_prompt(
+        self,
+        prompt: str,
+        schema: type[ModelT],
+        node_name: str = "unspecified",
+    ) -> ModelT:
         """Generate a structured response from an already-rendered prompt."""
 
-        token_count = await self._check_token_limit(prompt)
-        response = await self._call_with_retry(prompt, schema, token_count=token_count)
-        return self._parse_response(response, schema)
+        token_estimate = self._check_token_limit(prompt)
+        cache_key = _response_cache_key(prompt, schema, self.model_names)
+        cached_json = None if self.model is not None else _get_cached_response(cache_key)
+        if cached_json is not None:
+            logger.info(
+                "Gemini response cache hit node=%s prompt_tokens_estimate=%d",
+                node_name,
+                token_estimate,
+            )
+            return schema.model_validate_json(cached_json)
+
+        response = await self._call_with_retry(
+            prompt, schema, token_count=token_estimate, node_name=node_name
+        )
+        parsed = self._parse_response(response, schema)
+        if self.model is None:
+            _cache_response(cache_key, parsed.model_dump_json())
+        return parsed
 
     async def generate_plan_with_streaming(
         self, event_data: dict[str, Any], schema: type[ModelT]
     ) -> AsyncIterator[str]:
-        """Yield response text chunks for long-running operations."""
+        """Yield buffered response chunks so a retry never duplicates partial output."""
 
         prompt = self._build_prompt(event_data, schema)
-        token_count = await self._check_token_limit(prompt)
-        response = await self._call_with_retry(
-            prompt, schema, stream=True, token_count=token_count
+        token_estimate = self._check_token_limit(prompt)
+        chunks = await self._call_with_retry(
+            prompt,
+            schema,
+            stream=True,
+            token_count=token_estimate,
+            node_name="generate_plan_streaming",
         )
-        async for chunk in response:
-            text = getattr(chunk, "text", "")
-            if text:
-                yield text
+        for chunk in chunks:
+            yield chunk
 
     def count_tokens(self, prompt: str) -> int:
-        """Return the SDK token count, with a conservative local fallback."""
+        """Return a local token estimate without spending a provider request."""
 
-        try:
-            response = self._require_model().count_tokens(
-                prompt,
-                request_options={"timeout": self.timeout},
-            )
-            return int(response.total_tokens)
-        except (GoogleAPIError, AttributeError, TypeError, TimeoutError) as exc:
-            logger.warning("Gemini token counting failed; using estimate: %s", type(exc).__name__)
-            return max(1, len(prompt) // 4)
-
-    async def _count_tokens_for_request(self, prompt: str) -> int:
-        """Count tokens without blocking the event loop, bounded by Gemini timeout."""
-
-        try:
-            async_counter = getattr(self._require_model(), "count_tokens_async", None)
-            if async_counter is None:
-                return await asyncio.to_thread(self.count_tokens, prompt)
-            response = await async_counter(
-                prompt,
-                request_options={
-                    "timeout": get_settings().gemini_token_count_timeout_seconds
-                },
-            )
-            return int(response.total_tokens)
-        except (GoogleAPIError, AttributeError, TypeError, TimeoutError) as exc:
-            logger.warning("Gemini token counting failed; using estimate: %s", type(exc).__name__)
-            return max(1, len(prompt) // 4)
+        return _estimated_tokens(prompt)
 
     def validate_response(self, response: Any, schema: type[ModelT]) -> ModelT:
         """Validate a parsed response against its requested Pydantic schema."""
@@ -160,6 +263,7 @@ class GeminiClient:
         schema: type[ModelT],
         stream: bool = False,
         token_count: int = 0,
+        node_name: str = "unspecified",
     ) -> Any:
         generation_config = {
             "temperature": self.temperature,
@@ -168,39 +272,214 @@ class GeminiClient:
             "response_mime_type": "application/json",
             "response_schema": pydantic_to_gemini_schema(schema),
         }
-        for attempt in range(self.max_retries + 1):
-            try:
-                logger.info(
-                    "Calling Gemini model=%s attempt=%d tokens=%d",
-                    self.model_name,
-                    attempt + 1,
-                    token_count,
-                )
-                return await self._require_model().generate_content_async(
-                    prompt,
-                    generation_config=generation_config,
-                    stream=stream,
-                    request_options={"timeout": self.timeout},
-                )
-            except (
-                ResourceExhausted,
-                ServiceUnavailable,
-                DeadlineExceeded,
-                InternalServerError,
-            ) as exc:
-                if attempt >= self.max_retries:
-                    if isinstance(exc, DeadlineExceeded):
-                        raise GeminiTimeoutError(
-                            "Gemini API request timed out after retries"
-                        ) from exc
-                    raise GeminiClientError("Gemini API request failed after retries") from exc
-                delay = self.retry_delay * (2**attempt) + random.uniform(0, self.retry_delay)
-                logger.warning("Gemini request retrying in %.2fs: %s", delay, type(exc).__name__)
-                await asyncio.sleep(delay)
-            except GoogleAPIError as exc:
-                raise GeminiClientError(
-                    "Gemini rejected the request; verify model access and request configuration"
-                ) from exc
+        failures: list[tuple[str, Exception]] = []
+        invalid_key_indices: set[int] = set()
+        invalid_model_names: set[str] = set()
+        retries_used = 0
+
+        for model_index, model_name in enumerate(self.model_names):
+            if model_name in invalid_model_names:
+                continue
+            api_keys = ("",) if self.model is not None else self.api_keys
+            for configured_key_index, api_key in enumerate(api_keys):
+                key_index = configured_key_index + 1 if api_key else 0
+                if key_index in invalid_key_indices:
+                    continue
+                if configured_key_index > 0:
+                    logger.info(
+                        "Gemini API key fallback node=%s model=%s "
+                        "api_key_index=%d api_key=%s fallback_attempt=%d",
+                        node_name,
+                        model_name,
+                        key_index,
+                        _mask_api_key(api_key),
+                        configured_key_index,
+                    )
+                if model_index > 0:
+                    logger.info(
+                        "Gemini model fallback node=%s model=%s fallback_attempt=%d",
+                        node_name,
+                        model_name,
+                        model_index,
+                    )
+                if self.model is not None:
+                    model = self.model
+                else:
+                    model = _configured_model(model_name, api_key)
+                retry_count = 0
+                while True:
+                    logger.info(
+                        "Calling Gemini node=%s model=%s api_key_index=%d "
+                        "api_key=%s retry_count=%d input_tokens_estimate=%d",
+                        node_name,
+                        model_name,
+                        key_index,
+                        _mask_api_key(api_key) if api_key else "injected-model",
+                        retry_count,
+                        token_count,
+                    )
+                    try:
+                        response = await model.generate_content_async(
+                            prompt,
+                            generation_config=generation_config,
+                            stream=stream,
+                            request_options={"timeout": self.timeout},
+                        )
+                        if stream:
+                            chunks: list[str] = []
+                            async for chunk in response:
+                                text = getattr(chunk, "text", "")
+                                if text:
+                                    chunks.append(text)
+                            logger.info(
+                                "Gemini response complete node=%s model=%s "
+                                "api_key_index=%d output_tokens_estimate=%d",
+                                node_name,
+                                model_name,
+                                key_index,
+                                _estimated_tokens("".join(chunks)),
+                            )
+                            return chunks
+                        logger.info(
+                            "Gemini response complete node=%s model=%s "
+                            "api_key_index=%d output_tokens_estimate=%d",
+                            node_name,
+                            model_name,
+                            key_index,
+                            _estimated_tokens(getattr(response, "text", "") or ""),
+                        )
+                        return response
+                    except ResourceExhausted as exc:
+                        category = "rate_limit" if _is_rate_limit(exc) else "quota"
+                        failures.append((category, exc))
+                        logger.warning(
+                            "Gemini quota-related failure node=%s model=%s "
+                            "api_key_index=%d api_key=%s retry_count=%d category=%s",
+                            node_name,
+                            model_name,
+                            key_index,
+                            _mask_api_key(api_key) if api_key else "injected-model",
+                            retry_count,
+                            category,
+                        )
+                        if category == "rate_limit" and retries_used < self.max_retries:
+                            await self._wait_before_retry(
+                                retries_used, node_name, model_name
+                            )
+                            retries_used += 1
+                            retry_count += 1
+                            continue
+                        break
+                    except _RETRYABLE_ERRORS as exc:
+                        failures.append(("network", exc))
+                        if retries_used >= self.max_retries:
+                            logger.warning(
+                                "Gemini transient failure node=%s model=%s "
+                                "api_key_index=%d api_key=%s retry_budget_used=%d error=%s",
+                                node_name,
+                                model_name,
+                                key_index,
+                                _mask_api_key(api_key) if api_key else "injected-model",
+                                retries_used,
+                                type(exc).__name__,
+                            )
+                            break
+                        await self._wait_before_retry(retries_used, node_name, model_name)
+                        retries_used += 1
+                        retry_count += 1
+                    except (Unauthenticated, PermissionDenied) as exc:
+                        failures.append(("credentials", exc))
+                        invalid_key_indices.add(key_index)
+                        logger.error(
+                            "Gemini credentials rejected node=%s model=%s "
+                            "api_key_index=%d api_key=%s",
+                            node_name,
+                            model_name,
+                            key_index,
+                            _mask_api_key(api_key) if api_key else "injected-model",
+                        )
+                        break
+                    except NotFound as exc:
+                        failures.append(("model", exc))
+                        invalid_model_names.add(model_name)
+                        logger.warning(
+                            "Gemini model unavailable node=%s model=%s "
+                            "api_key_index=%d api_key=%s",
+                            node_name,
+                            model_name,
+                            key_index,
+                            _mask_api_key(api_key) if api_key else "injected-model",
+                        )
+                        break
+                    except GoogleAPIError as exc:
+                        failures.append(("provider", exc))
+                        logger.error(
+                            "Gemini request rejected node=%s model=%s "
+                            "api_key_index=%d api_key=%s error=%s",
+                            node_name,
+                            model_name,
+                            key_index,
+                            _mask_api_key(api_key) if api_key else "injected-model",
+                            type(exc).__name__,
+                        )
+                        break
+                if model_name in invalid_model_names:
+                    break
+
+        self._raise_provider_failure(failures)
+
+    async def _wait_before_retry(
+        self, retry_count: int, node_name: str, model_name: str
+    ) -> None:
+        delay = min(self.retry_delay * (2**retry_count), self.retry_max_delay)
+        logger.warning(
+            "Gemini retry scheduled node=%s model=%s retry_count=%d delay_seconds=%.1f",
+            node_name,
+            model_name,
+            retry_count + 1,
+            delay,
+        )
+        await asyncio.sleep(delay)
+
+    @staticmethod
+    def _raise_provider_failure(failures: list[tuple[str, Exception]]) -> None:
+        if not failures:
+            raise GeminiClientError("Gemini request failed without a provider response")
+        categories = {category for category, _ in failures}
+        cause = failures[-1][1]
+        if "quota" in categories or "rate_limit" in categories:
+            if "rate_limit" in categories and "quota" not in categories:
+                raise GeminiRateLimitError(
+                    "Gemini rate limit persists across configured fallbacks"
+                ) from cause
+            raise GeminiQuotaError(
+                "Gemini quota is exhausted across configured keys and models"
+            ) from cause
+        if categories == {"credentials"}:
+            raise GeminiInvalidCredentialsError(
+                "All configured Gemini API keys were rejected"
+            ) from cause
+        if categories == {"model"}:
+            raise GeminiInvalidModelError(
+                "No configured Gemini model is available for this request"
+            ) from cause
+        if "network" in categories:
+            if isinstance(cause, DeadlineExceeded):
+                raise GeminiTimeoutError("Gemini request timed out after retries") from cause
+            raise GeminiNetworkError(
+                "Gemini is temporarily unavailable after bounded retries"
+            ) from cause
+        if "credentials" in categories:
+            raise GeminiInvalidCredentialsError(
+                "Gemini rejected the configured API credentials"
+            ) from cause
+        if "model" in categories:
+            raise GeminiInvalidModelError(
+                "Gemini rejected the configured model"
+            ) from cause
+        raise GeminiClientError(
+            "Gemini rejected the request; verify model access and request configuration"
+        ) from cause
 
     def _parse_response(self, response: Any, schema: type[ModelT]) -> ModelT:
         text = getattr(response, "text", None)
@@ -212,56 +491,26 @@ class GeminiClient:
             raise GeminiResponseError("Gemini returned invalid JSON") from exc
         return self.validate_response(payload, schema)
 
-    def _require_model(self) -> Any:
-        if self.model is None:
-            raise GeminiConfigurationError("Gemini model is not configured")
-        return self.model
-
     def _build_prompt(self, event_data: dict[str, Any], schema: type[ModelT]) -> str:
         return PLAN_GENERATION_PROMPT.format(
-            event_data=json.dumps(event_data, ensure_ascii=True, default=str),
-            schema=json.dumps(pydantic_to_gemini_schema(schema), ensure_ascii=True),
+            event_data=json.dumps(event_data, ensure_ascii=False, default=str),
+            schema=json.dumps(pydantic_to_gemini_schema(schema), ensure_ascii=False),
         )
 
-    async def _check_token_limit(self, prompt: str) -> int:
-        token_count = await self._count_tokens_for_request(prompt)
+    def _check_token_limit(self, prompt: str) -> int:
+        token_count = _estimated_tokens(prompt)
         if token_count > self.max_input_tokens:
             raise GeminiTokenLimitError(
-                f"prompt uses {token_count} tokens; maximum is {self.max_input_tokens}"
+                f"prompt uses approximately {token_count} tokens; "
+                f"maximum is {self.max_input_tokens}"
             )
         return token_count
 
 
 def configure_gemini() -> None:
-    """Verify API credentials and model availability during service startup."""
+    """Validate local Gemini configuration without spending quota at startup."""
 
     settings = get_settings()
-    if not settings.gemini_api_key:
-        raise GeminiConfigurationError("GEMINI_API_KEY is required to start the AI service")
-
-    genai.configure(api_key=settings.gemini_api_key)
-    try:
-        models = genai.list_models(
-            request_options={"timeout": settings.gemini_validation_timeout_seconds}
-        )
-        model = next(
-            (
-                item
-                for item in models
-                if item.name.removeprefix("models/") == settings.gemini_model
-            ),
-            None,
-        )
-    except GoogleAPIError as exc:
-        raise GeminiConfigurationError(
-            "Unable to validate Gemini credentials or model availability"
-        ) from exc
-
-    if model is None:
-        raise GeminiConfigurationError(
-            f"Configured Gemini model {settings.gemini_model!r} is unavailable to this API key"
-        )
-    if "generateContent" not in model.supported_generation_methods:
-        raise GeminiConfigurationError(
-            f"Configured Gemini model {settings.gemini_model!r} does not support generateContent"
-        )
+    if not settings.get_gemini_api_keys():
+        raise GeminiConfigurationError("GEMINI_API_KEY or GEMINI_API_KEYS is required")
+    settings.get_gemini_models()
