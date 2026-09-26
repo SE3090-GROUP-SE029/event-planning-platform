@@ -8,6 +8,13 @@ import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetai
 import VendorProfilePage from '../features/vendors/pages/VendorProfilePage';
 import VendorServicesPage from '../features/vendors/pages/VendorServicesPage';
 import { ScheduleBuilderPage } from '../features/scheduling/pages/ScheduleBuilderPage';
+import VendorAvailabilityPage from '../features/vendors/pages/VendorAvailabilityPage';
+import VendorMarketplacePage from '../features/vendors/pages/VendorMarketplacePage';
+import VendorMarketplaceDetailPage from '../features/vendors/pages/VendorMarketplaceDetailPage';
+import RequestQuotationPage from '../features/quotations/pages/RequestQuotationPage';
+import MyQuotationsPage from '../features/quotations/pages/MyQuotationsPage';
+import VendorQuotationsPage from '../features/quotations/pages/VendorQuotationsPage';
+import VendorQuotationDetailPage from '../features/quotations/pages/VendorQuotationDetailPage';
 
 export const router = createBrowserRouter([
   {
@@ -39,6 +46,22 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute requiredRole="ADMIN"><AdminEventDetailsPage /></ProtectedRoute>,
   },
   {
+    path: '/marketplace',
+    element: <ProtectedRoute><VendorMarketplacePage /></ProtectedRoute>,
+  },
+  {
+    path: '/marketplace/:vendorId',
+    element: <ProtectedRoute><VendorMarketplaceDetailPage /></ProtectedRoute>,
+  },
+  {
+    path: '/marketplace/:vendorId/request-quotation',
+    element: <ProtectedRoute requiredRole="EVENT_PLANNER"><RequestQuotationPage /></ProtectedRoute>,
+  },
+  {
+    path: '/quotations/mine',
+    element: <ProtectedRoute requiredRole="EVENT_PLANNER"><MyQuotationsPage /></ProtectedRoute>,
+  },
+  {
     path: '/vendor/profile',
     element: <ProtectedRoute requiredRole="VENDOR"><VendorProfilePage /></ProtectedRoute>,
   },
@@ -47,7 +70,19 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute requiredRole="VENDOR"><VendorServicesPage /></ProtectedRoute>,
   },
   {
-  path: '/events/:eventId/schedule',
-  element: <ScheduleBuilderPage />
-  }
+    path: '/events/:eventId/schedule',
+    element: <ProtectedRoute><ScheduleBuilderPage /></ProtectedRoute>,
+  },
+  {
+    path: '/vendor/availability',
+    element: <ProtectedRoute requiredRole="VENDOR"><VendorAvailabilityPage /></ProtectedRoute>,
+  },
+  {
+    path: '/vendor/quotations',
+    element: <ProtectedRoute requiredRole="VENDOR"><VendorQuotationsPage /></ProtectedRoute>,
+  },
+  {
+    path: '/vendor/quotations/:id',
+    element: <ProtectedRoute requiredRole="VENDOR"><VendorQuotationDetailPage /></ProtectedRoute>,
+  },
 ]);

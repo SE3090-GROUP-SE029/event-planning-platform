@@ -51,7 +51,28 @@ public class VendorOfferingServiceTests
         Assert.Equal(vendorId, created.VendorId);
         Assert.Equal("Wedding Photography", created.ServiceName);
         Assert.Equal("Full-day wedding photography service", created.Description);
+        Assert.Null(created.Price);
+        Assert.Null(created.PricingType);
         Assert.Single(db.VendorOfferings);
+    }
+
+    [Fact]
+    public async Task CreateAsync_SetsPriceAndPricingType()
+    {
+        using var db = CreateDb();
+        var userId = Guid.NewGuid();
+        await SeedVendorAsync(db, userId);
+        var service = new VendorOfferingService(new VendorRepository(db), new VendorOfferingRepository(db));
+
+        var created = await service.CreateAsync(userId, new CreateVendorOfferingRequest
+        {
+            ServiceName = "Wedding Photography",
+            Price = 85000.50m,
+            PricingType = "FIXED"
+        });
+
+        Assert.Equal(85000.50m, created.Price);
+        Assert.Equal("FIXED", created.PricingType);
     }
 
     [Fact]
@@ -98,6 +119,56 @@ public class VendorOfferingServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_UpdatesPriceAndPricingType()
+    {
+        using var db = CreateDb();
+        var userId = Guid.NewGuid();
+        await SeedVendorAsync(db, userId);
+        var service = new VendorOfferingService(new VendorRepository(db), new VendorOfferingRepository(db));
+        var created = await service.CreateAsync(userId, new CreateVendorOfferingRequest
+        {
+            ServiceName = "Catering",
+            Price = 1000m,
+            PricingType = "FIXED"
+        });
+
+        var updated = await service.UpdateAsync(userId, created.Id, new UpdateVendorOfferingRequest
+        {
+            ServiceName = "Catering",
+            Price = 2500.75m,
+            PricingType = "PER_PERSON"
+        });
+
+        Assert.Equal(2500.75m, updated.Price);
+        Assert.Equal("PER_PERSON", updated.PricingType);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ClearsPriceAndPricingType()
+    {
+        using var db = CreateDb();
+        var userId = Guid.NewGuid();
+        await SeedVendorAsync(db, userId);
+        var service = new VendorOfferingService(new VendorRepository(db), new VendorOfferingRepository(db));
+        var created = await service.CreateAsync(userId, new CreateVendorOfferingRequest
+        {
+            ServiceName = "DJ Package",
+            Price = 40000m,
+            PricingType = "PER_DAY"
+        });
+
+        var updated = await service.UpdateAsync(userId, created.Id, new UpdateVendorOfferingRequest
+        {
+            ServiceName = "DJ Package",
+            Price = null,
+            PricingType = null
+        });
+
+        Assert.Null(updated.Price);
+        Assert.Null(updated.PricingType);
+    }
+
+    [Fact]
     public async Task DeleteAsync_RemovesOwnedService()
     {
         using var db = CreateDb();
@@ -125,13 +196,17 @@ public class VendorOfferingServiceTests
         var service = new VendorOfferingService(new VendorRepository(db), new VendorOfferingRepository(db));
         var created = await service.CreateAsync(userA, new CreateVendorOfferingRequest
         {
-            ServiceName = "A Service"
+            ServiceName = "A Service",
+            Price = 10000m,
+            PricingType = "FIXED"
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             service.UpdateAsync(userB, created.Id, new UpdateVendorOfferingRequest
             {
-                ServiceName = "Hacked"
+                ServiceName = "Hacked",
+                Price = 1m,
+                PricingType = "FIXED"
             }));
     }
 
@@ -145,6 +220,39 @@ public class VendorOfferingServiceTests
             service.CreateAsync(Guid.NewGuid(), new CreateVendorOfferingRequest
             {
                 ServiceName = "Orphan Service"
+            }));
+    }
+
+    [Fact]
+    public async Task CreateAsync_Throws_WhenPriceSetWithoutPricingType()
+    {
+        using var db = CreateDb();
+        var userId = Guid.NewGuid();
+        await SeedVendorAsync(db, userId);
+        var service = new VendorOfferingService(new VendorRepository(db), new VendorOfferingRepository(db));
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.CreateAsync(userId, new CreateVendorOfferingRequest
+            {
+                ServiceName = "Bad Pricing",
+                Price = 1000m
+            }));
+    }
+
+    [Fact]
+    public async Task CreateAsync_Throws_WhenPricingTypeInvalid()
+    {
+        using var db = CreateDb();
+        var userId = Guid.NewGuid();
+        await SeedVendorAsync(db, userId);
+        var service = new VendorOfferingService(new VendorRepository(db), new VendorOfferingRepository(db));
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.CreateAsync(userId, new CreateVendorOfferingRequest
+            {
+                ServiceName = "Bad Type",
+                Price = 1000m,
+                PricingType = "WEEKLY"
             }));
     }
 }

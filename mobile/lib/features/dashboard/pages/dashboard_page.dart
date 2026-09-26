@@ -20,6 +20,7 @@ class DashboardPage extends ConsumerWidget {
     final session = ref.watch(currentUserProvider);
     final roles = session?.roles ?? const <String>[];
     final isVendor = roles.contains('VENDOR');
+    final isEventPlanner = roles.contains('EVENT_PLANNER');
     final email = session?.email ?? 'User';
     final name = email.split('@').first;
     final displayName = name.isNotEmpty
@@ -198,6 +199,27 @@ class DashboardPage extends ConsumerWidget {
                     onTap: () => Navigator.of(context)
                         .pushNamed('/events', arguments: session),
                   ),
+                  if (isEventPlanner) ...[
+                    PastelListItem(
+                      icon: Icons.store_mall_directory_outlined,
+                      iconVariant: PastelIconVariant.olive,
+                      title: 'Vendor Marketplace',
+                      subtitle:
+                          'Browse approved vendors, services, and prices',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/marketplace', arguments: session),
+                    ),
+                    PastelListItem(
+                      icon: Icons.receipt_long_outlined,
+                      iconVariant: PastelIconVariant.blue,
+                      title: 'My quotations',
+                      subtitle: 'Track pending and responded quotation requests',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/quotations/mine', arguments: session),
+                    ),
+                  ],
                   if (isVendor) ...[
                     PastelListItem(
                       icon: Icons.storefront_rounded,
@@ -217,6 +239,29 @@ class DashboardPage extends ConsumerWidget {
                       showDivider: true,
                       onTap: () => Navigator.of(context)
                           .pushNamed('/vendors/services', arguments: session),
+                    ),
+                    PastelListItem(
+                      icon: Icons.schedule_outlined,
+                      iconVariant: PastelIconVariant.pink,
+                      title: 'Vendor availability',
+                      subtitle:
+                          'Set when your business is available for events',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/vendors/availability',
+                        arguments: session,
+                      ),
+                    ),
+                    PastelListItem(
+                      icon: Icons.request_quote_outlined,
+                      iconVariant: PastelIconVariant.yellow,
+                      title: 'Quotation requests',
+                      subtitle: 'Review and respond to planner quotation requests',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/vendors/quotations',
+                        arguments: session,
+                      ),
                     ),
                   ],
                   PastelListItem(

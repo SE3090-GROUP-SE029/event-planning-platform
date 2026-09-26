@@ -9,8 +9,15 @@ import 'features/dashboard/pages/dashboard_page.dart';
 import 'features/events/pages/event_details_page.dart';
 import 'features/events/pages/event_form_page.dart';
 import 'features/events/pages/event_list_page.dart';
+import 'features/vendors/pages/vendor_availability_page.dart';
+import 'features/vendors/pages/vendor_marketplace_detail_page.dart';
+import 'features/vendors/pages/vendor_marketplace_page.dart';
 import 'features/vendors/pages/vendor_profile_page.dart';
 import 'features/vendors/pages/vendor_services_page.dart';
+import 'features/quotations/pages/my_quotations_page.dart';
+import 'features/quotations/pages/request_quotation_page.dart';
+import 'features/quotations/pages/vendor_quotation_detail_page.dart';
+import 'features/quotations/pages/vendor_quotations_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +51,16 @@ class MyApp extends StatelessWidget {
         '/events/edit': (context) => const EventFormPage(isEditing: true),
         '/vendors/profile': (context) => const VendorProfilePage(),
         '/vendors/services': (context) => const VendorServicesPage(),
+        '/vendors/availability': (context) => const VendorAvailabilityPage(),
+        '/vendors/quotations': (context) => const VendorQuotationsPage(),
+        '/vendors/quotations/details': (context) =>
+            const VendorQuotationDetailPage(),
+        '/marketplace': (context) => const VendorMarketplacePage(),
+        '/marketplace/details': (context) =>
+            const VendorMarketplaceDetailPage(),
+        '/marketplace/request-quotation': (context) =>
+            const RequestQuotationPage(),
+        '/quotations/mine': (context) => const MyQuotationsPage(),
       },
     );
   }

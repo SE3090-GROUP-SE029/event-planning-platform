@@ -9,6 +9,13 @@ import '../../auth/widgets/custom_text_field.dart';
 import '../api/vendor_remote_datasource.dart';
 import '../models/vendor_service_model.dart';
 
+const _pricingTypes = [
+  ('FIXED', 'Fixed (LKR)'),
+  ('PER_PERSON', 'Per person (LKR)'),
+  ('PER_HOUR', 'Per hour (LKR)'),
+  ('PER_DAY', 'Per day (LKR)'),
+];
+
 class VendorServicesPage extends StatefulWidget {
   const VendorServicesPage({super.key});
 
@@ -20,10 +27,12 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
   final _formKey = GlobalKey<FormState>();
   final _serviceNameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
   final _vendorApi = VendorRemoteDataSource();
 
   List<VendorServiceModel> _services = [];
   String? _editingId;
+  String? _pricingType;
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -43,6 +52,7 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
   void dispose() {
     _serviceNameController.dispose();
     _descriptionController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -78,6 +88,9 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
       _editingId = service.id;
       _serviceNameController.text = service.serviceName;
       _descriptionController.text = service.description ?? '';
+      _priceController.text =
+          service.price == null ? '' : service.price!.toStringAsFixed(2);
+      _pricingType = service.pricingType;
     });
   }
 
@@ -86,6 +99,15 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
       _editingId = null;
       _serviceNameController.clear();
       _descriptionController.clear();
+      _priceController.clear();
+      _pricingType = null;
+    });
+  }
+
+  void _clearPriceFields() {
+    setState(() {
+      _priceController.clear();
+      _pricingType = null;
     });
   }
 
@@ -94,6 +116,23 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
     final token = _auth?.accessToken;
     if (token == null) return;
 
+    final rawPrice = _priceController.text.trim();
+    double? price;
+    String? pricingType;
+
+    if (rawPrice.isNotEmpty) {
+      price = double.tryParse(rawPrice);
+      if (price == null || price < 0) {
+        setState(() => _error = 'Enter a valid price of Rs. 0 or more');
+        return;
+      }
+      if (_pricingType == null || _pricingType!.isEmpty) {
+        setState(() => _error = 'Select a pricing type when setting a price');
+        return;
+      }
+      pricingType = _pricingType;
+    }
+
     final payload = VendorServiceModel(
       id: _editingId ?? '',
       vendorId: '',
@@ -101,6 +140,8 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
+      price: price,
+      pricingType: pricingType,
     );
 
     setState(() {
@@ -256,6 +297,42 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                             maxLines: 3,
                           ),
                           const SizedBox(height: AppDimens.space16),
+                          CustomTextField(
+                            label: 'Price (Rs. / LKR)',
+                            hint: '85000.00',
+                            controller: _priceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                          ),
+                          const SizedBox(height: AppDimens.space16),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey(_pricingType ?? ''),
+                            initialValue: _pricingType ?? '',
+                            decoration: const InputDecoration(
+                              labelText: 'Pricing type',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: '',
+                                child: Text('None'),
+                              ),
+                              ..._pricingTypes.map(
+                                (option) => DropdownMenuItem<String>(
+                                  value: option.$1,
+                                  child: Text(option.$2),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _pricingType =
+                                    (value == null || value.isEmpty) ? null : value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: AppDimens.space16),
                           SizedBox(
                             width: double.infinity,
                             height: 48,
@@ -272,6 +349,10 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                               onPressed: _clearForm,
                               child: const Text('Cancel edit'),
                             ),
+                            TextButton(
+                              onPressed: _clearPriceFields,
+                              child: const Text('Clear price'),
+                            ),
                           ],
                         ],
                       ),
@@ -286,7 +367,8 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                   else
                     ..._services.map(
                       (service) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppDimens.space12),
+                        padding:
+                            const EdgeInsets.only(bottom: AppDimens.space12),
                         child: PastelCard(
                           padding: const EdgeInsets.all(AppDimens.space16),
                           child: Row(
@@ -308,6 +390,13 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                                       service.description ?? 'No description',
                                       style: const TextStyle(
                                         color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      service.displayPrice,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ],
