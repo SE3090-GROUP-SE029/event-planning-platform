@@ -210,6 +210,15 @@ class DashboardPage extends ConsumerWidget {
                       onTap: () => Navigator.of(context)
                           .pushNamed('/marketplace', arguments: session),
                     ),
+                    PastelListItem(
+                      icon: Icons.receipt_long_outlined,
+                      iconVariant: PastelIconVariant.blue,
+                      title: 'My quotations',
+                      subtitle: 'Track pending and responded quotation requests',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/quotations/mine', arguments: session),
+                    ),
                   ],
                   if (isVendor) ...[
                     PastelListItem(
@@ -240,6 +249,17 @@ class DashboardPage extends ConsumerWidget {
                       showDivider: true,
                       onTap: () => Navigator.of(context).pushNamed(
                         '/vendors/availability',
+                        arguments: session,
+                      ),
+                    ),
+                    PastelListItem(
+                      icon: Icons.request_quote_outlined,
+                      iconVariant: PastelIconVariant.yellow,
+                      title: 'Quotation requests',
+                      subtitle: 'Review and respond to planner quotation requests',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/vendors/quotations',
                         arguments: session,
                       ),
                     ),

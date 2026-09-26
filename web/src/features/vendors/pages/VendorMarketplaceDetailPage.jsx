@@ -51,6 +51,7 @@ export default function VendorMarketplaceDetailPage() {
   const logout = useAuthStore((state) => state.logout);
   const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
   const isAdmin = useAuthStore((state) => state.hasRole('ADMIN'));
+  const isEventPlanner = useAuthStore((state) => state.hasRole('EVENT_PLANNER'));
   const { data: vendor, isLoading, isError, error } = useVendorMarketplaceDetail(vendorId);
   const imageUrl = resolveVendorImageUrl(vendor?.profileImageUrl);
 
@@ -66,16 +67,20 @@ export default function VendorMarketplaceDetailPage() {
           activeTab="marketplace"
           showEvents={isAdmin}
           showMarketplace
+          showMyQuotations={isEventPlanner}
           showVendorProfile={isVendor}
           showVendorServices={isVendor}
           showVendorAvailability={isVendor}
+          showVendorQuotations={isVendor}
           onSelectTab={(tab) => {
             if (tab === 'dashboard') navigate('/dashboard');
             if (tab === 'events') navigate('/admin/events');
             if (tab === 'marketplace') navigate('/marketplace');
+            if (tab === 'my-quotations') navigate('/quotations/mine');
             if (tab === 'vendor-profile') navigate('/vendor/profile');
             if (tab === 'vendor-services') navigate('/vendor/services');
             if (tab === 'vendor-availability') navigate('/vendor/availability');
+            if (tab === 'vendor-quotations') navigate('/vendor/quotations');
           }}
           onLogout={handleLogout}
         />
@@ -124,6 +129,16 @@ export default function VendorMarketplaceDetailPage() {
                           {vendor.websiteUrl}
                         </a>
                       </Typography>
+                    )}
+                    {isEventPlanner && (
+                      <Button
+                        variant="contained"
+                        sx={{ mt: 2, bgcolor: '#19191C' }}
+                        onClick={() => navigate(`/marketplace/${vendorId}/request-quotation`)}
+                        disabled={!vendor.services?.length}
+                      >
+                        Request quotation
+                      </Button>
                     )}
                   </Box>
                 </Box>

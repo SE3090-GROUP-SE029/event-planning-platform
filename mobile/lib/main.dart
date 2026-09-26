@@ -14,6 +14,10 @@ import 'features/vendors/pages/vendor_marketplace_detail_page.dart';
 import 'features/vendors/pages/vendor_marketplace_page.dart';
 import 'features/vendors/pages/vendor_profile_page.dart';
 import 'features/vendors/pages/vendor_services_page.dart';
+import 'features/quotations/pages/my_quotations_page.dart';
+import 'features/quotations/pages/request_quotation_page.dart';
+import 'features/quotations/pages/vendor_quotation_detail_page.dart';
+import 'features/quotations/pages/vendor_quotations_page.dart';
 import 'features/plans/pages/plan_review_page.dart';
 
 Future<void> main() async {
@@ -49,9 +53,15 @@ class MyApp extends StatelessWidget {
         '/vendors/profile': (context) => const VendorProfilePage(),
         '/vendors/services': (context) => const VendorServicesPage(),
         '/vendors/availability': (context) => const VendorAvailabilityPage(),
+        '/vendors/quotations': (context) => const VendorQuotationsPage(),
+        '/vendors/quotations/details': (context) =>
+            const VendorQuotationDetailPage(),
         '/marketplace': (context) => const VendorMarketplacePage(),
         '/marketplace/details': (context) =>
             const VendorMarketplaceDetailPage(),
+        '/marketplace/request-quotation': (context) =>
+            const RequestQuotationPage(),
+        '/quotations/mine': (context) => const MyQuotationsPage(),
         '/plans/review': (context) => PlanReviewPage(
               planId: ModalRoute.of(context)!.settings.arguments as String,
             ),
