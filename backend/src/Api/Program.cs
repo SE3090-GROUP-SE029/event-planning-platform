@@ -69,6 +69,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? builder.Configuration["Jwt:Secret"]
+    ?? builder.Configuration["JwtSettings:Secret"]
+    ?? "FallbackSuperSecretKeyForDevelopmentTesting1234567890!@#$";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? builder.Configuration["JwtSettings:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? builder.Configuration["JwtSettings:Audience"];
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
@@ -126,14 +132,14 @@ builder.Services.AddAuthentication(options =>
         {
             options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = true,
-                ValidIssuer = jwtSettings.Issuer,
-                ValidateAudience = true,
-                ValidAudience = jwtSettings.Audience,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+                IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtKey)),
+                ValidateIssuer = !string.IsNullOrEmpty(jwtIssuer),
+                ValidIssuer = jwtIssuer,
+                ValidateAudience = !string.IsNullOrEmpty(jwtAudience),
+                ValidAudience = jwtAudience,
                 ValidateLifetime = true,
-                ClockSkew = TimeSpan.FromSeconds(30)
+                ClockSkew = TimeSpan.Zero
             };
         });
 

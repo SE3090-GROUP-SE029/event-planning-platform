@@ -59,7 +59,6 @@ public class ScheduleRepository : IScheduleRepository
         }
 
         activity.Status = status.ToString();
-        activity.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
         return activity;
