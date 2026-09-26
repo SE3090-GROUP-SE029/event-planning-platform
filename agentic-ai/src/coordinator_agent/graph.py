@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
 from .models import (
@@ -91,7 +92,9 @@ def _route_after_validation(state: CoordinatorState) -> str:
     return "handle_validation_error"
 
 
-def build_coordinator_graph() -> Any:
+def build_coordinator_graph(
+    checkpointer: BaseCheckpointSaver | None = None,
+) -> Any:
     """Build the sequential, retry-aware coordinator graph."""
 
     graph = StateGraph(CoordinatorState)
@@ -129,4 +132,4 @@ def build_coordinator_graph() -> Any:
     )
     graph.add_edge("finalize_plan", END)
     graph.add_edge("handle_validation_error", END)
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)

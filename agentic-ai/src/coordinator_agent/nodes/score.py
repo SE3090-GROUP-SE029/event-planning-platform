@@ -20,10 +20,12 @@ async def detect_missing_requirements(
 
     provided = state.event.get("requirements", [])
     prompt = MISSING_REQUIREMENT_DETECTION_PROMPT.format(
-        event_details=json.dumps(state.event, ensure_ascii=True, default=str),
-        requirements=json.dumps(provided, ensure_ascii=True, default=str),
+        event_details=json.dumps(state.event, ensure_ascii=False, default=str),
+        requirements=json.dumps(provided, ensure_ascii=False, default=str),
     )
-    result = await GeminiClient().generate_with_prompt(prompt, MissingRequirementsOutput)
+    result = await GeminiClient().generate_with_prompt(
+        prompt, MissingRequirementsOutput, node_name="detect_missing_requirements"
+    )
     present = json.dumps(state.event, ensure_ascii=True, default=str).casefold()
     unique: dict[str, MissingRequirementModel] = {}
     for item in result.requirements:

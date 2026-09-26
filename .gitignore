@@ -65,6 +65,7 @@ agentic-ai/venv/
 agentic-ai/__pycache__/
 agentic-ai/.env
 agentic-ai/.venv/
+agentic-ai/.data/
 agentic-ai/dist/
 agentic-ai/build/
 *.pyc

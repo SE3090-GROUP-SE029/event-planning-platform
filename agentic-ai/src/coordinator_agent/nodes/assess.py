@@ -38,7 +38,9 @@ async def allocate_budget(state: CoordinatorState) -> dict[str, dict[str, float]
         service_categories=json.dumps(state.service_categories),
         guest_count=state.event.get("guest_count", "unknown"),
     )
-    result = await GeminiClient().generate_with_prompt(prompt, BudgetOutput)
+    result = await GeminiClient().generate_with_prompt(
+        prompt, BudgetOutput, node_name="allocate_budget"
+    )
     requested_allocations: dict[str, float] = {}
     for item in result.allocation:
         category = item.category.strip()

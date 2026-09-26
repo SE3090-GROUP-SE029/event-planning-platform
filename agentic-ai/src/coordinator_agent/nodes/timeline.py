@@ -1,6 +1,5 @@
 """High-level planning timeline node."""
 
-import json
 from datetime import date, datetime
 
 from pydantic import BaseModel, Field
@@ -10,8 +9,13 @@ from src.gemini_client.client import GeminiClient
 from ..state import CoordinatorState
 
 
+class TimelinePhase(BaseModel):
+    phase_name: str = Field(..., min_length=1)
+    timing: str = Field(..., min_length=1)
+
+
 class TimelineOutput(BaseModel):
-    phases: dict[str, str] = Field(..., min_length=3, max_length=8)
+    phases: list[TimelinePhase] = Field(..., min_length=3, max_length=8)
 
 
 def _complexity(state: CoordinatorState) -> str:
@@ -30,12 +34,18 @@ async def propose_timeline(state: CoordinatorState) -> dict[str, dict[str, str]]
         complexity=_complexity(state),
         vendor_count=len(state.target_vendor_types),
     )
-    result = await GeminiClient().generate_with_prompt(prompt, TimelineOutput)
-    phases = {
-        name.strip(): timing.strip()
-        for name, timing in result.phases.items()
-        if name.strip() and timing.strip()
-    }
+    result = await GeminiClient().generate_with_prompt(
+        prompt, TimelineOutput, node_name="propose_timeline"
+    )
+    phases: dict[str, str] = {}
+    for phase in result.phases:
+        name = phase.phase_name.strip()
+        timing = phase.timing.strip()
+        if not name or not timing:
+            continue
+        if name in phases:
+            raise ValueError(f"timeline contains duplicate phase name: {name}")
+        phases[name] = timing
     if len(phases) < 3:
         raise ValueError("timeline must contain at least three non-empty phases")
     return {"proposed_timeline": dict(list(phases.items())[:8])}

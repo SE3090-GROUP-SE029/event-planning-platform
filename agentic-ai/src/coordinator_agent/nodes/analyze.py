@@ -21,10 +21,12 @@ async def analyze_requirements(state: CoordinatorState) -> dict[str, str]:
 
     logger.info("Analyzing requirements for event %s", state.event_id)
     prompt = REQUIREMENTS_ANALYSIS_PROMPT.format(
-        event_details=json.dumps(state.event, ensure_ascii=True, default=str)
+        event_details=json.dumps(state.event, ensure_ascii=False, default=str)
     )
     try:
-        result = await GeminiClient().generate_with_prompt(prompt, AnalysisOutput)
+        result = await GeminiClient().generate_with_prompt(
+            prompt, AnalysisOutput, node_name="analyze_requirements"
+        )
         analysis = result.analysis.strip()
         if not analysis:
             raise ValueError("Gemini returned an empty requirements analysis")
