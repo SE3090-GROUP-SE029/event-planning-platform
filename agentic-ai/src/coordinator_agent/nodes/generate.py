@@ -33,10 +33,12 @@ async def identify_service_categories(state: CoordinatorState) -> dict[str, list
     """Identify generic service categories and reject vendor-like values."""
 
     prompt = SERVICE_CATEGORY_PROMPT.format(
-        event_details=json.dumps(state.event, ensure_ascii=True, default=str),
+        event_details=json.dumps(state.event, ensure_ascii=False, default=str),
         analysis=state.requirements_analysis,
     )
-    result = await GeminiClient().generate_with_prompt(prompt, ServiceCategoriesOutput)
+    result = await GeminiClient().generate_with_prompt(
+        prompt, ServiceCategoriesOutput, node_name="identify_service_categories"
+    )
     categories = {
         category.strip()
         for category in result.categories

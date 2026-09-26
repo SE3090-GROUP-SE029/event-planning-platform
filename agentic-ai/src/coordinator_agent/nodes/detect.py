@@ -23,11 +23,13 @@ async def assess_risks(state: CoordinatorState) -> dict[str, list[RiskModel]]:
     """Assess and rank planning-relevant risks."""
 
     prompt = RISK_ASSESSMENT_PROMPT.format(
-        event_details=json.dumps(state.event, ensure_ascii=True, default=str),
+        event_details=json.dumps(state.event, ensure_ascii=False, default=str),
         budget=json.dumps(state.budget_allocation),
         constraints=state.requirements_analysis,
     )
-    result = await GeminiClient().generate_with_prompt(prompt, RisksOutput)
+    result = await GeminiClient().generate_with_prompt(
+        prompt, RisksOutput, node_name="assess_risks"
+    )
     unique: dict[str, RiskModel] = {}
     for risk in result.risks:
         key = risk.risk.strip().casefold()

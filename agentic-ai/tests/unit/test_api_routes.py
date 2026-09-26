@@ -39,7 +39,10 @@ def test_coordinator_route_returns_gateway_timeout_for_execution_timeout(
     response = _request_status(monkeypatch, TimeoutError("internal timeout"))
 
     assert response.status_code == 504
-    assert response.json()["detail"] == "Plan generation took too long. Please try again."
+    assert response.json()["detail"] == {
+        "code": "provider_timeout",
+        "message": "Plan generation took too long. Please try again.",
+    }
 
 
 def test_coordinator_route_returns_bad_gateway_for_provider_failure(
@@ -50,9 +53,31 @@ def test_coordinator_route_returns_bad_gateway_for_provider_failure(
     )
 
     assert response.status_code == 502
-    assert response.json()["detail"] == (
-        "The AI provider could not generate a plan. Please try again later."
+    assert response.json()["detail"] == {
+        "code": "provider_error",
+        "message": "The AI provider could not generate a plan. Please try again later.",
+    }
+
+
+def test_coordinator_route_exposes_quota_category_and_retry_after(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    failure = CoordinatorProviderError(
+        "internal provider details",
+        code="quota_exhausted",
+        status_code=429,
+        retry_after=60,
     )
+
+    response = _request_status(monkeypatch, failure)
+
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "60"
+    assert response.json()["detail"] == {
+        "code": "quota_exhausted",
+        "message": "Gemini quota is exhausted. Retry later.",
+    }
+    assert "internal provider details" not in response.text
 
 
 def test_coordinator_route_returns_unprocessable_entity_for_invalid_plan(
