@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/pastel_bottom_nav_bar.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
@@ -102,6 +104,11 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
     return Scaffold(
       backgroundColor: AppColors.canvas,
       appBar: AppBar(title: const Text('Vendor Marketplace')),
+      bottomNavigationBar: PastelBottomNavBar.roleBased(
+        context: context,
+        session: session,
+        currentIndex: 2,
+      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
@@ -211,19 +218,21 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
                         SizedBox(
                           width: double.infinity,
                           height: 48,
-                          child: ElevatedButton(
+                          child: ElevatedButton.icon(
+                            style: AppButtonStyles.primary(),
                             onPressed: () {
                               setState(() => _page = 1);
                               _load();
                             },
-                            child: const Text('Search'),
+                            icon: const Icon(Icons.search, size: 18),
+                            label: const Text('Search Vendors'),
                           ),
                         ),
                       ],
                     ),
                   ),
                   const PastelSectionHeader(title: 'Approved vendors'),
-                  if (_items.isEmpty)
+                  if (_error == null && _items.isEmpty)
                     const PastelCard(
                       padding: EdgeInsets.all(AppDimens.space20),
                       child: Text('No approved vendors match your filters.'),
@@ -271,9 +280,11 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
+                              const SizedBox(height: 10),
                               Align(
                                 alignment: Alignment.centerRight,
-                                child: TextButton(
+                                child: ElevatedButton.icon(
+                                  style: AppButtonStyles.create(),
                                   onPressed: () {
                                     Navigator.of(context).pushNamed(
                                       '/marketplace/details',
@@ -283,7 +294,8 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
                                       },
                                     );
                                   },
-                                  child: const Text('View Vendor'),
+                                  icon: const Icon(Icons.visibility_outlined, size: 16),
+                                  label: const Text('View Vendor'),
                                 ),
                               ),
                             ],

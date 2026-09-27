@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_icon_badge.dart';
 import '../../../shared/widgets/pastel_pill_badge.dart';
@@ -497,6 +498,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
+        style: AppButtonStyles.ai(),
         onPressed: _generatingPlan
             ? null
             : plan != null
@@ -510,7 +512,11 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.pastelPinkText),
+                ),
               )
             : Icon(plan != null
                 ? Icons.assignment_outlined

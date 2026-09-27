@@ -39,6 +39,10 @@ class AppColors {
   static const Color pastelLavenderLight = Color(0xFFF7F2FD);
   static const Color pastelLavenderText = Color(0xFF391652);
 
+  static const Color pastelPeach = Color(0xFFFFD1B3);
+  static const Color pastelPeachLight = Color(0xFFFFF3EC);
+  static const Color pastelPeachText = Color(0xFF5C2D0E);
+
   // Dark Pill Counter Badge (as [2], [3], [24] in reference)
   static const Color badgeDark = Color(0xFF1A1A1E);
   static const Color badgeDarkText = Color(0xFFFFFFFF);

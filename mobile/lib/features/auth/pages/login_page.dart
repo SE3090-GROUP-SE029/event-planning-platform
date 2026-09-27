@@ -122,10 +122,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     PastelCard(
                       padding: const EdgeInsets.all(AppDimens.space24),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           const Text(
                             'Welcome back',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 18,
@@ -136,6 +137,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           const SizedBox(height: AppDimens.space4),
                           const Text(
                             'Sign in to access your workspace',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,

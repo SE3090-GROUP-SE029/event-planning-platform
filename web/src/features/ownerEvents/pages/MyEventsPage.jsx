@@ -7,8 +7,7 @@ import {
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { useAuthStore } from '../../../shared/store/authStore';
-import CollapsibleSidebar from '../../../shared/components/layout/CollapsibleSidebar';
-import TopSearchNavbar from '../../../shared/components/layout/TopSearchNavbar';
+import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 import StatusBadge from '../../../shared/components/ui/StatusBadge';
 import { generatePlan, statusLabel, unwrapItems, useEventPlans, useMyEvents } from '../api/ownerEventApi';
@@ -77,23 +76,19 @@ function EventPlanCard({ event }) {
 }
 
 export default function MyEventsPage() {
-  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
   const isAdmin = user?.roles?.includes('ADMIN') || false;
   const eventsQuery = useMyEvents(!isAdmin);
   const events = eventsQuery.data?.items || [];
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 }, gap: { xs: 2, md: 3 } }}>
-      <CollapsibleSidebar
-        activeTab="dashboard"
-        onSelectTab={() => navigate('/dashboard')}
-        onLogout={() => { logout(); navigate('/login'); }}
-      />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <TopSearchNavbar user={user} title="My events" subtitle="Owner workspace" />
-        <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.04em', mb: 0.5 }}>
+    <AppLayout
+      activeTab="my-events"
+      title="My events"
+      subtitle="Owner workspace"
+    >
+      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 1 }}>
+        <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: '-0.03em', mb: 0.5 }}>
           Event plans
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 2.5 }}>
@@ -103,8 +98,9 @@ export default function MyEventsPage() {
         {!isAdmin && eventsQuery.isLoading && <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}><CircularProgress /></Box>}
         {!isAdmin && eventsQuery.isError && <Alert severity="error">{eventsQuery.error.message}</Alert>}
         {!isAdmin && eventsQuery.isSuccess && events.length === 0 && (
-          <SurfaceCard sx={{ p: 3 }}>
-            <Typography>No events yet. Create an event to generate its AI plan.</Typography>
+          <SurfaceCard sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>No events found</Typography>
+            <Typography color="text.secondary">Create an event to start generating its AI-assisted execution plan.</Typography>
           </SurfaceCard>
         )}
         {!isAdmin && events.length > 0 && (
@@ -113,6 +109,6 @@ export default function MyEventsPage() {
           </Stack>
         )}
       </Box>
-    </Box>
+    </AppLayout>
   );
 }
