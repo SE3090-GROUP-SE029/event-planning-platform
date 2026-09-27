@@ -23,6 +23,7 @@ namespace Backend.IntegrationTests;
 public class RegistrationHostFixture : IAsyncLifetime
 {
     private WebApplication? app;
+    private string schemaName = string.Empty;
     public HttpClient Client { get; private set; } = null!;
     public string ConnectionString { get; private set; } = string.Empty;
     public TestClock Clock { get; } = new();
@@ -48,7 +49,7 @@ public class RegistrationHostFixture : IAsyncLifetime
         {
             Timeout = 10, CommandTimeout = 30, MaxPoolSize = 30
         };
-        var schemaName = $"integration_{Guid.NewGuid():N}";
+        schemaName = $"integration_{Guid.NewGuid():N}";
         await using (var connection = new NpgsqlConnection(connectionBuilder.ConnectionString))
         {
             await connection.OpenAsync();
@@ -76,7 +77,9 @@ public class RegistrationHostFixture : IAsyncLifetime
         builder.Services.AddControllers().AddApplicationPart(typeof(RegistrationFormsController).Assembly);
         builder.Services.AddGuestManagement(builder.Configuration);
         builder.Services.AddScoped<ITestService, TestService>();
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(ConnectionString));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(
+            ConnectionString,
+            npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", schemaName)));
         builder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(Clock));
         builder.Services.Replace(ServiceDescriptor.Singleton<IInvitationEmailSender>(Email));
         // Drive durable work explicitly in tests; no test calls Python or Ollama.
@@ -100,7 +103,11 @@ public class RegistrationHostFixture : IAsyncLifetime
         Client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()), Timeout = TimeSpan.FromSeconds(60) };
     }
 
-    public AppDbContext CreateDb() => new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(ConnectionString).Options);
+    public AppDbContext CreateDb() => new(new DbContextOptionsBuilder<AppDbContext>()
+        .UseNpgsql(
+            ConnectionString,
+            npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", schemaName))
+        .Options);
 
     public static Guid GuestOwnerGuid(string owner) =>
         new Guid(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(owner)));
