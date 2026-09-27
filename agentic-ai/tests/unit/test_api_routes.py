@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from uuid import uuid4
 
 import httpx
@@ -12,6 +13,29 @@ from src.coordinator_agent.execution import (
 )
 
 
+def _valid_generate_payload() -> dict[str, object]:
+    return {
+        "eventId": str(uuid4()),
+        "event": {
+            "name": "Gala",
+            "type": "WEDDING",
+            "date": "2027-06-15T18:00:00",
+            "location": "Town Hall",
+            "guest_count": 100,
+            "budget": 12500.50,
+            "requirements": "Vegetarian catering",
+        },
+    }
+
+
+async def _post_generate(payload: dict[str, object]) -> httpx.Response:
+    app = FastAPI()
+    app.include_router(routes.router)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        return await client.post("/api/coordinator/generate", json=payload)
+
+
 def _request_status(
     monkeypatch: pytest.MonkeyPatch, failure: Exception
 ) -> httpx.Response:
@@ -19,18 +43,129 @@ def _request_status(
         raise failure
 
     monkeypatch.setattr(routes, "execute_coordinator_agent", fail_execution)
-    app = FastAPI()
-    app.include_router(routes.router)
+    return asyncio.run(_post_generate(_valid_generate_payload()))
 
-    async def send_request() -> httpx.Response:
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            return await client.post(
-                "/api/coordinator/generate",
-                json={"eventId": str(uuid4()), "event": {}},
-            )
 
-    return asyncio.run(send_request())
+def test_coordinator_route_accepts_backend_event_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_id = str(uuid4())
+    payload = _valid_generate_payload()
+    payload["eventId"] = event_id
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    async def execute(event_id_arg: str, event: dict[str, object], **_kwargs: object) -> object:
+        calls.append((event_id_arg, event))
+        return {
+            "service_categories": ["Catering"],
+            "target_vendor_types": ["Caterer"],
+            "proposed_timeline": [
+                {"phase_name": "Planning", "timing": "12 weeks before", "description": "Plan"},
+                {"phase_name": "Booking", "timing": "8 weeks before", "description": "Book"},
+                {"phase_name": "Confirmation", "timing": "1 week before", "description": "Confirm"},
+            ],
+            "budget_allocation": [
+                {
+                    "category": "Catering",
+                    "amount": 100.0,
+                    "percentage_of_total": 100.0,
+                }
+            ],
+            "identified_risks": [
+                {
+                    "risk": "A supplier may become unavailable.",
+                    "severity": "Medium",
+                    "recommendation": "Confirm bookings and retain a backup option.",
+                }
+            ],
+            "rationale": (
+                "This complete plan balances the event priorities, confirms vendors "
+                "early, and reserves adequate time for final confirmations."
+            ),
+            "plan_completeness_score": 90,
+            "validation_summary": "Valid",
+        }
+
+    monkeypatch.setattr(routes, "execute_coordinator_agent", execute)
+    response = asyncio.run(_post_generate(payload))
+
+    assert response.status_code == 200
+    assert response.json()["service_categories"] == ["Catering"]
+    assert response.json()["budget_allocation"][0]["amount"] == 100.0
+    assert response.json()["identified_risks"][0]["severity"] == "Medium"
+    assert len(response.json()["proposed_timeline"]) == 3
+    assert len(calls) == 1
+    assert calls[0][0] == event_id
+    assert set(calls[0][1]) == {
+        "name",
+        "type",
+        "date",
+        "location",
+        "guest_count",
+        "budget",
+        "requirements",
+    }
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda event: event.pop("requirements"),
+        lambda event: event.update(type="wedding"),
+        lambda event: event.update(date="next week"),
+        lambda event: event.update(date=123),
+        lambda event: event.update(date="2027-06-15"),
+        lambda event: event.update(location={"name": "Town Hall"}),
+        lambda event: event.update(guest_count="100"),
+        lambda event: event.update(guest_count=True),
+        lambda event: event.update(budget=-1),
+        lambda event: event.update(budget=0),
+        lambda event: event.update(unexpected="value"),
+        lambda event: event.update(name="   "),
+    ],
+)
+def test_malformed_event_is_rejected_before_workflow(
+    monkeypatch: pytest.MonkeyPatch,
+    mutate: Callable[[dict[str, object]], object],
+) -> None:
+    called = False
+
+    async def execute(*_args: object, **_kwargs: object) -> object:
+        nonlocal called
+        called = True
+        raise AssertionError("workflow must not run for an invalid request")
+
+    monkeypatch.setattr(routes, "execute_coordinator_agent", execute)
+    payload = _valid_generate_payload()
+    event = payload["event"]
+    assert isinstance(event, dict)
+    mutate(event)
+
+    response = asyncio.run(_post_generate(payload))
+
+    assert response.status_code == 422
+    assert not called
+
+
+@pytest.mark.parametrize("event_id", [3, "not-a-uuid"])
+def test_malformed_event_id_is_rejected_before_workflow(
+    monkeypatch: pytest.MonkeyPatch, event_id: object
+) -> None:
+    called = False
+
+    async def execute(*_args: object, **_kwargs: object) -> object:
+        nonlocal called
+        called = True
+        raise AssertionError("workflow must not run for an invalid request")
+
+    monkeypatch.setattr(routes, "execute_coordinator_agent", execute)
+    payload = _valid_generate_payload()
+    payload["eventId"] = event_id
+
+    response = asyncio.run(_post_generate(payload))
+
+    assert response.status_code == 422
+    assert not called
 
 
 def test_coordinator_route_returns_gateway_timeout_for_execution_timeout(

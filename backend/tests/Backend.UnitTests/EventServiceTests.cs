@@ -21,10 +21,12 @@ public class EventServiceTests
 
         Assert.NotNull(repository.AddedEvent);
         Assert.Equal(ownerId, repository.AddedEvent!.OwnerId);
+        Assert.Equal("Annual celebration", repository.AddedEvent.EventName);
         Assert.Equal(EventStatus.DRAFT, repository.AddedEvent.Status);
         Assert.Equal(repository.AddedEvent.CreatedAt, repository.AddedEvent.UpdatedAt);
         Assert.Equal(repository.AddedEvent.Id, result.Id);
         Assert.Equal(ownerId, result.OwnerId);
+        Assert.Equal("Annual celebration", result.EventName);
         Assert.Equal(EventStatus.DRAFT, result.Status);
         Assert.True(repository.SaveChangesCalled);
     }
@@ -144,6 +146,7 @@ public class EventServiceTests
 
         var result = await service.UpdateAsync(eventEntity.Id, eventEntity.OwnerId, new UpdateEventRequest
         {
+            EventName = "Updated event",
             EventType = EventType.WEDDING,
             GuestCount = 80,
             Budget = 4000,
@@ -154,6 +157,7 @@ public class EventServiceTests
         });
 
         Assert.Equal(EventType.WEDDING, result.EventType);
+        Assert.Equal("Updated event", result.EventName);
         Assert.Equal(EventStatus.CONFIRMED, result.Status);
         Assert.NotEqual(originalUpdatedAt, result.UpdatedAt);
     }
@@ -177,6 +181,7 @@ public class EventServiceTests
         await Assert.ThrowsAsync<ValidationException>(() =>
             service.UpdateAsync(eventEntity.Id, eventEntity.OwnerId, new UpdateEventRequest
             {
+                EventName = "Updated event",
                 EventType = EventType.WEDDING,
                 GuestCount = 10,
                 Budget = 100,
@@ -211,6 +216,7 @@ public class EventServiceTests
 
     private static CreateEventRequest ValidRequest() => new()
     {
+        EventName = "Annual celebration",
         EventType = EventType.CORPORATE,
         GuestCount = 50,
         Budget = 2500,
@@ -224,6 +230,7 @@ public class EventServiceTests
     {
         Id = Guid.NewGuid(),
         OwnerId = ownerId,
+        EventName = "Annual celebration",
         EventType = EventType.CORPORATE,
         GuestCount = 50,
         Budget = 2500,

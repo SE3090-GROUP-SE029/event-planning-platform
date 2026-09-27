@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import socket
 import threading
 import time
 from collections import OrderedDict
@@ -26,6 +27,7 @@ from google.api_core.exceptions import (
     ServiceUnavailable,
     Unauthenticated,
 )
+import httpx
 from pydantic import BaseModel, ValidationError
 
 from src.coordinator_agent.config import get_settings
@@ -48,7 +50,15 @@ from .structured_output import StructuredOutputValidator
 
 logger = logging.getLogger(__name__)
 ModelT = TypeVar("ModelT", bound=BaseModel)
-_RETRYABLE_ERRORS = (ServiceUnavailable, DeadlineExceeded, InternalServerError)
+_RETRYABLE_ERRORS = (
+    ServiceUnavailable,
+    DeadlineExceeded,
+    InternalServerError,
+    httpx.TransportError,
+    ConnectionError,
+    socket.gaierror,
+    TimeoutError,
+)
 _RESPONSE_CACHE_TTL_SECONDS = 900
 _RESPONSE_CACHE_MAX_ENTRIES = 512
 _response_cache: OrderedDict[str, tuple[float, str]] = OrderedDict()
@@ -464,7 +474,10 @@ class GeminiClient:
                 "No configured Gemini model is available for this request"
             ) from cause
         if "network" in categories:
-            if isinstance(cause, DeadlineExceeded):
+            if isinstance(
+                cause,
+                (DeadlineExceeded, httpx.TimeoutException, TimeoutError),
+            ):
                 raise GeminiTimeoutError("Gemini request timed out after retries") from cause
             raise GeminiNetworkError(
                 "Gemini is temporarily unavailable after bounded retries"

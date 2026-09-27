@@ -16,6 +16,30 @@ public class EventDtoValidatorTests
         Assert.True(result.IsValid);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Validate_ReturnsError_WhenEventNameIsMissing(string eventName)
+    {
+        var request = ValidRequest();
+        request.EventName = eventName;
+
+        var result = _validator.Validate(request);
+
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.EventName));
+    }
+
+    [Fact]
+    public void Validate_ReturnsError_WhenEventNameIsTooLong()
+    {
+        var request = ValidRequest();
+        request.EventName = new string('x', 201);
+
+        var result = _validator.Validate(request);
+
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.EventName));
+    }
+
     [Fact]
     public void Validate_ReturnsError_WhenEventTypeIsMissing()
     {
@@ -75,8 +99,20 @@ public class EventDtoValidatorTests
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.PreferredDate));
     }
 
+    [Fact]
+    public void Validate_ReturnsError_WhenEventDurationIsNotPositive()
+    {
+        var request = ValidRequest();
+        request.EventDuration = TimeSpan.Zero;
+
+        var result = _validator.Validate(request);
+
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.EventDuration));
+    }
+
     private static CreateEventRequest ValidRequest() => new()
     {
+        EventName = "Annual celebration",
         EventType = EventType.WEDDING,
         GuestCount = 100,
         Budget = 5000,

@@ -1,12 +1,14 @@
 using Application.DTOs.Scheduling;
 using Application.Services.Scheduling;
 using Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "EventPlannerOnly")]
 public class SchedulesController : ControllerBase
 {
     private readonly ScheduleService _scheduleService;

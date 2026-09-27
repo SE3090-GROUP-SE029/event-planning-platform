@@ -19,9 +19,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Restore
-        run: dotnet restore backend/Backend.sln
+        run: dotnet restore backend/backend.sln
       - name: Build
-        run: dotnet build backend/Backend.sln --no-restore --configuration Release
+        run: dotnet build backend/backend.sln --no-restore --configuration Release
 
   test-backend:
     needs: build-backend
@@ -45,11 +45,12 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Restore
-        run: dotnet restore backend/Backend.sln
-      - name: Unit tests
-        run: dotnet test backend/Backend.sln --no-restore --configuration Release --logger "trx" --results-directory ./TestResults
+        run: dotnet restore backend/backend.sln
+      - name: Backend tests
+        run: dotnet test backend/backend.sln --no-restore --configuration Release --logger "trx" --results-directory ./TestResults
         env:
-          ConnectionStrings__Default: "Host=localhost;Database=app_test;Username=test;Password=test"
+          TEST_DATABASE_CONNECTION: "Host=localhost;Port=5432;Database=app_test;Username=test;Password=test"
+          ConnectionStrings__DefaultConnection: "Host=localhost;Database=app_test;Username=test;Password=test"
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -92,7 +93,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - run: npm test -- --watchAll=false
+      - run: npm test
 
   flutter-analyze:
     runs-on: ubuntu-latest
@@ -105,6 +106,13 @@ jobs:
         with:
           flutter-version: '3.24.x'
           channel: 'stable'
+      - name: Prepare Flutter environment
+        run: |
+          if grep -Eiq '(^|_)(secret|token|password|passwd|api[_-]?key|private[_-]?key)(_|=)' .env.example; then
+            echo ".env.example contains secret-like settings; refusing to copy it."
+            exit 1
+          fi
+          cp .env.example .env.local
       - run: flutter pub get
       - run: flutter analyze
 
@@ -120,6 +128,13 @@ jobs:
         with:
           flutter-version: '3.24.x'
           channel: 'stable'
+      - name: Prepare Flutter environment
+        run: |
+          if grep -Eiq '(^|_)(secret|token|password|passwd|api[_-]?key|private[_-]?key)(_|=)' .env.example; then
+            echo ".env.example contains secret-like settings; refusing to copy it."
+            exit 1
+          fi
+          cp .env.example .env.local
       - run: flutter pub get
       - run: flutter test
 
@@ -136,6 +151,13 @@ jobs:
         with:
           flutter-version: '3.24.x'
           channel: 'stable'
+      - name: Prepare Flutter environment
+        run: |
+          if grep -Eiq '(^|_)(secret|token|password|passwd|api[_-]?key|private[_-]?key)(_|=)' .env.example; then
+            echo ".env.example contains secret-like settings; refusing to copy it."
+            exit 1
+          fi
+          cp .env.example .env.local
       - run: flutter pub get
       - name: Build APK
         run: flutter build apk --release
@@ -143,7 +165,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: flutter-apk
-          path: mobile/build/app/outputs/flutter-app.apk
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
 
   ai-checks:
     runs-on: ubuntu-latest
@@ -178,26 +200,39 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: dotnet tool install --global dotnet-ef
+      - run: dotnet restore backend/backend.sln
+      - name: Build backend
+        run: dotnet build backend/backend.sln --configuration Release --no-restore
+      - name: Install EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 8.0.11
       - name: Apply all migrations to a scratch DB
-        run: dotnet ef database update --project backend/src/YourApi --connection "Host=localhost;Database=app_migrate_check;Username=test;Password=test"
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=app_migrate_check;Username=test;Password=test"
+        run: >
+          dotnet ef database update
+          --project backend/src/Infrastructure/Infrastructure.csproj
+          --startup-project backend/src/Api/Api.csproj
+          --configuration Release
+          --no-build
+          --connection
+          "Host=localhost;Port=5432;Database=app_migrate_check;Username=test;******"
 
   release-gate:
     if: always()
-    needs: [test-backend, test-web, flutter-test, ai-checks, migration-check]
+    needs: [build-backend, test-backend, build-web, test-web, flutter-analyze, flutter-test, ai-checks, migration-check]
     runs-on: ubuntu-latest
     steps:
       - name: Check results
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "Release verification failed."
+          if [[ "${{ contains(needs.*.result, 'success') }}" != "true" || "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" || "${{ contains(needs.*.result, 'skipped') }}" == "true" ]]; then
+            echo "Release verification did not pass."
             exit 1
           fi
           echo "All release checks passed."
 
   create-release:
     needs: [release-gate, flutter-build]
-    if: startsWith(github.ref, 'refs/tags/v') && always()
+    if: startsWith(github.ref, 'refs/tags/v') && needs.release-gate.result == 'success' && needs.flutter-build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

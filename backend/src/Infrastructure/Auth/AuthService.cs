@@ -14,9 +14,9 @@ public class AuthService : IAuthService
     private readonly IRefreshTokenRepository _refreshRepo;
     private readonly ITokenService _tokenService;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly JwtSettings _jwtSettings;
+    private readonly JwtOptions _jwtSettings;
 
-    public AuthService(IUserRepository userRepo, IRefreshTokenRepository refreshRepo, ITokenService tokenService, IPasswordHasher passwordHasher, Microsoft.Extensions.Options.IOptions<JwtSettings> jwtSettings)
+    public AuthService(IUserRepository userRepo, IRefreshTokenRepository refreshRepo, ITokenService tokenService, IPasswordHasher passwordHasher, Microsoft.Extensions.Options.IOptions<JwtOptions> jwtSettings)
     {
         _userRepo = userRepo;
         _refreshRepo = refreshRepo;

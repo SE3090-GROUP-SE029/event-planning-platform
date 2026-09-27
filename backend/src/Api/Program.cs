@@ -10,6 +10,7 @@ using Application.Services.Vendors;
 using Application.Services.Planning;
 using Application.Services.Validation;
 using Application.Validators.Events;
+using Api.GuestManagement;
 using FluentValidation;
 using Infrastructure.Auth;
 using Infrastructure.Data;
@@ -61,10 +62,16 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Test feature service (correct namespace and class name)
 builder.Services.AddScoped<ITestService, TestService>();
+
+// C4 Guest Management — AI, email, registration, invitation, QR services
+builder.Services.AddGuestManagement(builder.Configuration);
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
+        builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured."),
         npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
@@ -75,7 +82,16 @@ var jwtKey = builder.Configuration["Jwt:Key"]
     ?? "FallbackSuperSecretKeyForDevelopmentTesting1234567890!@#$";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? builder.Configuration["JwtSettings:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? builder.Configuration["JwtSettings:Audience"];
+// JWT configuration (required by dev authentication)
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
+    ?? throw new InvalidOperationException("The Jwt configuration section is missing.");
+builder.Services.Configure<AdminSeedOptions>(builder.Configuration.GetSection("AdminSeed"));
+builder.Services.Configure<AgenticAiOptions>(builder.Configuration.GetSection("AgenticAI"));
+var agenticAiOptions = builder.Configuration.GetSection("AgenticAI").Get<AgenticAiOptions>()
+    ?? new AgenticAiOptions();
 
+// Dev repository and service registrations
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IVendorRepository, VendorRepository>();
@@ -111,10 +127,8 @@ builder.Services.AddScoped<IPlanDecisionService, PlanDecisionService>();
 builder.Services.AddScoped<IAgenticAiClient, AgenticAiClient>();
 builder.Services.AddHttpClient("AgenticAI", client =>
 {
-    client.BaseAddress = new Uri(
-        builder.Configuration["AgenticAI:BaseUrl"] ?? "http://localhost:8000");
-    client.Timeout = TimeSpan.FromSeconds(
-        builder.Configuration.GetValue("AgenticAI:TimeoutSeconds", 250));
+    client.BaseAddress = new Uri(agenticAiOptions.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(agenticAiOptions.TimeoutSeconds);
 });
 builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 
@@ -122,6 +136,12 @@ builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestVal
 builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 builder.Services.AddScoped<ConflictDetectionService>();
 builder.Services.AddScoped<ScheduleService>();
+
+// Component 3: Scheduling Registrations
+builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
+builder.Services.AddScoped<ConflictDetectionService>();
+builder.Services.AddScoped<ScheduleService>();
+
 
 builder.Services.AddAuthentication(options =>
     {
@@ -195,7 +215,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Avoid HTTPS redirects on the local http profile (causes browser "Network Error" on uploads).
-var httpsPort = Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORT");
+var httpsPort = app.Configuration["ASPNETCORE_HTTPS_PORT"];
 if (!string.IsNullOrWhiteSpace(httpsPort))
 {
     app.UseHttpsRedirection();
@@ -205,6 +225,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Admin user seeding on startup (skips gracefully when AdminSeed:Password is not configured)
+// NOTE: Requires human review — touches auth/user database state on application startup.
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -213,7 +235,8 @@ using (var scope = app.Services.CreateScope())
     {
         var db = services.GetRequiredService<AppDbContext>();
         var passwordHasher = services.GetRequiredService<IPasswordHasher>();
-        await AdminSeeder.SeedAdminAsync(db, passwordHasher, app.Configuration, logger);
+        var adminSeedOptions = services.GetRequiredService<IOptions<AdminSeedOptions>>();
+        await AdminSeeder.SeedAdminAsync(db, passwordHasher, adminSeedOptions.Value, logger);
     }
     catch (Exception ex)
     {

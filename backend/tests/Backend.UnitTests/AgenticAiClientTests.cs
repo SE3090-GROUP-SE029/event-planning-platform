@@ -3,8 +3,8 @@ using System.Text;
 using Application.Dtos.Plans;
 using Domain.Entities;
 using Infrastructure.Services.Planning;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Backend.UnitTests;
 
@@ -43,12 +43,13 @@ public sealed class AgenticAiClientTests
             {
                 BaseAddress = new Uri("http://agentic-ai.test")
             }),
-            new ConfigurationBuilder().Build(),
+            Options.Create(new AgenticAiOptions()),
             NullLogger<AgenticAiClient>.Instance);
 
         var result = await client.GeneratePlanAsync(new Event
         {
             Id = Guid.NewGuid(),
+            EventName = "Conference launch",
             Budget = 1000m
         });
 
@@ -73,11 +74,11 @@ public sealed class AgenticAiClientTests
             {
                 BaseAddress = new Uri("http://agentic-ai.test")
             }),
-            new ConfigurationBuilder().Build(),
+            Options.Create(new AgenticAiOptions()),
             NullLogger<AgenticAiClient>.Instance);
 
         var exception = await Assert.ThrowsAsync<HttpRequestException>(
-            () => client.GeneratePlanAsync(new Event { Id = Guid.NewGuid() }));
+            () => client.GeneratePlanAsync(new Event { Id = Guid.NewGuid(), EventName = "Conference launch" }));
 
         Assert.Equal(HttpStatusCode.BadGateway, exception.StatusCode);
         Assert.Equal(1, handler.CallCount);

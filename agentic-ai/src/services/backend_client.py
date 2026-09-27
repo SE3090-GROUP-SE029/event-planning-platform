@@ -1,15 +1,15 @@
 import httpx
-import os
 from typing import Any, Optional
 from datetime import datetime
 from src.models.message_models import MessageResponse
+from src.coordinator_agent.config import get_settings
 import logging
 
 logger = logging.getLogger(__name__)
 
 class BackendClient:
     def __init__(self):
-        self.base_url = os.getenv("BACKEND_API_URL", "http://localhost:5207")
+        self.base_url = get_settings().backend_api_url
         self.client = httpx.AsyncClient(base_url=self.base_url, timeout=10.0)
 
     async def ping(self) -> dict:

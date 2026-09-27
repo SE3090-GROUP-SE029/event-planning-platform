@@ -7,6 +7,7 @@ import re
 from pydantic import BaseModel, Field
 
 from src.coordinator_agent.prompts import SERVICE_CATEGORY_PROMPT
+from src.coordinator_agent.utils import normalize_service_category
 from src.gemini_client.client import GeminiClient
 from ..state import CoordinatorState
 
@@ -40,14 +41,15 @@ async def identify_service_categories(state: CoordinatorState) -> dict[str, list
         prompt, ServiceCategoriesOutput, node_name="identify_service_categories"
     )
     categories = {
-        category.strip()
+        normalize_service_category(category): category.strip()
         for category in result.categories
         if _is_valid_category(category)
     }
     if len(categories) < 3:
         logger.warning("Fewer than three valid categories returned; adding defaults")
-        categories.update(_default_categories(state.event))
-    ordered = sorted(categories)[:12]
+        for category in _default_categories(state.event):
+            categories.setdefault(normalize_service_category(category), category)
+    ordered = sorted(categories.values())[:12]
     return {
         "service_categories": ordered,
         "target_vendor_types": [f"{category} provider" for category in ordered],
