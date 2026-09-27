@@ -318,6 +318,17 @@ class DashboardPage extends ConsumerWidget {
                           .pushNamed('/quotations/mine', arguments: session),
                     ),
                     PastelListItem(
+                      icon: Icons.book_online_outlined,
+                      iconVariant: PastelIconVariant.olive,
+                      title: 'My bookings',
+                      subtitle: 'View and cancel confirmed vendor bookings',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/bookings/mine', arguments: session),
+                    ),
+                  ],
+                  if (isVendor) ...[
+                    PastelListItem(
                       icon: Icons.add_circle_outline_rounded,
                       iconVariant: PastelIconVariant.yellow,
                       title: 'Plan new event',
@@ -362,6 +373,39 @@ class DashboardPage extends ConsumerWidget {
                       ),
                     ),
                     PastelListItem(
+                      icon: Icons.request_quote_outlined,
+                      iconVariant: PastelIconVariant.yellow,
+                      title: 'Quotation requests',
+                      subtitle: 'Review and respond to planner quotation requests',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/vendors/quotations',
+                        arguments: session,
+                      ),
+                    ),
+                    PastelListItem(
+                      icon: Icons.book_online_outlined,
+                      iconVariant: PastelIconVariant.blue,
+                      title: 'Bookings',
+                      subtitle: 'Complete or cancel confirmed bookings',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/vendors/bookings',
+                        arguments: session,
+                      ),
+                    ),
+                  ],
+                  PastelListItem(
+                    icon: Icons.add_circle_outline_rounded,
+                    iconVariant: PastelIconVariant.yellow,
+                    title: 'Plan new event',
+                    subtitle: 'Start a new event planning journey',
+                    showDivider: false,
+                    onTap: () => Navigator.of(context)
+                        .pushNamed('/events/create', arguments: session),
+                  ),
+                  if (isVendor)
+                    PastelListItem(
                       icon: Icons.storefront_rounded,
                       iconVariant: PastelIconVariant.olive,
                       title: 'Vendor profile',
@@ -371,7 +415,6 @@ class DashboardPage extends ConsumerWidget {
                       onTap: () => Navigator.of(context)
                           .pushNamed('/vendors/profile', arguments: session),
                     ),
-                  ],
                 ],
               ),
             ),

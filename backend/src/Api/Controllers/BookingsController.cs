@@ -1,65 +1,38 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Application.Dtos.Bookings;
-using Application.Dtos.Quotations;
 using Application.Services.Bookings;
-using Application.Services.Quotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
 [ApiController]
-[Route("api/quotations")]
-[Authorize(Roles = "EVENT_PLANNER,VENDOR")]
-public class QuotationsController : ControllerBase
+[Route("api/bookings")]
+[Authorize]
+public class BookingsController : ControllerBase
 {
-    private readonly IQuotationService _quotations;
     private readonly IBookingService _bookings;
 
-    public QuotationsController(IQuotationService quotations, IBookingService bookings)
+    public BookingsController(IBookingService bookings)
     {
-        _quotations = quotations;
         _bookings = bookings;
-    }
-
-    [HttpPost]
-    [Authorize(Policy = "EventPlannerOnly")]
-    public async Task<ActionResult<QuotationResponse>> Create(CreateQuotationRequest request)
-    {
-        try
-        {
-            var result = await _quotations.CreateAsync(GetCurrentUserId(), request);
-            return Created($"/api/quotations/{result.Id}", result);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Forbid();
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     [HttpGet("mine")]
     [Authorize(Policy = "EventPlannerOnly")]
-    public async Task<ActionResult<IReadOnlyList<QuotationResponse>>> ListMine()
+    public async Task<ActionResult<IReadOnlyList<BookingResponse>>> ListMine()
     {
-        return Ok(await _quotations.ListMineAsync(GetCurrentUserId()));
+        return Ok(await _bookings.ListMineAsync(GetCurrentUserId()));
     }
 
     [HttpGet("vendor")]
     [Authorize(Policy = "VendorOnly")]
-    public async Task<ActionResult<IReadOnlyList<QuotationResponse>>> ListForVendor()
+    public async Task<ActionResult<IReadOnlyList<BookingResponse>>> ListForVendor()
     {
         try
         {
-            return Ok(await _quotations.ListForVendorAsync(GetCurrentUserId()));
+            return Ok(await _bookings.ListForVendorAsync(GetCurrentUserId()));
         }
         catch (KeyNotFoundException ex)
         {
@@ -68,11 +41,11 @@ public class QuotationsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<QuotationResponse>> GetById(Guid id)
+    public async Task<ActionResult<BookingResponse>> GetById(Guid id)
     {
         try
         {
-            var result = await _quotations.GetByIdAsync(
+            var result = await _bookings.GetByIdAsync(
                 id,
                 GetCurrentUserId(),
                 User.IsInRole("VENDOR"));
@@ -88,13 +61,13 @@ public class QuotationsController : ControllerBase
         }
     }
 
-    [HttpPut("{id:guid}/respond")]
+    [HttpPut("{id:guid}/complete")]
     [Authorize(Policy = "VendorOnly")]
-    public async Task<ActionResult<QuotationResponse>> Respond(Guid id, RespondToQuotationRequest request)
+    public async Task<ActionResult<BookingResponse>> Complete(Guid id)
     {
         try
         {
-            return Ok(await _quotations.RespondAsync(GetCurrentUserId(), id, request));
+            return Ok(await _bookings.CompleteAsync(GetCurrentUserId(), id));
         }
         catch (UnauthorizedAccessException)
         {
@@ -108,20 +81,18 @@ public class QuotationsController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
-    [HttpPost("{id:guid}/accept")]
-    [Authorize(Policy = "EventPlannerOnly")]
-    public async Task<ActionResult<BookingResponse>> Accept(Guid id)
+    [HttpPut("{id:guid}/cancel")]
+    public async Task<ActionResult<BookingResponse>> Cancel(Guid id, CancelBookingRequest request)
     {
         try
         {
-            var result = await _bookings.AcceptQuotationAsync(GetCurrentUserId(), id);
-            return Created($"/api/bookings/{result.Id}", result);
+            return Ok(await _bookings.CancelAsync(
+                GetCurrentUserId(),
+                id,
+                request,
+                User.IsInRole("VENDOR")));
         }
         catch (UnauthorizedAccessException)
         {

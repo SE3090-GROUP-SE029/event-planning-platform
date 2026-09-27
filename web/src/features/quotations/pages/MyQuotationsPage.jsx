@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -19,7 +20,12 @@ import {
 
 export default function MyQuotationsPage() {
   const navigate = useNavigate();
+  const [actionError, setActionError] = useState('');
   const { data: quotations = [], isLoading, isError, error } = useMyQuotations();
+  const acceptMutation = { isPending: false };
+  const handleAccept = (quotationId) => {
+    setActionError(`Unable to accept quotation ${quotationId}.`);
+  };
 
   return (
     <AppLayout
@@ -40,6 +46,12 @@ export default function MyQuotationsPage() {
 
           {isError && (
             <Alert severity="error">{error?.message || 'Failed to load quotations.'}</Alert>
+          )}
+
+          {actionError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError('')}>
+              {actionError}
+            </Alert>
           )}
 
           {!isLoading && !isError && quotations.length === 0 && (
@@ -77,6 +89,18 @@ export default function MyQuotationsPage() {
                   Quoted price: {formatQuotedPrice(q.quotedPrice)}
                 </Typography>
                 <Typography variant="body2">Vendor terms: {q.vendorTerms || '—'}</Typography>
+                {q.status === 'QUOTED' && (
+                  <Button
+                    variant="contained"
+                    sx={{ mt: 2, borderRadius: 9999 }}
+                    disabled={acceptMutation.isPending}
+                    onClick={() => handleAccept(q.id)}
+                  >
+                    {acceptMutation.isPending
+                      ? 'Accepting…'
+                      : 'Accept quotation'}
+                  </Button>
+                )}
               </SurfaceCard>
             ))}
           </Stack>

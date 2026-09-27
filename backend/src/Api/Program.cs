@@ -3,6 +3,7 @@ using Application.Common.Interfaces;
 using Application.Dtos.Events;
 using Application.Services.Auth;
 using Application.Services.Admin;
+using Application.Services.Bookings;
 using Application.Services.Events;
 using Application.Services.Quotations;
 using Application.Services.Scheduling;
@@ -93,6 +94,8 @@ builder.Services.AddScoped<IVendorGalleryImageRepository, VendorGalleryImageRepo
 builder.Services.AddScoped<IVendorAvailabilityRepository, VendorAvailabilityRepository>();
 builder.Services.AddScoped<IVendorMarketplaceRepository, VendorMarketplaceRepository>();
 builder.Services.AddScoped<IQuotationRepository, QuotationRepository>();
+builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IVendorImageStorage>(_ =>
 {
     var webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
@@ -108,6 +111,7 @@ builder.Services.AddScoped<IVendorGalleryService, VendorGalleryService>();
 builder.Services.AddScoped<IVendorAvailabilityService, VendorAvailabilityService>();
 builder.Services.AddScoped<IVendorMarketplaceService, VendorMarketplaceService>();
 builder.Services.AddScoped<IQuotationService, QuotationService>();
+builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
