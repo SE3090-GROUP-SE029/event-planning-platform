@@ -219,6 +219,15 @@ class DashboardPage extends ConsumerWidget {
                       onTap: () => Navigator.of(context)
                           .pushNamed('/quotations/mine', arguments: session),
                     ),
+                    PastelListItem(
+                      icon: Icons.book_online_outlined,
+                      iconVariant: PastelIconVariant.olive,
+                      title: 'My bookings',
+                      subtitle: 'View and cancel confirmed vendor bookings',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/bookings/mine', arguments: session),
+                    ),
                   ],
                   if (isVendor) ...[
                     PastelListItem(
@@ -260,6 +269,17 @@ class DashboardPage extends ConsumerWidget {
                       showDivider: true,
                       onTap: () => Navigator.of(context).pushNamed(
                         '/vendors/quotations',
+                        arguments: session,
+                      ),
+                    ),
+                    PastelListItem(
+                      icon: Icons.book_online_outlined,
+                      iconVariant: PastelIconVariant.blue,
+                      title: 'Bookings',
+                      subtitle: 'Complete or cancel confirmed bookings',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/vendors/bookings',
                         arguments: session,
                       ),
                     ),

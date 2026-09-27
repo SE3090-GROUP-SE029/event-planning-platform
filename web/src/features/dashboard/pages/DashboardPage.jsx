@@ -212,10 +212,12 @@ export default function DashboardPage() {
           showPlanMonitoring={isAdmin}
           showMarketplace={showMarketplace}
           showMyQuotations={isEventPlanner}
+          showMyBookings={isEventPlanner}
           showVendorProfile={isVendor}
           showVendorServices={isVendor}
           showVendorAvailability={isVendor}
           showVendorQuotations={isVendor}
+          showVendorBookings={isVendor}
           onSelectTab={(tab) => {
             if (tab === 'dashboard') navigate('/dashboard');
             if (tab === 'events') navigate('/admin/events');
@@ -226,10 +228,12 @@ export default function DashboardPage() {
             if (tab === 'plans') navigate('/admin/plans');
             if (tab === 'marketplace') navigate('/marketplace');
             if (tab === 'my-quotations') navigate('/quotations/mine');
+            if (tab === 'my-bookings') navigate('/bookings/mine');
             if (tab === 'vendor-profile') navigate('/vendor/profile');
             if (tab === 'vendor-services') navigate('/vendor/services');
             if (tab === 'vendor-availability') navigate('/vendor/availability');
             if (tab === 'vendor-quotations') navigate('/vendor/quotations');
+            if (tab === 'vendor-bookings') navigate('/vendor/bookings');
           }}
           onLogout={handleLogout}
         />

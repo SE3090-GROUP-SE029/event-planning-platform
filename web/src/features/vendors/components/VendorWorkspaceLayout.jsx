@@ -23,12 +23,14 @@ export default function VendorWorkspaceLayout({ activeTab, title, subtitle, chil
           showVendorServices
           showVendorAvailability
           showVendorQuotations
+          showVendorBookings
           onSelectTab={(tab) => {
             if (tab === 'dashboard') navigate('/dashboard');
             if (tab === 'vendor-profile') navigate('/vendor/profile');
             if (tab === 'vendor-services') navigate('/vendor/services');
             if (tab === 'vendor-availability') navigate('/vendor/availability');
             if (tab === 'vendor-quotations') navigate('/vendor/quotations');
+            if (tab === 'vendor-bookings') navigate('/vendor/bookings');
           }}
           onLogout={handleLogout}
         />

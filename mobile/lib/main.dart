@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +9,9 @@ import 'features/auth/models/auth_response_model.dart';
 import 'features/auth/pages/login_page.dart';
 import 'features/auth/pages/register_page.dart';
 import 'features/auth/providers/auth_providers.dart';
+import 'features/bookings/pages/booking_detail_page.dart';
+import 'features/bookings/pages/my_bookings_page.dart';
+import 'features/bookings/pages/vendor_bookings_page.dart';
 import 'features/dashboard/pages/dashboard_page.dart';
 import 'features/events/models/event_model.dart';
 import 'features/events/pages/event_details_page.dart';
@@ -36,6 +39,8 @@ const _plannerRoutes = {
   '/marketplace/details',
   '/marketplace/request-quotation',
   '/quotations/mine',
+  '/bookings/mine',
+  '/bookings/details',
   '/plans/review',
 };
 
@@ -45,6 +50,7 @@ const _vendorRoutes = {
   '/vendors/availability',
   '/vendors/quotations',
   '/vendors/quotations/details',
+  '/vendors/bookings',
 };
 
 const _authenticatedRoutes = {
@@ -190,10 +196,13 @@ final Map<String, WidgetBuilder> _pageBuilders = {
   '/vendors/availability': (_) => const VendorAvailabilityPage(),
   '/vendors/quotations': (_) => const VendorQuotationsPage(),
   '/vendors/quotations/details': (_) => const VendorQuotationDetailPage(),
+  '/vendors/bookings': (_) => const VendorBookingsPage(),
   '/marketplace': (_) => const VendorMarketplacePage(),
   '/marketplace/details': (_) => const VendorMarketplaceDetailPage(),
   '/marketplace/request-quotation': (_) => const RequestQuotationPage(),
   '/quotations/mine': (_) => const MyQuotationsPage(),
+  '/bookings/mine': (_) => const MyBookingsPage(),
+  '/bookings/details': (_) => const BookingDetailPage(),
   '/plans/review': (context) => PlanReviewPage(
         planId: ModalRoute.of(context)!.settings.arguments as String,
       ),
@@ -218,10 +227,12 @@ bool isRouteArgumentsValid(String routeName, Object? arguments) {
     case '/events':
     case '/marketplace':
     case '/quotations/mine':
+    case '/bookings/mine':
     case '/vendors/profile':
     case '/vendors/services':
     case '/vendors/availability':
     case '/vendors/quotations':
+    case '/vendors/bookings':
       return arguments == null || arguments is AuthResponseModel;
     case '/events/create':
       return arguments == null ||
@@ -248,6 +259,10 @@ bool isRouteArgumentsValid(String routeName, Object? arguments) {
       return arguments is Map &&
           _nonEmptyString(arguments['quotationId']) &&
           (arguments['auth'] == null || arguments['auth'] is AuthResponseModel);
+    case '/bookings/details':
+      return arguments is Map &&
+          _nonEmptyString(arguments['bookingId']) &&
+          (arguments['auth'] == null || arguments['auth'] is AuthResponseModel);
     case '/plans/review':
       return _nonEmptyString(arguments);
     default:
@@ -266,13 +281,15 @@ Object? _argumentsForRoute(
       (routeName == '/events' ||
           routeName == '/marketplace' ||
           routeName == '/quotations/mine' ||
+          routeName == '/bookings/mine' ||
           _vendorRoutes.contains(routeName))) {
     return session;
   }
 
   if ((routeName == '/marketplace/details' ||
           routeName == '/marketplace/request-quotation' ||
-          routeName == '/vendors/quotations/details') &&
+          routeName == '/vendors/quotations/details' ||
+          routeName == '/bookings/details') &&
       arguments is Map) {
     return {...arguments, 'auth': arguments['auth'] ?? session};
   }
