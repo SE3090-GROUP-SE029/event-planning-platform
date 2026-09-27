@@ -64,6 +64,7 @@ class EventListController extends ChangeNotifier {
 EventModel emptyEvent() => EventModel(
       id: '',
       ownerId: '',
+      eventName: '',
       eventType: EventType.wedding,
       guestCount: 1,
       budget: 0,

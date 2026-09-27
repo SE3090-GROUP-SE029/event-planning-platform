@@ -342,9 +342,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                             ),
                             const SizedBox(height: AppDimens.space18),
                             Text(
-                              event.preferredVenue.isEmpty
+                              event.eventName.isEmpty
                                   ? 'Untitled Event'
-                                  : event.preferredVenue,
+                                  : event.eventName,
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
                                 fontSize: 24,

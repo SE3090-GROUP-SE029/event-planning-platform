@@ -265,11 +265,11 @@ class _EventListPageState extends ConsumerState<EventListPage> {
                                   ),
                                   const SizedBox(height: AppDimens.space14),
 
-                                  // Venue / Title
+                                  // Event title
                                   Text(
-                                    event.preferredVenue.isEmpty
+                                    event.eventName.isEmpty
                                         ? 'Untitled Event'
-                                        : event.preferredVenue,
+                                        : event.eventName,
                                     style: const TextStyle(
                                       color: AppColors.textPrimary,
                                       fontSize: 18,

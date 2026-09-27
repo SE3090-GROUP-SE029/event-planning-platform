@@ -1,17 +1,15 @@
 """LangGraph workflow assembly for the coordinator agent."""
 
+import json
 import logging
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from pydantic import ValidationError
 
 from .models import (
-    BudgetAllocationOutput,
     CoordinatorPlanResponse,
-    MissingRequirementOutput,
-    RiskOutput,
-    TimelinePhaseOutput,
 )
 from .nodes.analyze import analyze_requirements
 from .nodes.assess import allocate_budget
@@ -38,36 +36,51 @@ def finalize_plan(state: CoordinatorState) -> dict[str, object]:
 
     budget_total = sum(state.budget_allocation.values())
     budget_items = [
-        BudgetAllocationOutput(
-            category=category,
-            amount=amount,
-            percentage_of_total=(amount / budget_total * 100 if budget_total else 0),
-        )
+        {
+            "category": category,
+            "amount": amount,
+            "percentage_of_total": amount / budget_total * 100,
+        }
         for category, amount in state.budget_allocation.items()
     ]
-    plan = CoordinatorPlanResponse(
-        service_categories=state.service_categories,
-        budget_allocation=budget_items,
-        target_vendor_types=state.target_vendor_types,
-        proposed_timeline=[
-            TimelinePhaseOutput(
-                phase_name=phase,
-                timing=timing,
-                description=f"Complete {phase.lower()} for the event.",
-            )
+    candidate = {
+        "service_categories": state.service_categories,
+        "budget_allocation": budget_items,
+        "target_vendor_types": state.target_vendor_types,
+        "proposed_timeline": [
+            {
+                "phase_name": phase,
+                "timing": timing,
+                "description": f"Complete {phase.lower()} for the event.",
+            }
             for phase, timing in state.proposed_timeline.items()
         ],
-        rationale=state.rationale,
-        identified_risks=[
-            RiskOutput.model_validate(risk) for risk in state.identified_risks
+        "rationale": state.rationale,
+        "identified_risks": [
+            risk.model_dump(mode="json") for risk in state.identified_risks
         ],
-        missing_requirements=[
-            MissingRequirementOutput.model_validate(item)
-            for item in state.missing_requirements
+        "missing_requirements": [
+            item.model_dump(mode="json") for item in state.missing_requirements
         ],
-        plan_completeness_score=state.completeness_score,
-        validation_summary="Coordinator self-validation passed.",
+        "plan_completeness_score": state.completeness_score,
+        "validation_summary": "Coordinator self-validation passed.",
+    }
+    logger.info(
+        "Generated plan before validation: %s",
+        json.dumps(candidate, ensure_ascii=False, sort_keys=True),
     )
+    try:
+        plan = CoordinatorPlanResponse.model_validate(candidate)
+    except ValidationError as exc:
+        logger.error(
+            "Validation failed: %s",
+            json.dumps(
+                exc.errors(include_input=False, include_url=False),
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        )
+        raise
     return {"final_plan": plan}
 
 

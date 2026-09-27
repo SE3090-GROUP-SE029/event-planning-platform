@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../../shared/store/authStore';
 import apiClient from '../../../shared/api/apiClient';
+import { hasAdminWebAccess } from '../../../shared/auth/roleAccess';
 
 export const useLogin = () => {
   const { setAuth, setError } = useAuthStore();
@@ -8,6 +9,9 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: async (credentials) => {
       const response = await apiClient.post('/api/auth/login', credentials);
+      if (!hasAdminWebAccess(response.data?.roles)) {
+        throw new Error('Only Admin accounts may sign in to the website.');
+      }
       return response.data;
     },
     onSuccess: (data) => {
@@ -15,6 +19,7 @@ export const useLogin = () => {
       setError(null);
     },
     onError: (error) => {
+      useAuthStore.getState().logout();
       setError(error.message);
     },
   });

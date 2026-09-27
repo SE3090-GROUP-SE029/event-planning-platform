@@ -8,16 +8,30 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class RiskModel(BaseModel):
     """A risk identified while planning an event."""
 
-    risk: str = Field(..., max_length=500)
+    risk: str = Field(..., min_length=1, max_length=500)
     severity: Literal["Low", "Medium", "High"]
-    recommendation: str = Field(..., max_length=1000)
+    recommendation: str = Field(..., min_length=1, max_length=1000)
+
+    @field_validator("risk", "recommendation", mode="before")
+    @classmethod
+    def reject_blank_risk_text(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            raise ValueError("risk text must not be blank")
+        return value
 
 
 class MissingRequirementModel(BaseModel):
     """A requirement that must be clarified before execution."""
 
-    requirement: str = Field(..., max_length=200)
-    reason: str = Field(..., max_length=500)
+    requirement: str = Field(..., min_length=1, max_length=200)
+    reason: str = Field(..., min_length=1, max_length=500)
+
+    @field_validator("requirement", "reason", mode="before")
+    @classmethod
+    def reject_blank_requirement_text(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            raise ValueError("missing-requirement text must not be blank")
+        return value
 
 
 class RiskOutput(RiskModel):
@@ -29,11 +43,20 @@ class MissingRequirementOutput(MissingRequirementModel):
 
 
 class BudgetAllocationOutput(BaseModel):
-    """A non-negative budget allocation."""
+    """A positive budget allocation."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
 
     category: str = Field(..., min_length=1)
-    amount: float = Field(..., ge=0)
-    percentage_of_total: float = Field(..., ge=0, le=100)
+    amount: float = Field(..., gt=0)
+    percentage_of_total: float = Field(..., gt=0, le=100)
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def reject_blank_category(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            raise ValueError("budget category must not be blank")
+        return value
 
 
 class TimelinePhaseOutput(BaseModel):
@@ -48,15 +71,16 @@ class CoordinatorPlanOutput(BaseModel):
     """The structured plan returned by the coordinator agent."""
 
     model_config = ConfigDict(
-        json_schema_extra={"examples": [{"service_categories": ["Catering"]}]}
+        allow_inf_nan=False,
+        json_schema_extra={"examples": [{"service_categories": ["Catering"]}]},
     )
 
     service_categories: list[str] = Field(..., min_length=1)
-    budget_allocation: list[BudgetAllocationOutput] = Field(default_factory=list)
+    budget_allocation: list[BudgetAllocationOutput] = Field(..., min_length=1)
     target_vendor_types: list[str] = Field(..., min_length=1)
     proposed_timeline: list[TimelinePhaseOutput] = Field(..., min_length=3)
-    rationale: str = Field(..., max_length=2000)
-    identified_risks: list[RiskOutput] = Field(default_factory=list)
+    rationale: str = Field(..., min_length=100, max_length=2000)
+    identified_risks: list[RiskOutput] = Field(..., min_length=1)
     missing_requirements: list[MissingRequirementOutput] = Field(default_factory=list)
     plan_completeness_score: int = Field(..., ge=0, le=100)
     validation_summary: str = Field(..., min_length=1)
@@ -68,10 +92,18 @@ class CoordinatorPlanOutput(BaseModel):
             raise ValueError("list items must not be blank")
         return values
 
+    @field_validator("rationale", mode="before")
+    @classmethod
+    def reject_blank_rationale(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            raise ValueError("rationale must not be blank")
+        return value
+
     @model_validator(mode="after")
     def validate_budget_entries(self) -> "CoordinatorPlanOutput":
-        if any(item.amount < 0 for item in self.budget_allocation):
-            raise ValueError("budget amounts must be non-negative")
+        errors = self.budget_validation_errors()
+        if errors:
+            raise ValueError("; ".join(errors))
         return self
 
     def total_budget_allocated(self) -> float:

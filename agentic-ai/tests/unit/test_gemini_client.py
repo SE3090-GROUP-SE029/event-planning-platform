@@ -1,9 +1,11 @@
 import asyncio
 import json
 import logging
+import socket
 from typing import Any
 
 import pytest
+import httpx
 from google.api_core.exceptions import (
     DeadlineExceeded,
     NotFound,
@@ -21,6 +23,7 @@ from src.coordinator_agent.nodes.assess import BudgetOutput
 from src.gemini_client import client as gemini_client_module
 from src.gemini_client.client import GeminiClient, configure_gemini
 from src.gemini_client.exceptions import (
+    GeminiClientError,
     GeminiConfigurationError,
     GeminiInvalidCredentialsError,
     GeminiInvalidModelError,
@@ -37,15 +40,30 @@ from src.gemini_client.schema import pydantic_to_gemini_schema
 def _plan_payload() -> dict[str, Any]:
     return {
         "service_categories": ["Catering"],
-        "budget_allocation": [],
+        "budget_allocation": [
+            {
+                "category": "Catering",
+                "amount": 100.0,
+                "percentage_of_total": 100.0,
+            }
+        ],
         "target_vendor_types": ["Caterer"],
         "proposed_timeline": [
             {"phase_name": "A", "timing": "Now", "description": "Do A"},
             {"phase_name": "B", "timing": "Later", "description": "Do B"},
             {"phase_name": "C", "timing": "Event", "description": "Do C"},
         ],
-        "rationale": "A suitable plan",
-        "identified_risks": [],
+        "rationale": (
+            "This complete plan balances the event priorities, confirms vendors "
+            "early, and reserves adequate time for final confirmations."
+        ),
+        "identified_risks": [
+            {
+                "risk": "A supplier may become unavailable.",
+                "severity": "Medium",
+                "recommendation": "Confirm bookings and retain a backup option.",
+            }
+        ],
         "missing_requirements": [],
         "plan_completeness_score": 90,
         "validation_summary": "Valid",
@@ -124,6 +142,17 @@ class _RetryModel(_Model):
         if self.attempt_count <= self.failures:
             raise ServiceUnavailable("temporarily unavailable")
         return await super().generate_content_async(**kwargs)
+
+
+class _TransportFailureModel(_Model):
+    def __init__(self, failure: Exception) -> None:
+        super().__init__()
+        self.failure = failure
+        self.attempt_count = 0
+
+    async def generate_content_async(self, *_args: Any, **_kwargs: Any) -> _Response:
+        self.attempt_count += 1
+        raise self.failure
 
 
 def test_client_generates_validated_plan_without_api_key() -> None:
@@ -245,6 +274,7 @@ def test_invalid_model_identifier_fails_settings_validation() -> None:
 def test_gemini_model_is_loaded_from_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-flash")
     monkeypatch.setenv("GEMINI_API_KEYS", "second-key, third-key")
     monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "gemini-2.0-flash")
@@ -544,6 +574,46 @@ def test_all_transient_failures_have_a_network_domain_error(
         asyncio.run(
             GeminiClient().generate_with_prompt(
                 "Return a network domain error for this request.",
+                AnalysisOutput,
+            )
+        )
+
+    assert model.attempt_count == 2
+
+
+@pytest.mark.parametrize(
+    ("failure", "domain_error"),
+    [
+        (httpx.ConnectError("connection failed"), GeminiNetworkError),
+        (ConnectionError("connection failed"), GeminiNetworkError),
+        (socket.gaierror(-2, "DNS lookup failed"), GeminiNetworkError),
+        (httpx.ReadTimeout("request timed out"), GeminiTimeoutError),
+    ],
+)
+def test_transport_failures_have_a_domain_error(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Exception,
+    domain_error: type[GeminiClientError],
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        gemini_api_key="primary-test-key",
+        gemini_model="gemini-primary",
+        gemini_max_retries=1,
+    )
+    model = _TransportFailureModel(failure)
+
+    async def skip_delay(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(gemini_client_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(gemini_client_module, "_configured_model", lambda *_args: model)
+    monkeypatch.setattr(gemini_client_module.asyncio, "sleep", skip_delay)
+
+    with pytest.raises(domain_error):
+        asyncio.run(
+            GeminiClient().generate_with_prompt(
+                "Map transport failures to a Gemini domain error.",
                 AnalysisOutput,
             )
         )

@@ -3,14 +3,14 @@ using System.Text.Json.Serialization;
 using Application.Dtos.Plans;
 using Application.Services.Planning;
 using Domain.Entities;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Services.Planning;
 
 public sealed class AgenticAiClient(
     IHttpClientFactory httpClientFactory,
-    IConfiguration configuration,
+    IOptions<AgenticAiOptions> options,
     ILogger<AgenticAiClient> logger) : IAgenticAiClient
 {
     public async Task<CoordinatorPlanResponse> GeneratePlanAsync(
@@ -23,7 +23,7 @@ public sealed class AgenticAiClient(
             eventId = eventEntity.Id,
             @event = new
             {
-                name = eventEntity.PreferredVenue ?? "Event",
+                name = eventEntity.EventName,
                 type = eventEntity.EventType.ToString(),
                 date = eventEntity.PreferredDate,
                 location = eventEntity.PreferredVenue,
@@ -34,7 +34,7 @@ public sealed class AgenticAiClient(
         };
 
         using var response = await client.PostAsJsonAsync(
-            configuration["AgenticAI:GeneratePath"] ?? "/api/coordinator/generate",
+            options.Value.GeneratePath,
             request,
             cancellationToken);
         if (!response.IsSuccessStatusCode)

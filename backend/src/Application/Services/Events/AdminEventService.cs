@@ -55,6 +55,7 @@ public sealed class AdminEventService : IAdminEventService
     {
         Id = eventEntity.Id,
         OwnerId = eventEntity.OwnerId,
+        EventName = eventEntity.EventName,
         EventType = eventEntity.EventType,
         GuestCount = eventEntity.GuestCount,
         Budget = eventEntity.Budget,

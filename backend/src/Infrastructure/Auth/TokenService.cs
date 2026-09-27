@@ -12,9 +12,9 @@ namespace Infrastructure.Auth;
 
 public class TokenService : ITokenService
 {
-    private readonly JwtSettings _settings;
+    private readonly JwtOptions _settings;
 
-    public TokenService(IOptions<JwtSettings> settings)
+    public TokenService(IOptions<JwtOptions> settings)
     {
         _settings = settings.Value;
     }

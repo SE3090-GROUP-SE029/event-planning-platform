@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/api/session_store.dart';
 import '../../../core/api/dio_client.dart';
 import '../api/auth_remote_datasource.dart';
 import '../api/auth_repository.dart';
@@ -7,7 +8,18 @@ import '../models/auth_response_model.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
 
-final dioProvider = Provider<Dio>((ref) => DioClient().dio);
+final sessionStoreProvider = Provider<SessionStore>((ref) {
+  return SecureSessionStore();
+});
+
+final dioProvider = Provider<Dio>((ref) {
+  final client = DioClient();
+  client.onSessionExpired = () {
+    ref.read(authNotifierProvider.notifier).expireSession();
+  };
+  ref.onDispose(() => client.onSessionExpired = null);
+  return client.dio;
+});
 
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
   return AuthRemoteDataSourceImpl(dio: ref.watch(dioProvider));
@@ -16,6 +28,7 @@ final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
     remoteDataSource: ref.watch(authRemoteDataSourceProvider),
+    sessionStore: ref.watch(sessionStoreProvider),
   );
 });
 
@@ -30,7 +43,7 @@ class AuthNotifier extends AsyncNotifier<AuthResponseModel?> {
   AuthRepository get _repository => ref.read(authRepositoryProvider);
 
   @override
-  Future<AuthResponseModel?> build() async => null;
+  Future<AuthResponseModel?> build() => _repository.restoreSession();
 
   Future<void> login(String email, String password) async {
     state = const AsyncLoading();
@@ -64,20 +77,17 @@ class AuthNotifier extends AsyncNotifier<AuthResponseModel?> {
 
   Future<void> logout() async {
     final session = state.value;
-    if (session == null) {
-      state = const AsyncData(null);
-      return;
-    }
-
     state = const AsyncLoading();
-    final result = await AsyncValue.guard(
-      () => _repository.logout(session.refreshToken),
-    );
-    state = result.when(
-      data: (_) => const AsyncData(null),
-      loading: () => const AsyncLoading(),
-      error: (error, stackTrace) => AsyncError(error, stackTrace),
-    );
+    try {
+      await _repository.logout(session?.refreshToken ?? '');
+      state = const AsyncData(null);
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
+  }
+
+  void expireSession() {
+    state = const AsyncData(null);
   }
 
   Future<void> refreshToken() async {
@@ -85,8 +95,10 @@ class AuthNotifier extends AsyncNotifier<AuthResponseModel?> {
     if (session == null) return;
 
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => _repository.refresh(session.refreshToken),
-    );
+    try {
+      state = AsyncData(await _repository.refresh(session.refreshToken));
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 }

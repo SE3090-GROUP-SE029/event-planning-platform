@@ -59,10 +59,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               backgroundColor: AppColors.success,
             ),
           );
-          Navigator.of(context).pushReplacementNamed(
-            '/dashboard',
-            arguments: session,
-          );
+          Navigator.of(context)
+              .pushNamedAndRemoveUntil('/dashboard', (_) => false);
         },
         error: (error, _) {
           ScaffoldMessenger.of(context).showSnackBar(

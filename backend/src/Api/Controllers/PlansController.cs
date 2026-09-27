@@ -22,6 +22,7 @@ public sealed class PlansController(
     IEventRepository eventRepository) : ControllerBase
 {
     [HttpPost("events/{eventId:guid}/plans/generate")]
+    [Authorize(Policy = "EventPlannerOnly")]
     public async Task<ActionResult<ApiResponse<EventPlanDraft>>> Generate(
         Guid eventId,
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] GeneratePlanRequest? request,
@@ -108,6 +109,7 @@ public sealed class PlansController(
     }
 
     [HttpPost("plans/{planId:guid}/approve")]
+    [Authorize(Policy = "EventPlannerOnly")]
     public async Task<ActionResult<ApiResponse<EventPlanDraft>>> Approve(
         Guid planId,
         [FromBody] ApprovePlanRequest request,
@@ -126,6 +128,7 @@ public sealed class PlansController(
     }
 
     [HttpPost("plans/{planId:guid}/reject")]
+    [Authorize(Policy = "EventPlannerOnly")]
     public async Task<ActionResult<ApiResponse<EventPlanDraft>>> Reject(
         Guid planId,
         [FromBody] RejectPlanRequest request,

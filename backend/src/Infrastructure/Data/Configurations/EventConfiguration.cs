@@ -18,6 +18,7 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
         builder.HasKey(e => e.Id);
         builder.Property(e => e.OwnerId).IsRequired();
         builder.HasIndex(e => e.OwnerId);
+        builder.Property(e => e.EventName).IsRequired().HasMaxLength(200);
         builder.Property(e => e.EventType).IsRequired();
         builder.Property(e => e.GuestCount).IsRequired();
         builder.Property(e => e.Budget).IsRequired().HasPrecision(18, 2);

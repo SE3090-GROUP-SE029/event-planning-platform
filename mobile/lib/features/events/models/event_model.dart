@@ -49,6 +49,7 @@ String _durationJson(Duration value) {
 class EventModel {
   final String id;
   final String ownerId;
+  final String eventName;
   final EventType eventType;
   final int guestCount;
   final double budget;
@@ -63,6 +64,7 @@ class EventModel {
   const EventModel({
     required this.id,
     required this.ownerId,
+    required this.eventName,
     required this.eventType,
     required this.guestCount,
     required this.budget,
@@ -78,6 +80,7 @@ class EventModel {
   factory EventModel.fromJson(Map<String, dynamic> json) => EventModel(
         id: '${json['id'] ?? ''}',
         ownerId: '${json['ownerId'] ?? ''}',
+        eventName: json['eventName'] as String? ?? '',
         eventType: _parseEnum(json['eventType'], EventType.values),
         guestCount: (json['guestCount'] as num?)?.toInt() ?? 0,
         budget: (json['budget'] as num?)?.toDouble() ?? 0,
@@ -94,6 +97,7 @@ class EventModel {
 
   Map<String, dynamic> toCreateJson() => {
         'eventType': eventType.index,
+        'eventName': eventName,
         'guestCount': guestCount,
         'budget': budget,
         'preferredVenue': preferredVenue,
@@ -104,6 +108,7 @@ class EventModel {
 
   Map<String, dynamic> toUpdateJson() => {
         'eventType': eventType.index,
+        'eventName': eventName,
         'guestCount': guestCount,
         'budget': budget,
         'preferredVenue': preferredVenue,

@@ -3,10 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/auth/api/auth_remote_datasource.dart';
 import 'package:mobile/features/auth/api/auth_repository.dart';
 import 'package:mobile/features/auth/models/auth_response_model.dart';
+import 'package:mobile/features/auth/models/current_user_model.dart';
 import 'package:mobile/features/auth/models/login_request_model.dart';
 import 'package:mobile/features/auth/models/register_request_model.dart';
 import 'package:mobile/features/auth/models/refresh_request_model.dart';
 import 'package:mobile/features/auth/providers/auth_providers.dart';
+import 'package:mobile/core/api/session_store.dart';
 
 void main() {
   test('login exposes AsyncData with the authenticated session', () async {
@@ -70,7 +72,11 @@ void main() {
 }
 
 class FakeAuthRepository extends AuthRepository {
-  FakeAuthRepository() : super(remoteDataSource: FakeAuthRemoteDataSource());
+  FakeAuthRepository()
+      : super(
+          remoteDataSource: FakeAuthRemoteDataSource(),
+          sessionStore: MemorySessionStore(),
+        );
 
   bool shouldFail = false;
   String? loggedOutToken;
@@ -122,4 +128,24 @@ class FakeAuthRemoteDataSource implements AuthRemoteDataSource {
   @override
   Future<AuthResponseModel> refresh(RefreshRequestModel request) =>
       throw UnimplementedError();
+
+  @override
+  Future<CurrentUserModel> getCurrentUser() => throw UnimplementedError();
+}
+
+class MemorySessionStore implements SessionStore {
+  AuthResponseModel? session;
+
+  @override
+  Future<AuthResponseModel?> readSession() async => session;
+
+  @override
+  Future<void> writeSession(AuthResponseModel session) async {
+    this.session = session;
+  }
+
+  @override
+  Future<void> clearSession() async {
+    session = null;
+  }
 }

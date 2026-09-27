@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../../core/api/dio_client.dart';
 import '../models/auth_response_model.dart';
+import '../models/current_user_model.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
 import '../models/refresh_request_model.dart';
@@ -10,6 +11,17 @@ abstract class AuthRemoteDataSource {
   Future<AuthResponseModel> register(RegisterRequestModel request);
   Future<void> logout(String refreshToken);
   Future<AuthResponseModel> refresh(RefreshRequestModel request);
+  Future<CurrentUserModel> getCurrentUser();
+}
+
+class AuthApiException implements Exception {
+  final int? statusCode;
+  final String message;
+
+  const AuthApiException(this.message, {this.statusCode});
+
+  @override
+  String toString() => message;
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -68,17 +80,52 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
-  String _handleError(DioException error) {
+  @override
+  Future<CurrentUserModel> getCurrentUser() async {
+    try {
+      final response = await dio.get('/api/auth/me');
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw const FormatException(
+          'The current-user response has an invalid format.',
+        );
+      }
+      return CurrentUserModel.fromJson(data);
+    } on DioException catch (error) {
+      throw _handleError(error);
+    }
+  }
+
+  AuthApiException _handleError(DioException error) {
     if (error.response?.data is Map<String, dynamic>) {
       final data = error.response!.data as Map<String, dynamic>;
-      if (data.containsKey('message')) return data['message'].toString();
-      if (data.containsKey('error')) return data['error'].toString();
+      if (data.containsKey('message')) {
+        return AuthApiException(
+          data['message'].toString(),
+          statusCode: error.response?.statusCode,
+        );
+      }
+      if (data.containsKey('error')) {
+        return AuthApiException(
+          data['error'].toString(),
+          statusCode: error.response?.statusCode,
+        );
+      }
     }
     if (error.response?.statusCode == 401) {
-      return 'Invalid email or password';
+      return AuthApiException(
+        'Invalid email or password',
+        statusCode: error.response?.statusCode,
+      );
     } else if (error.response?.statusCode == 400) {
-      return 'Invalid request data. Please check your inputs.';
+      return AuthApiException(
+        'Invalid request data. Please check your inputs.',
+        statusCode: error.response?.statusCode,
+      );
     }
-    return error.message ?? 'An error occurred. Please try again.';
+    return AuthApiException(
+      error.message ?? 'An error occurred. Please try again.',
+      statusCode: error.response?.statusCode,
+    );
   }
 }

@@ -9,7 +9,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/quotations")]
-[Authorize]
+[Authorize(Roles = "EVENT_PLANNER,VENDOR")]
 public class QuotationsController : ControllerBase
 {
     private readonly IQuotationService _quotations;

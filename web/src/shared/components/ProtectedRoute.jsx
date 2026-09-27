@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { Typography, Button, Container, Paper } from '@mui/material';
 import { useAuthStore } from '../store/authStore';
+import { hasAdminWebAccess } from '../auth/roleAccess';
 
 export default function ProtectedRoute({ children, requiredRole }) {
   const token = useAuthStore((state) => state.accessToken);
@@ -9,6 +10,25 @@ export default function ProtectedRoute({ children, requiredRole }) {
 
   if (!token || !user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!hasAdminWebAccess(user.roles)) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 10 }}>
+        <Paper elevation={3} sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
+          <Typography variant="h4" color="error" fontWeight="bold" sx={{ mb: 2 }}>
+            Admin access required
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Only Admin accounts may access the website. Your active roles:{' '}
+            <strong>{user.roles?.join(', ') || 'None'}</strong>
+          </Typography>
+          <Button variant="contained" onClick={logout}>
+            Sign Out
+          </Button>
+        </Paper>
+      </Container>
+    );
   }
 
   if (requiredRole && !user.roles?.includes(requiredRole.toUpperCase())) {

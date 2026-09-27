@@ -27,6 +27,7 @@ public class EventService : IEventService
         {
             Id = Guid.NewGuid(),
             OwnerId = ownerId,
+            EventName = request.EventName.Trim(),
             EventType = request.EventType!.Value,
             GuestCount = request.GuestCount,
             Budget = request.Budget,
@@ -87,6 +88,7 @@ public class EventService : IEventService
 
         var createRequest = new CreateEventRequest
         {
+            EventName = request.EventName,
             EventType = request.EventType,
             GuestCount = request.GuestCount,
             Budget = request.Budget,
@@ -105,6 +107,7 @@ public class EventService : IEventService
         }
 
         eventEntity.EventType = request.EventType!.Value;
+        eventEntity.EventName = request.EventName.Trim();
         eventEntity.GuestCount = request.GuestCount;
         eventEntity.Budget = request.Budget;
         eventEntity.PreferredVenue = request.PreferredVenue.Trim();
@@ -159,6 +162,7 @@ public class EventService : IEventService
     {
         Id = eventEntity.Id,
         OwnerId = eventEntity.OwnerId,
+        EventName = eventEntity.EventName,
         EventType = eventEntity.EventType,
         GuestCount = eventEntity.GuestCount,
         Budget = eventEntity.Budget,

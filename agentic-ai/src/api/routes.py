@@ -1,10 +1,12 @@
 """Coordinator API routes."""
 
 import logging
+from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.coordinator_agent.execution import (
     CoordinatorExecutionError,
@@ -25,13 +27,54 @@ _PROVIDER_MESSAGES = {
 }
 
 
+class CoordinatorEventRequest(BaseModel):
+    """Validated event payload sent by the backend planning client."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    name: str = Field(..., min_length=1, max_length=500)
+    type: Literal["WEDDING", "CORPORATE", "BIRTHDAY"]
+    date: datetime
+    location: str | None = Field(..., max_length=500)
+    guest_count: int = Field(..., ge=1)
+    budget: float = Field(..., gt=0, allow_inf_nan=False)
+    requirements: str | None = Field(..., max_length=4000)
+
+    @field_validator("name")
+    @classmethod
+    def reject_blank_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("name must not be blank")
+        return value
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def parse_backend_datetime(cls, value: object) -> datetime:
+        if not isinstance(value, str) or "T" not in value:
+            raise ValueError("date must be an ISO 8601 datetime string")
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("date must be an ISO 8601 datetime string") from exc
+
+
 class GenerateCoordinatorPlanRequest(BaseModel):
     """Backend request for generating a coordinator plan."""
 
-    event_id: UUID = Field(..., alias="eventId")
-    event: dict[str, object]
+    model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
 
-    model_config = {"populate_by_name": True}
+    event_id: UUID = Field(..., alias="eventId")
+    event: CoordinatorEventRequest
+
+    @field_validator("event_id", mode="before")
+    @classmethod
+    def parse_event_id(cls, value: object) -> UUID:
+        if not isinstance(value, str):
+            raise ValueError("eventId must be a UUID string")
+        try:
+            return UUID(value)
+        except ValueError as exc:
+            raise ValueError("eventId must be a valid UUID") from exc
 
 
 @router.get("/schema", response_model=dict[str, object])
@@ -51,7 +94,7 @@ async def generate_coordinator_plan(
     try:
         return await execute_coordinator_agent(
             str(request.event_id),
-            request.event,
+            request.event.model_dump(mode="json"),
             checkpointer=getattr(
                 http_request.app.state, "coordinator_checkpointer", None
             ),

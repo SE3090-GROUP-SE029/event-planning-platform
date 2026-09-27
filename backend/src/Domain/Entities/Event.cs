@@ -6,6 +6,7 @@ public class Event
 {
     public Guid Id { get; set; }
     public Guid OwnerId { get; set; }
+    public string EventName { get; set; } = string.Empty;
     public EventType EventType { get; set; }
     public int GuestCount { get; set; }
     public decimal Budget { get; set; }

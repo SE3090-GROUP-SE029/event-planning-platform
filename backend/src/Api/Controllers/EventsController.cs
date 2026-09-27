@@ -10,7 +10,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/events")]
-[Authorize]
+[Authorize(Policy = "EventPlannerOnly")]
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;

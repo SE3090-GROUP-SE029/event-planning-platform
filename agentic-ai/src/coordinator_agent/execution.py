@@ -141,16 +141,35 @@ async def execute_coordinator_agent(
                 timeout=execution_timeout,
             )
         if not final_state.validation_passed or final_state.final_plan is None:
-            raise ValidationError.from_exception_data(
-                "CoordinatorState",
-                [
+            logger.error(
+                "Coordinator final validation failed for event %s: %s",
+                event_id,
+                json.dumps(
                     {
-                        "type": "value_error",
-                        "loc": ("validation",),
-                        "input": final_state.validation_errors,
-                        "ctx": {"error": "final coordinator validation failed"},
-                    }
-                ],
+                        "validation_passed": final_state.validation_passed,
+                        "validation_errors": final_state.validation_errors,
+                        "service_categories": final_state.service_categories,
+                        "budget_allocation": final_state.budget_allocation,
+                        "budget_total": sum(final_state.budget_allocation.values()),
+                        "event_budget": final_state.event.get("budget"),
+                        "timeline": final_state.proposed_timeline,
+                        "risk_assessments": [
+                            risk.model_dump(mode="json")
+                            for risk in final_state.identified_risks
+                        ],
+                        "missing_requirements": [
+                            item.model_dump(mode="json")
+                            for item in final_state.missing_requirements
+                        ],
+                        "rationale": final_state.rationale,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+            )
+            raise CoordinatorValidationError(
+                "Generated plan failed coordinator validation: "
+                + "; ".join(final_state.validation_errors)
             )
         logger.info("Coordinator agent completed for event %s", event_id)
         if checkpointer is not None:
@@ -203,8 +222,19 @@ async def execute_coordinator_agent(
             f"Plan generation exceeded {execution_timeout} second timeout"
         ) from exc
     except ValidationError as exc:
-        logger.error("Coordinator final validation failed for event %s", event_id)
-        raise CoordinatorValidationError("Generated plan did not pass validation") from exc
+        errors = exc.errors(include_input=False, include_url=False)
+        logger.error(
+            "Coordinator final validation failed for event %s: %s",
+            event_id,
+            json.dumps(errors, ensure_ascii=False, sort_keys=True),
+        )
+        raise CoordinatorValidationError(
+            "Generated plan did not pass validation: "
+            + "; ".join(
+                f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+                for error in errors
+            )
+        ) from exc
     except CoordinatorExecutionError:
         raise
     except GeminiClientError as exc:
