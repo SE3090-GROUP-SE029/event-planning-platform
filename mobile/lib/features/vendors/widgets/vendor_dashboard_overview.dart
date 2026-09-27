@@ -113,20 +113,20 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
-                    const PastelIconBadge(
+                    PastelIconBadge(
                       icon: Icons.storefront_rounded,
                       variant: PastelIconVariant.olive,
                       size: 48,
                       iconSize: 24,
                     ),
-                    const SizedBox(width: 14),
+                    SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Create your business profile',
                             style: TextStyle(
                               color: AppColors.textPrimary,
@@ -134,8 +134,8 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          const Text(
+                          SizedBox(height: 2),
+                          Text(
                             'Set up your vendor profile to start listing services and receiving quotes.',
                             style: TextStyle(
                               color: AppColors.textSecondary,
