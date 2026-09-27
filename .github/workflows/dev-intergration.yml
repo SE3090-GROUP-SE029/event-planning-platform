@@ -180,7 +180,7 @@ jobs:
           --configuration Release
           --no-build
           --connection
-          "Host=localhost;Port=5432;Database=app_migrate_check;Username=test;******"
+          "Host=localhost;Port=5432;Database=app_migrate_check;Username=test;Password=test"
 
   integration-gate:
     if: always()

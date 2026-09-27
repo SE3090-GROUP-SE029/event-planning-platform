@@ -68,6 +68,29 @@ public sealed class EventSnapshot
             evt.UpdatedAt ?? evt.CreatedAt);
     }
 
+    public static EventSnapshot FromPersistedData(
+        string? eventName,
+        EventType eventType,
+        DateTime eventDate,
+        string? location,
+        int guestCount,
+        decimal budget,
+        List<string>? requirements,
+        DateTime createdAt,
+        DateTime lastModifiedAt) =>
+        new()
+        {
+            EventName = eventName ?? string.Empty,
+            EventType = eventType,
+            EventDate = eventDate,
+            Location = location ?? string.Empty,
+            GuestCount = guestCount,
+            Budget = budget,
+            Requirements = requirements ?? [],
+            CreatedAt = createdAt,
+            LastModifiedAt = lastModifiedAt
+        };
+
     public override string ToString() => $"{EventName} ({EventDate:O}, {GuestCount} guests)";
 
     private static string RequiredText(string value, string parameterName) =>

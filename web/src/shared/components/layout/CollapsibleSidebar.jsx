@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Box, IconButton, Typography } from '@mui/material';
 import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
@@ -8,6 +8,7 @@ import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import BookOnlineOutlinedIcon from '@mui/icons-material/BookOnlineOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -20,11 +21,13 @@ const Icons = {
   Schedule: () => <CalendarMonthIcon />,
   Marketplace: () => <StorefrontOutlinedIcon />,
   MyQuotations: () => <ReceiptLongOutlinedIcon />,
+  MyBookings: () => <BookOnlineOutlinedIcon />,
   Profile: () => <FaceIcon />,
   Services: () => <HandymanOutlinedIcon />,
   Availability: () => <ScheduleOutlinedIcon />,
   Plans: () => <AssignmentOutlinedIcon />,
   VendorQuotations: () => <RequestQuoteOutlinedIcon />,
+  VendorBookings: () => <BookOnlineOutlinedIcon />,
   Logout: () => <MeetingRoomIcon />,
   ChevronLeft: () => <ChevronLeftIcon />,
   ChevronRight: () => <ChevronRightIcon />,
@@ -36,10 +39,12 @@ export default function CollapsibleSidebar({
   showSchedule = true,
   showMarketplace = false,
   showMyQuotations = false,
+  showMyBookings = false,
   showVendorProfile = false,
   showVendorServices = false,
   showVendorAvailability = false,
   showVendorQuotations = false,
+  showVendorBookings = false,
   showPlanMonitoring = false,
   onSelectTab,
   onLogout,
@@ -51,10 +56,12 @@ export default function CollapsibleSidebar({
     ...(showSchedule ? [{ id: 'schedule', label: 'Schedule', icon: Icons.Schedule }] : []),
     ...(showMarketplace ? [{ id: 'marketplace', label: 'Marketplace', icon: Icons.Marketplace }] : []),
     ...(showMyQuotations ? [{ id: 'my-quotations', label: 'My quotations', icon: Icons.MyQuotations }] : []),
+    ...(showMyBookings ? [{ id: 'my-bookings', label: 'My bookings', icon: Icons.MyBookings }] : []),
     ...(showVendorProfile ? [{ id: 'vendor-profile', label: 'Vendor profile', icon: Icons.Profile }] : []),
     ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
     ...(showVendorAvailability ? [{ id: 'vendor-availability', label: 'Availability', icon: Icons.Availability }] : []),
     ...(showVendorQuotations ? [{ id: 'vendor-quotations', label: 'Quotation requests', icon: Icons.VendorQuotations }] : []),
+    ...(showVendorBookings ? [{ id: 'vendor-bookings', label: 'Bookings', icon: Icons.VendorBookings }] : []),
     ...(showPlanMonitoring ? [{ id: 'plans', label: 'Plan monitoring', icon: Icons.Plans }] : []),
   ];
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Application.Common.Exceptions;
 using Domain.Entities;
 using Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -51,7 +52,7 @@ public sealed class EventPlanDraftConfiguration : IEntityTypeConfiguration<Event
             .HasConversion(JsonConverter<Dictionary<string, string>>());
         builder.Property(draft => draft.EventSnapshot)
             .HasColumnType("jsonb")
-            .HasConversion(JsonConverter<EventSnapshot>());
+            .HasConversion(EventSnapshotJsonConverter());
 
         builder.HasOne(draft => draft.Event)
             .WithMany(evt => evt.EventPlanDrafts)
@@ -94,4 +95,59 @@ public sealed class EventPlanDraftConfiguration : IEntityTypeConfiguration<Event
     private static T DeserializeJson<T>(string value) where T : class =>
         JsonSerializer.Deserialize<T>(value, JsonOptions)
         ?? throw new JsonException($"Could not deserialize JSON as {typeof(T).Name}.");
+
+    private static ValueConverter<EventSnapshot, string> EventSnapshotJsonConverter() =>
+        new(
+            value => JsonSerializer.Serialize(EventSnapshotPersistenceModel.From(value), JsonOptions),
+            value => DeserializeEventSnapshot(value));
+
+    private static EventSnapshot DeserializeEventSnapshot(string value)
+    {
+        try
+        {
+            var persisted = JsonSerializer.Deserialize<EventSnapshotPersistenceModel>(value, JsonOptions)
+                ?? throw new JsonException("EventSnapshot JSON was null.");
+            return EventSnapshot.FromPersistedData(
+                persisted.EventName,
+                persisted.EventType,
+                persisted.EventDate,
+                persisted.Location,
+                persisted.GuestCount,
+                persisted.Budget,
+                persisted.Requirements,
+                persisted.CreatedAt,
+                persisted.LastModifiedAt);
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or NotSupportedException)
+        {
+            throw new PersistedJsonDeserializationException(nameof(EventSnapshot), value, ex);
+        }
+    }
+
+    private sealed class EventSnapshotPersistenceModel
+    {
+        public string? EventName { get; set; }
+        public EventType EventType { get; set; }
+        public DateTime EventDate { get; set; }
+        public string? Location { get; set; }
+        public int GuestCount { get; set; }
+        public decimal Budget { get; set; }
+        public List<string>? Requirements { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime LastModifiedAt { get; set; }
+
+        public static EventSnapshotPersistenceModel From(EventSnapshot snapshot) =>
+            new()
+            {
+                EventName = snapshot.EventName,
+                EventType = snapshot.EventType,
+                EventDate = snapshot.EventDate,
+                Location = snapshot.Location,
+                GuestCount = snapshot.GuestCount,
+                Budget = snapshot.Budget,
+                Requirements = snapshot.Requirements,
+                CreatedAt = snapshot.CreatedAt,
+                LastModifiedAt = snapshot.LastModifiedAt
+            };
+    }
 }

@@ -6,6 +6,7 @@ using Application.Services.Validation;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Data;
+using Infrastructure.Repositories;
 using Infrastructure.Services.Planning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -31,6 +32,30 @@ public sealed class PlanGenerationServiceTests
         Assert.Equal(eventEntity.EventName, plan.EventSnapshot.EventName);
         Assert.Equal(PlanStatus.PendingPlannerReview, plan.Status);
         Assert.Same(plan, planRepository.AddedPlan);
+        Assert.Equal(1, aiClient.CallCount);
+    }
+
+    [Fact]
+    public async Task GeneratePlanAsync_SavesAndRetrievesGeneratedPlan()
+    {
+        var ownerId = Guid.NewGuid();
+        var eventEntity = CreateEvent(ownerId);
+        using var db = CreateDb();
+        db.Events.Add(eventEntity);
+        await db.SaveChangesAsync();
+
+        var aiClient = new TestAgenticAiClient();
+        var planRepository = new EventPlanDraftRepository(db);
+        var service = CreateService(db, eventEntity, ownerId, false, aiClient, planRepository);
+        var generated = await service.GeneratePlanAsync(eventEntity.Id);
+
+        db.ChangeTracker.Clear();
+        var retrieved = await planRepository.GetByIdAsync(generated.Id);
+
+        Assert.NotNull(retrieved);
+        Assert.Equal(generated.Id, retrieved!.Id);
+        Assert.Equal(generated.EventSnapshot.EventName, retrieved.EventSnapshot.EventName);
+        Assert.Equal(generated.EventSnapshot.Requirements, retrieved.EventSnapshot.Requirements);
         Assert.Equal(1, aiClient.CallCount);
     }
 
@@ -169,7 +194,7 @@ public sealed class PlanGenerationServiceTests
         Guid userId,
         bool isAdmin,
         TestAgenticAiClient aiClient,
-        TestEventPlanDraftRepository planRepository) =>
+        IEventPlanDraftRepository planRepository) =>
         new(
             new TestEventRepository(eventEntity),
             planRepository,

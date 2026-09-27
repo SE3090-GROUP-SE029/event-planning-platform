@@ -5,6 +5,7 @@ import '../../../core/theme/app_dimens.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
+import '../../bookings/api/booking_remote_datasource.dart';
 import '../api/quotation_remote_datasource.dart';
 import '../models/quotation_model.dart';
 
@@ -17,9 +18,11 @@ class MyQuotationsPage extends StatefulWidget {
 
 class _MyQuotationsPageState extends State<MyQuotationsPage> {
   final _api = QuotationRemoteDataSource();
+  final _bookingApi = BookingRemoteDataSource();
   AuthResponseModel? _auth;
   List<QuotationModel> _items = [];
   bool _loading = true;
+  bool _accepting = false;
   String? _error;
 
   @override
@@ -62,6 +65,37 @@ class _MyQuotationsPageState extends State<MyQuotationsPage> {
     }
   }
 
+  Future<void> _accept(QuotationModel quotation) async {
+    final auth = _auth;
+    if (auth == null) return;
+    setState(() {
+      _accepting = true;
+      _error = null;
+    });
+    try {
+      final booking = await _bookingApi.acceptQuotation(auth.accessToken, quotation.id);
+      if (!mounted) return;
+      await Navigator.of(context).pushNamed(
+        '/bookings/details',
+        arguments: {
+          'auth': auth,
+          'bookingId': booking.id,
+          'vendorMode': false,
+        },
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _accepting = false;
+      });
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _accepting = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,7 +103,7 @@ class _MyQuotationsPageState extends State<MyQuotationsPage> {
       appBar: AppBar(title: const Text('My quotations')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
+          : _error != null && _items.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(AppDimens.space20),
@@ -84,6 +118,11 @@ class _MyQuotationsPageState extends State<MyQuotationsPage> {
                       const PastelSectionHeader(
                         title: 'Your quotation requests',
                       ),
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppDimens.space12),
+                          child: Text(_error!, style: const TextStyle(color: AppColors.error)),
+                        ),
                       if (_items.isEmpty)
                         const PastelCard(
                           padding: EdgeInsets.all(AppDimens.space20),
@@ -109,12 +148,20 @@ class _MyQuotationsPageState extends State<MyQuotationsPage> {
                                   Text('Message: ${q.customerMessage ?? '—'}'),
                                   Text('Quoted price: ${q.displayQuotedPrice}'),
                                   Text('Vendor terms: ${q.vendorTerms ?? '—'}'),
+                                  if (q.status == 'QUOTED')
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: ElevatedButton(
+                                        onPressed: _accepting ? null : () => _accept(q),
+                                        child: Text(_accepting ? 'Accepting…' : 'Accept quotation'),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                      if (_auth != null)
+                      if (_auth != null) ...[
                         TextButton(
                           onPressed: () => Navigator.of(context).pushNamed(
                             '/marketplace',
@@ -122,6 +169,14 @@ class _MyQuotationsPageState extends State<MyQuotationsPage> {
                           ),
                           child: const Text('Browse marketplace'),
                         ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pushNamed(
+                            '/bookings/mine',
+                            arguments: _auth,
+                          ),
+                          child: const Text('My bookings'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
