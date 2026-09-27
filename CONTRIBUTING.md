@@ -57,22 +57,30 @@ python -m uvicorn src.main:app --reload
 The API loads local settings from `backend/src/Api/appsettings.json` and
 `appsettings.Development.json` through the standard ASP.NET Core configuration
 providers. This includes the database connection, JWT, admin seed, SMTP, guest
-AI, and Agentic AI sections; a local `.env` file is not read. The EF Core design-
-time factory loads the same JSON settings, so the migration command above does
-not require a manually exported connection-string variable.
+AI, and Agentic AI sections; a local `.env` file is not read. The EF Core
+design-time factory reads these JSON files when available, then applies
+environment variables as overrides. Migrations can therefore run in CI using
+`ConnectionStrings__DefaultConnection` without requiring a checked-in settings
+file or application authentication configuration.
 
 Keep developer-specific credentials out of committed settings. Use .NET User
 Secrets for local secrets when needed, and inject production secrets through
 the deployment platform's environment/configuration provider. Environment
 variables may override JSON values in production. `ASPNETCORE_HTTPS_PORT` is
-only a hosting-provided HTTPS port, while `TEST_POSTGRES_BIN` is only an
-integration-test path override.
+only a hosting-provided HTTPS port.
+
+Backend integration tests require a PostgreSQL database. Set
+`TEST_DATABASE_CONNECTION` to a dedicated test database connection string, or
+use `ConnectionStrings__DefaultConnection` as a fallback. The test fixture
+creates a separate schema for each test class so tests can safely share a
+PostgreSQL service; these schemas remain in the configured test database.
+GitHub Actions provides this database as a PostgreSQL service container.
 
 5. Run tests before every commit
 
 ```
-#Backend
-dotnet test
+# Backend (set TEST_DATABASE_CONNECTION or ConnectionStrings__DefaultConnection)
+dotnet test backend/backend.sln
 
 #React web
 npm test

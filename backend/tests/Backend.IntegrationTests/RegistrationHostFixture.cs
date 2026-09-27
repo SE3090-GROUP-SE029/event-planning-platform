@@ -1,7 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
 using System.Security.Claims;
 using Api.Controllers;
 using Api.GuestManagement;
@@ -15,6 +12,7 @@ using Infrastructure.ExternalServices;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -25,9 +23,6 @@ namespace Backend.IntegrationTests;
 public class RegistrationHostFixture : IAsyncLifetime
 {
     private WebApplication? app;
-    private string dataDirectory = string.Empty;
-    private string postgresBin = string.Empty;
-    private bool databaseStarted;
     public HttpClient Client { get; private set; } = null!;
     public string ConnectionString { get; private set; } = string.Empty;
     public TestClock Clock { get; } = new();
@@ -37,27 +32,43 @@ public class RegistrationHostFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // Test-only isolated cluster. No configured application database or SMTP provider is used.
-        postgresBin = Environment.GetEnvironmentVariable("TEST_POSTGRES_BIN") ?? @"C:\Program Files\PostgreSQL\18\bin";
-        dataDirectory = Path.Combine(AppContext.BaseDirectory, "postgres-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dataDirectory);
-        var port = FreePort();
-        await RunPostgresToolAsync("initdb", "-D", dataDirectory, "-A", "trust", "-U", "postgres", "--no-locale", "--encoding=UTF8");
-        await RunPostgresToolAsync("pg_ctl", "-D", dataDirectory, "-l", Path.Combine(dataDirectory, "server.log"),
-            "-o", $"-h 127.0.0.1 -p {port}", "-w", "-t", "30", "start");
-        databaseStarted = true;
-        ConnectionString = new NpgsqlConnectionStringBuilder
+        var configuredConnectionString = Environment.GetEnvironmentVariable("TEST_DATABASE_CONNECTION");
+        if (string.IsNullOrWhiteSpace(configuredConnectionString))
         {
-            Host = "127.0.0.1", Port = port, Database = "postgres", Username = "postgres",
+            configuredConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+        }
+
+        if (string.IsNullOrWhiteSpace(configuredConnectionString))
+        {
+            throw new InvalidOperationException(
+                "Set TEST_DATABASE_CONNECTION or ConnectionStrings__DefaultConnection to a PostgreSQL test database.");
+        }
+
+        var connectionBuilder = new NpgsqlConnectionStringBuilder(configuredConnectionString)
+        {
             Timeout = 10, CommandTimeout = 30, MaxPoolSize = 30
-        }.ConnectionString;
+        };
+        var schemaName = $"integration_{Guid.NewGuid():N}";
+        await using (var connection = new NpgsqlConnection(connectionBuilder.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"CREATE SCHEMA \"{schemaName}\"";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        connectionBuilder.SearchPath = schemaName;
+        ConnectionString = connectionBuilder.ConnectionString;
         await using (var db = CreateDb()) await db.Database.MigrateAsync();
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
             EnvironmentName = "Testing",
-            ContentRootPath = dataDirectory
+            ContentRootPath = Path.GetTempPath()
         });
+        // Keep test-host settings independent of developer-specific appsettings files.
+        builder.Configuration.Sources.Clear();
+        builder.Configuration.AddEnvironmentVariables();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole();
@@ -157,33 +168,6 @@ public class RegistrationHostFixture : IAsyncLifetime
         Client?.Dispose();
         if (app is not null) await app.DisposeAsync();
         NpgsqlConnection.ClearAllPools();
-        if (databaseStarted) await RunPostgresToolAsync("pg_ctl", "-D", dataDirectory, "-m", "fast", "-w", "stop");
-        // Preserve cluster files/logs for inspection. No database or directory deletion occurs.
-    }
-
-    private async Task RunPostgresToolAsync(string name, params string[] arguments)
-    {
-        var executable = Path.Combine(postgresBin, OperatingSystem.IsWindows() ? name + ".exe" : name);
-        var start = new ProcessStartInfo(executable)
-        {
-            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
-            RedirectStandardOutput = true, RedirectStandardError = true
-        };
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Cannot start {name}.");
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
-        if (process.ExitCode != 0) throw new InvalidOperationException($"{name} failed: {await output}\n{await error}");
-    }
-
-    private static int FreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 }
 

@@ -44,9 +44,10 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Restore
         run: dotnet restore backend/backend.sln
-      - name: Unit tests
+      - name: Backend tests
         run: dotnet test backend/backend.sln --no-restore --configuration Release --logger "trx" --results-directory ./TestResults
         env:
+          TEST_DATABASE_CONNECTION: "Host=localhost;Port=5432;Database=app_test;Username=test;Password=test"
           ConnectionStrings__DefaultConnection: "Host=localhost;Database=app_test;Username=test;Password=test"
       - name: Publish test results
         if: always()
@@ -170,6 +171,8 @@ jobs:
       - name: Install EF Core CLI
         run: dotnet tool install --global dotnet-ef --version 8.0.11
       - name: Apply all migrations to a scratch DB
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=app_migrate_check;Username=test;Password=test"
         run: >
           dotnet ef database update
           --project backend/src/Infrastructure/Infrastructure.csproj

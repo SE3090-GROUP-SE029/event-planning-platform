@@ -14,17 +14,24 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
         var environmentName = environmentConfiguration["ASPNETCORE_ENVIRONMENT"]
             ?? environmentConfiguration["DOTNET_ENVIRONMENT"]
             ?? "Development";
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(FindApiSettingsDirectory())
-            .AddJsonFile("appsettings.json", optional: false)
-            .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
+        var configurationBuilder = new ConfigurationBuilder();
+        var settingsDirectory = FindApiSettingsDirectory(environmentName);
+        if (settingsDirectory is not null)
+        {
+            configurationBuilder
+                .SetBasePath(settingsDirectory)
+                .AddJsonFile("appsettings.json", optional: true)
+                .AddJsonFile($"appsettings.{environmentName}.json", optional: true);
+        }
+
+        var configuration = configurationBuilder
             .AddEnvironmentVariables()
             .Build();
         var connectionString = configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
-                "ConnectionStrings:DefaultConnection is missing from the API appsettings configuration.");
+                "ConnectionStrings:DefaultConnection is not configured. Set the ConnectionStrings__DefaultConnection environment variable.");
         }
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -36,30 +43,39 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
         return new AppDbContext(options);
     }
 
-    private static string FindApiSettingsDirectory()
+    private static string? FindApiSettingsDirectory(string environmentName)
     {
-        var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (directory is not null)
+        var startDirectories = new[]
         {
-            var candidates = new[]
-            {
-                directory.FullName,
-                Path.Combine(directory.FullName, "src", "Api"),
-                Path.Combine(directory.FullName, "Api"),
-                Path.Combine(directory.FullName, "backend", "src", "Api")
-            };
+            Directory.GetCurrentDirectory(),
+            AppContext.BaseDirectory
+        };
 
-            var apiDirectory = candidates.FirstOrDefault(path =>
-                File.Exists(Path.Combine(path, "appsettings.json")));
-            if (apiDirectory is not null)
+        foreach (var startDirectory in startDirectories)
+        {
+            var directory = new DirectoryInfo(startDirectory);
+            while (directory is not null)
             {
-                return apiDirectory;
+                var candidates = new[]
+                {
+                    directory.FullName,
+                    Path.Combine(directory.FullName, "src", "Api"),
+                    Path.Combine(directory.FullName, "Api"),
+                    Path.Combine(directory.FullName, "backend", "src", "Api")
+                };
+
+                var apiDirectory = candidates.FirstOrDefault(path =>
+                    File.Exists(Path.Combine(path, "appsettings.json"))
+                    || File.Exists(Path.Combine(path, $"appsettings.{environmentName}.json")));
+                if (apiDirectory is not null)
+                {
+                    return apiDirectory;
+                }
+
+                directory = directory.Parent;
             }
-
-            directory = directory.Parent;
         }
 
-        throw new DirectoryNotFoundException(
-            "Could not locate backend/src/Api/appsettings.json. Run EF Core commands from the backend or repository directory.");
+        return null;
     }
 }

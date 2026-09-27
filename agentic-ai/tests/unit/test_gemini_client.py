@@ -23,6 +23,7 @@ from src.coordinator_agent.nodes.assess import BudgetOutput
 from src.gemini_client import client as gemini_client_module
 from src.gemini_client.client import GeminiClient, configure_gemini
 from src.gemini_client.exceptions import (
+    GeminiClientError,
     GeminiConfigurationError,
     GeminiInvalidCredentialsError,
     GeminiInvalidModelError,
