@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Net;
+using Application.Common.Exceptions;
 using Application.Common.Interfaces;
 using Application.Dtos.Common;
 using Application.Dtos.Plans;
@@ -19,7 +20,8 @@ public sealed class PlansController(
     IPlanGenerationService generationService,
     IPlanDecisionService decisionService,
     IEventPlanDraftRepository planRepository,
-    IEventRepository eventRepository) : ControllerBase
+    IEventRepository eventRepository,
+    ILogger<PlansController> logger) : ControllerBase
 {
     [HttpPost("events/{eventId:guid}/plans/generate")]
     [Authorize(Policy = "EventPlannerOnly")]
@@ -86,10 +88,27 @@ public sealed class PlansController(
         if (!User.IsInRole("ADMIN") && !IsCurrentUser(eventEntity.OwnerId))
             return Forbid();
 
-        var plans = await planRepository.ListAsync(eventId, status, version, cancellationToken);
-        return Ok(ApiListResponse<EventPlanDraft>.Ok(
-            plans,
-            new ApiPagination { Page = 1, PageSize = plans.Count, Total = plans.Count, HasNextPage = false }));
+        try
+        {
+            var plans = await planRepository.ListAsync(eventId, status, version, cancellationToken);
+            return Ok(ApiListResponse<EventPlanDraft>.Ok(
+                plans,
+                new ApiPagination { Page = 1, PageSize = plans.Count, Total = plans.Count, HasNextPage = false }));
+        }
+        catch (PersistedJsonDeserializationException ex)
+        {
+            logger.LogError(
+                ex,
+                "Could not read persisted {DataType} JSON for event {EventId}. Raw JSON: {RawJson}",
+                ex.DataType,
+                eventId,
+                ex.RawJson);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                ApiResponse<EventPlanDraft>.Error(
+                    "Saved plan data is corrupted and could not be retrieved.",
+                    StatusCodes.Status500InternalServerError));
+        }
     }
 
     [HttpGet("plans/{planId:guid}")]
@@ -106,6 +125,20 @@ public sealed class PlansController(
             return Ok(ApiResponse<EventPlanDraft>.Ok(plan));
         }
         catch (KeyNotFoundException ex) { return NotFound(ApiResponse<EventPlanDraft>.Error(ex.Message, 404)); }
+        catch (PersistedJsonDeserializationException ex)
+        {
+            logger.LogError(
+                ex,
+                "Could not read persisted {DataType} JSON for plan {PlanId}. Raw JSON: {RawJson}",
+                ex.DataType,
+                planId,
+                ex.RawJson);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                ApiResponse<EventPlanDraft>.Error(
+                    "Saved plan data is corrupted and could not be retrieved.",
+                    StatusCodes.Status500InternalServerError));
+        }
     }
 
     [HttpPost("plans/{planId:guid}/approve")]
