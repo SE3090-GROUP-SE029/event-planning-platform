@@ -8,10 +8,11 @@ import '../../../shared/widgets/pastel_icon_badge.dart';
 import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
-import '../api/event_remote_datasource.dart';
-import '../models/event_model.dart';
 import '../../plans/api/plan_remote_datasource.dart';
 import '../../plans/models/plan_model.dart';
+import '../../scheduling/pages/event_schedule_page.dart';
+import '../api/event_remote_datasource.dart';
+import '../models/event_model.dart';
 
 class EventDetailsPage extends StatefulWidget {
   final EventRemoteDataSource? eventApi;
@@ -414,6 +415,34 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                   .first,
                             ),
                           ],
+                        ),
+                      ),
+
+                      PastelCard(
+                        padding: const EdgeInsets.all(AppDimens.space20),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    EventSchedulePage(eventId: event.id),
+                              ),
+                            ),
+                            icon: const Icon(Icons.calendar_today_outlined),
+                            label: const Text('View Schedule & Timeline'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.surfacePure,
+                              foregroundColor: AppColors.textPrimary,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: AppDimens.space14,
+                              ),
+                              side: const BorderSide(
+                                color: AppColors.borderSubtle,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
 
