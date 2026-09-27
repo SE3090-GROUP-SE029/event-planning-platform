@@ -8,12 +8,24 @@ export const pastelTheme = createTheme({
       paper: tokens.colors.surface,
     },
     primary: {
-      main: tokens.colors.obsidian,
-      contrastText: '#FFFFFF',
+      main: tokens.colors.pastelBlue,
+      contrastText: tokens.colors.pastelBlueText,
     },
     secondary: {
       main: tokens.colors.pastelPink,
       contrastText: tokens.colors.pastelPinkText,
+    },
+    success: {
+      main: tokens.colors.pastelGreen,
+      contrastText: tokens.colors.pastelGreenText,
+    },
+    warning: {
+      main: tokens.colors.pastelPeach,
+      contrastText: tokens.colors.pastelPeachText,
+    },
+    info: {
+      main: tokens.colors.pastelLavender,
+      contrastText: tokens.colors.pastelLavenderText,
     },
     text: {
       primary: tokens.colors.textPrimary,
@@ -84,28 +96,61 @@ export const pastelTheme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 9999,
-          padding: '10px 20px',
+          borderRadius: tokens.radius.pill,
+          padding: '10px 22px',
+          minHeight: 44,
           boxShadow: 'none',
           textTransform: 'none',
           fontWeight: 700,
+          fontSize: '0.875rem',
+          letterSpacing: '0.01em',
+          whiteSpace: 'nowrap',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          transition: 'all 0.2s ease',
           '&:hover': {
-            boxShadow: '0 8px 18px rgba(25, 25, 28, 0.12)',
+            boxShadow: tokens.shadows.soft,
+            transform: 'translateY(-1px)',
           },
         },
         containedPrimary: {
-          backgroundColor: tokens.colors.obsidian,
-          color: '#FFFFFF',
+          backgroundColor: tokens.colors.pastelBlue,
+          color: tokens.colors.pastelBlueText,
           '&:hover': {
-            backgroundColor: tokens.colors.obsidianHover,
+            backgroundColor: tokens.colors.pastelBlueBorder,
           },
         },
-        outlined: {
-          borderColor: 'rgba(25, 25, 28, 0.12)',
-          color: tokens.colors.textPrimary,
+        containedSecondary: {
+          backgroundColor: tokens.colors.pastelPink,
+          color: tokens.colors.pastelPinkText,
           '&:hover': {
-            backgroundColor: 'rgba(25, 25, 28, 0.04)',
-            borderColor: tokens.colors.obsidian,
+            backgroundColor: tokens.colors.pastelPinkBorder,
+          },
+        },
+        containedSuccess: {
+          backgroundColor: tokens.colors.pastelGreen,
+          color: tokens.colors.pastelGreenText,
+          '&:hover': { backgroundColor: tokens.colors.pastelGreenBorder },
+        },
+        containedInfo: {
+          backgroundColor: tokens.colors.pastelLavender,
+          color: tokens.colors.pastelLavenderText,
+          '&:hover': { backgroundColor: tokens.colors.pastelLavenderBorder },
+        },
+        containedWarning: {
+          backgroundColor: tokens.colors.pastelPeach,
+          color: tokens.colors.pastelPeachText,
+          '&:hover': { backgroundColor: tokens.colors.pastelPeachBorder },
+        },
+        outlined: {
+          borderColor: tokens.colors.borderLight,
+          color: tokens.colors.textPrimary,
+          backgroundColor: tokens.colors.surface,
+          '&:hover': {
+            backgroundColor: tokens.colors.surface,
+            borderColor: tokens.colors.pastelBlueBorder,
           },
         },
       },
@@ -113,17 +158,17 @@ export const pastelTheme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 24,
+          borderRadius: tokens.radius.card,
           boxShadow: tokens.shadows.card,
-          border: '1px solid rgba(25, 25, 28, 0.05)',
-          backgroundColor: '#FFFFFF',
+          border: `1px solid ${tokens.colors.borderLight}`,
+          backgroundColor: tokens.colors.surface,
         },
       },
     },
     MuiPaper: {
       styleOverrides: {
         root: {
-          borderRadius: 24,
+          borderRadius: tokens.radius.card,
         },
       },
     },
@@ -142,15 +187,15 @@ export const pastelTheme = createTheme({
         root: {
           '& .MuiOutlinedInput-root': {
             borderRadius: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: tokens.colors.surface,
             '& fieldset': {
-              borderColor: 'rgba(18, 17, 20, 0.12)',
+              borderColor: tokens.colors.borderLight,
             },
             '&:hover fieldset': {
-              borderColor: tokens.colors.obsidian,
+              borderColor: tokens.colors.pastelBlueBorder,
             },
             '&.Mui-focused fieldset': {
-              borderColor: tokens.colors.obsidian,
+              borderColor: tokens.colors.pastelBlueBorder,
               borderWidth: 1.4,
             },
           },
@@ -160,7 +205,7 @@ export const pastelTheme = createTheme({
     MuiSelect: {
       styleOverrides: {
         select: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: tokens.colors.surface,
         },
       },
     },
@@ -172,7 +217,7 @@ export const pastelTheme = createTheme({
           fontSize: '0.76rem',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
-          backgroundColor: 'rgba(247, 243, 233, 0.8)',
+          backgroundColor: tokens.colors.canvas,
         },
         body: {
           fontSize: '0.9rem',

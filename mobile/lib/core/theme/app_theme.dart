@@ -45,8 +45,8 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.obsidianBlack,
-          foregroundColor: Colors.white,
+          backgroundColor: AppColors.pastelBlue,
+          foregroundColor: AppColors.pastelBlueText,
           shape: const StadiumBorder(),
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -59,8 +59,8 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.obsidianBlack,
-          foregroundColor: Colors.white,
+          backgroundColor: AppColors.pastelBlue,
+          foregroundColor: AppColors.pastelBlueText,
           shape: const StadiumBorder(),
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -71,16 +71,16 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
           shape: const StadiumBorder(),
-          side: const BorderSide(color: AppColors.borderMuted),
+          side: const BorderSide(color: AppColors.borderMuted, width: 1.2),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.obsidianBlack,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.pastelPink,
+        foregroundColor: AppColors.pastelPinkText,
         shape: StadiumBorder(),
-        elevation: 4,
+        elevation: 3,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -197,4 +197,96 @@ class AppTheme {
       ),
     );
   }
+}
+
+class AppButtonStyles {
+  static ButtonStyle primary({double? radius}) => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.pastelBlue,
+        foregroundColor: AppColors.pastelBlueText,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius ?? AppDimens.radiusPill),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          letterSpacing: -0.2,
+        ),
+      );
+
+  static ButtonStyle create({double? radius}) => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.pastelLavender,
+        foregroundColor: AppColors.pastelLavenderText,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius ?? AppDimens.radiusPill),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          letterSpacing: -0.2,
+        ),
+      );
+
+  static ButtonStyle success({double? radius}) => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.pastelGreen,
+        foregroundColor: AppColors.pastelGreenText,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius ?? AppDimens.radiusPill),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          letterSpacing: -0.2,
+        ),
+      );
+
+  static ButtonStyle ai({double? radius}) => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.pastelPink,
+        foregroundColor: AppColors.pastelPinkText,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius ?? AppDimens.radiusPill),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          letterSpacing: -0.2,
+        ),
+      );
+
+  static ButtonStyle warning({double? radius}) => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.pastelPeach,
+        foregroundColor: AppColors.pastelPeachText,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius ?? AppDimens.radiusPill),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          letterSpacing: -0.2,
+        ),
+      );
+
+  static ButtonStyle outline({double? radius}) => OutlinedButton.styleFrom(
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        side: const BorderSide(color: AppColors.borderMuted, width: 1.2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius ?? AppDimens.radiusPill),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          letterSpacing: -0.2,
+        ),
+      );
 }

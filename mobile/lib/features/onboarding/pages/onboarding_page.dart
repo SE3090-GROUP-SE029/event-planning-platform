@@ -21,8 +21,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       imageLabel: 'A team planning and collaborating on an event',
       eyebrow: 'WELCOME TO PLAN IT',
       title: 'Make room for the moments that matter.',
-      description:
-          'Plan events efficiently, connect planners and vendors, and keep every detail moving together.',
       highlights: [
         'Bring event details into one workspace',
         'Keep your team and vendors in sync',
@@ -34,8 +32,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       imageLabel: 'People working together on an organized plan',
       eyebrow: 'FOR EVENT PLANNERS',
       title: 'From first idea to a thoughtful plan.',
-      description:
-          'Shape an event plan quickly, organize the work, and keep progress visible to everyone involved.',
       highlights: [
         'Create events, tasks, and schedules',
         'Keep budgets clear and organized',
@@ -47,8 +43,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       imageLabel: 'A business owner sharing services through mobile tools',
       eyebrow: 'FOR VENDORS',
       title: 'Put your services in the right place.',
-      description:
-          'Discover new opportunities, manage booking requests, and build visibility with event planners.',
       highlights: [
         'Showcase your services and expertise',
         'Manage requests and conversations',
@@ -127,6 +121,14 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   const Spacer(),
                   TextButton(
                     onPressed: _isSaving ? null : _finishOnboarding,
+                    style: TextButton.styleFrom(
+                      backgroundColor: AppColors.pastelGreenLight,
+                      foregroundColor: AppColors.pastelGreenText,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
                     child: const Text('Skip'),
                   ),
                 ],
@@ -165,6 +167,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     onPressed: _pageIndex == 0 || _isSaving
                         ? null
                         : () => _goToPage(_pageIndex - 1),
+                    style: TextButton.styleFrom(
+                      backgroundColor: AppColors.pastelBlue,
+                      foregroundColor: AppColors.pastelPinkText,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      disabledForegroundColor: Colors.grey.shade600,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
                     child: const Text('Previous'),
                   ),
                   const Spacer(),
@@ -176,6 +188,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                           : isLastPage
                               ? _finishOnboarding
                               : () => _goToPage(_pageIndex + 1),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 153, 203, 247),
+                        foregroundColor: AppColors.pastelBlueLight,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade600,
+                      ),
                       child: _isSaving
                           ? const SizedBox(
                               width: 20,
@@ -230,11 +248,13 @@ class _OnboardingSlideView extends StatelessWidget {
               const SizedBox(height: AppDimens.space16),
               PastelCard(
                 padding: const EdgeInsets.all(AppDimens.space20),
+                backgroundColor: const Color.fromARGB(255, 247, 205, 223),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
                       slide.eyebrow,
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: AppColors.pastelPinkText,
                         fontSize: 11,
@@ -245,32 +265,32 @@ class _OnboardingSlideView extends StatelessWidget {
                     const SizedBox(height: AppDimens.space8),
                     Text(
                       slide.title,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontSize: 24,
-                            height: 1.16,
-                          ),
+                      textAlign: TextAlign.center,
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontSize: 24,
+                                height: 1.16,
+                              ),
                     ),
-                    const SizedBox(height: AppDimens.space8),
-                    Text(
-                      slide.description,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
+                    const SizedBox(height: AppDimens.space20),
                     const SizedBox(height: AppDimens.space16),
                     ...slide.highlights.map(
                       (highlight) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppDimens.space8),
+                        padding:
+                            const EdgeInsets.only(bottom: AppDimens.space8),
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const Icon(
                               Icons.check_circle_rounded,
-                              color: AppColors.oliveRibbon,
+                              color: AppColors.oliveRibbonLight,
                               size: 18,
                             ),
                             const SizedBox(width: AppDimens.space8),
                             Expanded(
                               child: Text(
                                 highlight,
+                                textAlign: TextAlign.center,
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),
@@ -294,7 +314,6 @@ class _OnboardingSlide {
   final String imageLabel;
   final String eyebrow;
   final String title;
-  final String description;
   final List<String> highlights;
 
   const _OnboardingSlide({
@@ -302,7 +321,6 @@ class _OnboardingSlide {
     required this.imageLabel,
     required this.eyebrow,
     required this.title,
-    required this.description,
     required this.highlights,
   });
 }

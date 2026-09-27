@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/pastel_bottom_nav_bar.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
@@ -235,6 +237,11 @@ class _VendorAvailabilityPageState extends State<VendorAvailabilityPage> {
       appBar: AppBar(
         title: const Text('Vendor availability'),
       ),
+      bottomNavigationBar: PastelBottomNavBar.roleBased(
+        context: context,
+        session: _auth,
+        currentIndex: 1,
+      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
@@ -328,9 +335,18 @@ class _VendorAvailabilityPageState extends State<VendorAvailabilityPage> {
                           SizedBox(
                             width: double.infinity,
                             height: 48,
-                            child: ElevatedButton(
+                            child: ElevatedButton.icon(
+                              style: _editingId == null
+                                  ? AppButtonStyles.create()
+                                  : AppButtonStyles.success(),
                               onPressed: _saving ? null : _save,
-                              child: Text(
+                              icon: Icon(
+                                _editingId == null
+                                    ? Icons.add_circle_outline_rounded
+                                    : Icons.check_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
                                 _editingId == null
                                     ? 'Add period'
                                     : 'Save changes',
@@ -339,9 +355,12 @@ class _VendorAvailabilityPageState extends State<VendorAvailabilityPage> {
                           ),
                           if (_editingId != null) ...[
                             const SizedBox(height: AppDimens.space8),
-                            TextButton(
-                              onPressed: _clearForm,
-                              child: const Text('Cancel edit'),
+                            Center(
+                              child: TextButton.icon(
+                                onPressed: _clearForm,
+                                icon: const Icon(Icons.close_rounded, size: 16),
+                                label: const Text('Cancel edit'),
+                              ),
                             ),
                           ],
                         ],

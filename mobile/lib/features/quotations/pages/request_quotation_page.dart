@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
@@ -263,9 +264,17 @@ class _RequestQuotationPageState extends State<RequestQuotationPage> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _submitting || _events.isEmpty ? null : _submit,
-                            child: Text(_submitting ? 'Submitting…' : 'Submit request'),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              style: AppButtonStyles.primary(),
+                              onPressed:
+                                  _submitting || _events.isEmpty ? null : _submit,
+                              icon: const Icon(Icons.send_rounded, size: 16),
+                              label: Text(_submitting
+                                  ? 'Submitting…'
+                                  : 'Submit request'),
+                            ),
                           ),
                         ],
                       ),

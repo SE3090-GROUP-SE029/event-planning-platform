@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 // Replace the bundled files and Storyset source links here when refreshing artwork.
 const storysetOnboardingIllustrations = <String, String>{
-  'introduction': 'assets/illustrations/team-work.png',
-  'planner': 'assets/illustrations/business-plan.png',
-  'vendor': 'assets/illustrations/mobile-marketing.png',
+  'introduction': 'assets/illustrations/planit-img.png',
+  'planner': 'assets/illustrations/planner-img.png',
+  'vendor': 'assets/illustrations/vendor-img.png',
 };
 
 class StorysetIllustration extends StatelessWidget {

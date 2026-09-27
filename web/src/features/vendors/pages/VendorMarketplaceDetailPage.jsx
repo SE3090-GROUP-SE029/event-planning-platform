@@ -10,8 +10,7 @@ import {
 } from '@mui/material';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { useAuthStore } from '../../../shared/store/authStore';
-import CollapsibleSidebar from '../../../shared/components/layout/CollapsibleSidebar';
-import TopSearchNavbar from '../../../shared/components/layout/TopSearchNavbar';
+import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 import {
   resolveVendorImageUrl,
@@ -47,50 +46,20 @@ function formatPeriod(iso) {
 export default function VendorMarketplaceDetailPage() {
   const { vendorId } = useParams();
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
-  const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
-  const isAdmin = useAuthStore((state) => state.hasRole('ADMIN'));
   const isEventPlanner = useAuthStore((state) => state.hasRole('EVENT_PLANNER'));
   const { data: vendor, isLoading, isError, error } = useVendorMarketplaceDetail(vendorId);
   const imageUrl = resolveVendorImageUrl(vendor?.profileImageUrl);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 } }}>
-      <Box sx={{ display: 'flex', gap: { xs: 2, md: 3 }, minHeight: 'calc(100vh - 32px)' }}>
-        <CollapsibleSidebar
-          activeTab="marketplace"
-          showEvents={isAdmin}
-          showMarketplace
-          showMyQuotations={isEventPlanner}
-          showVendorProfile={isVendor}
-          showVendorServices={isVendor}
-          showVendorAvailability={isVendor}
-          showVendorQuotations={isVendor}
-          onSelectTab={(tab) => {
-            if (tab === 'dashboard') navigate('/dashboard');
-            if (tab === 'events') navigate('/admin/events');
-            if (tab === 'marketplace') navigate('/marketplace');
-            if (tab === 'my-quotations') navigate('/quotations/mine');
-            if (tab === 'vendor-profile') navigate('/vendor/profile');
-            if (tab === 'vendor-services') navigate('/vendor/services');
-            if (tab === 'vendor-availability') navigate('/vendor/availability');
-            if (tab === 'vendor-quotations') navigate('/vendor/quotations');
-          }}
-          onLogout={handleLogout}
-        />
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <TopSearchNavbar user={user} title="Vendor details" subtitle="Read-only marketplace profile" />
-
-          <Button variant="text" sx={{ mb: 2 }} onClick={() => navigate('/marketplace')}>
-            ← Back to marketplace
-          </Button>
+    <AppLayout
+      activeTab="marketplace"
+      title="Vendor details"
+      subtitle="Read-only marketplace profile"
+    >
+      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 1 }}>
+        <Button variant="text" sx={{ mb: 2 }} onClick={() => navigate('/marketplace')}>
+          ← Back to marketplace
+        </Button>
 
           {isLoading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
@@ -212,7 +181,6 @@ export default function VendorMarketplaceDetailPage() {
             </Stack>
           )}
         </Box>
-      </Box>
-    </Box>
+    </AppLayout>
   );
 }

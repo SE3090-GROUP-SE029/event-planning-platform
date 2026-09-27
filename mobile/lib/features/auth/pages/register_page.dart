@@ -131,7 +131,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     PastelCard(
                       padding: const EdgeInsets.all(AppDimens.space24),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           const Text(
                             'I am joining as',

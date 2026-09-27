@@ -1,48 +1,69 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import LoginPage from '../features/auth/pages/LoginPage';
-import DashboardPage from '../features/dashboard/pages/DashboardPage';
-import ProtectedRoute from '../shared/components/ProtectedRoute';
-import AdminEventManagementPage from '../features/adminEvents/pages/AdminEventManagementPage';
-import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetailsPage';
-import AdminPlanDashboardPage from '../features/adminPlans/pages/AdminPlanDashboardPage';
-import AdminPlanDetailsPage from '../features/adminPlans/pages/AdminPlanDetailsPage';
-import LandingPage from '../features/landing/pages/LandingPage';
+import {
+  AdminAnalyticsRoute,
+  AdminDashboardRoute,
+  AdminEventDetailsRoute,
+  AdminEventsRoute,
+  AdminPlanDetailsRoute,
+  AdminPlansRoute,
+  AdminSystemRoute,
+  AdminUsersRoute,
+  AdminVendorsRoute,
+  LandingRoute,
+  LoginRoute,
+} from './routeElements';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <LandingPage />,
+    element: <LandingRoute />,
   },
   {
     path: '/login',
-    element: <LoginPage />,
+    element: <LoginRoute />,
   },
   {
     path: '/register',
-    element: <Navigate to="/login" replace />,
+    element: <Navigate to="/" replace />,
   },
   {
-    path: '/dashboard',
-    element: (
-      <ProtectedRoute>
-        <DashboardPage />
-      </ProtectedRoute>
-    ),
+    path: '/admin/dashboard',
+    element: <AdminDashboardRoute />,
+  },
+  {
+    path: '/admin/analytics',
+    element: <AdminAnalyticsRoute />,
+  },
+  {
+    path: '/admin/users',
+    element: <AdminUsersRoute />,
   },
   {
     path: '/admin/events',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminEventManagementPage /></ProtectedRoute>,
+    element: <AdminEventsRoute />,
   },
   {
     path: '/admin/events/:id',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminEventDetailsPage /></ProtectedRoute>,
+    element: <AdminEventDetailsRoute />,
+  },
+  {
+    path: '/admin/vendors',
+    element: <AdminVendorsRoute />,
   },
   {
     path: '/admin/plans',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDashboardPage /></ProtectedRoute>,
+    element: <AdminPlansRoute />,
   },
   {
     path: '/admin/plans/:id',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDetailsPage /></ProtectedRoute>,
+    element: <AdminPlanDetailsRoute />,
+  },
+  {
+    path: '/admin/system',
+    element: <AdminSystemRoute />,
+  },
+  {
+    path: '*',
+    element: <Navigate to="/" replace />,
   },
 ]);

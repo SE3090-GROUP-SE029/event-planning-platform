@@ -7,9 +7,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { useAuthStore } from '../../../shared/store/authStore';
-import CollapsibleSidebar from '../../../shared/components/layout/CollapsibleSidebar';
-import TopSearchNavbar from '../../../shared/components/layout/TopSearchNavbar';
+import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 import StatusBadge from '../../../shared/components/ui/StatusBadge';
 import {
@@ -21,53 +19,18 @@ import {
 
 export default function MyQuotationsPage() {
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
-  const isEventPlanner = useAuthStore((state) => state.hasRole('EVENT_PLANNER'));
-  const isAdmin = useAuthStore((state) => state.hasRole('ADMIN'));
-  const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
   const { data: quotations = [], isLoading, isError, error } = useMyQuotations();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 } }}>
-      <Box sx={{ display: 'flex', gap: { xs: 2, md: 3 }, minHeight: 'calc(100vh - 32px)' }}>
-        <CollapsibleSidebar
-          activeTab="my-quotations"
-          showEvents={isAdmin}
-          showMarketplace={isEventPlanner || isAdmin}
-          showMyQuotations={isEventPlanner}
-          showVendorProfile={isVendor}
-          showVendorServices={isVendor}
-          showVendorAvailability={isVendor}
-          showVendorQuotations={isVendor}
-          onSelectTab={(tab) => {
-            if (tab === 'dashboard') navigate('/dashboard');
-            if (tab === 'events') navigate('/admin/events');
-            if (tab === 'marketplace') navigate('/marketplace');
-            if (tab === 'my-quotations') navigate('/quotations/mine');
-            if (tab === 'vendor-profile') navigate('/vendor/profile');
-            if (tab === 'vendor-services') navigate('/vendor/services');
-            if (tab === 'vendor-availability') navigate('/vendor/availability');
-            if (tab === 'vendor-quotations') navigate('/vendor/quotations');
-          }}
-          onLogout={handleLogout}
-        />
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <TopSearchNavbar
-            user={user}
-            title="My quotations"
-            subtitle="View-only status of your vendor quotation requests"
-          />
-
-          <Button variant="text" sx={{ mb: 2 }} onClick={() => navigate('/marketplace')}>
-            Browse marketplace
-          </Button>
+    <AppLayout
+      activeTab="my-quotations"
+      title="My quotations"
+      subtitle="View-only status of your vendor quotation requests"
+    >
+      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 1 }}>
+        <Button variant="text" sx={{ mb: 2 }} onClick={() => navigate('/marketplace')}>
+          Browse marketplace
+        </Button>
 
           {isLoading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
@@ -118,7 +81,6 @@ export default function MyQuotationsPage() {
             ))}
           </Stack>
         </Box>
-      </Box>
-    </Box>
+    </AppLayout>
   );
 }

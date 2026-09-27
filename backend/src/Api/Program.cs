@@ -2,6 +2,7 @@ using System.Text;
 using Application.Common.Interfaces;
 using Application.Dtos.Events;
 using Application.Services.Auth;
+using Application.Services.Admin;
 using Application.Services.Events;
 using Application.Services.Quotations;
 using Application.Services.Scheduling;
@@ -109,6 +110,8 @@ builder.Services.AddScoped<IVendorMarketplaceService, VendorMarketplaceService>(
 builder.Services.AddScoped<IQuotationService, QuotationService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
+builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
+builder.Services.AddScoped<IAdminReadService, AdminReadService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IEventPlanDraftRepository, EventPlanDraftRepository>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();

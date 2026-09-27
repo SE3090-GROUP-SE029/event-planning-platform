@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_icon_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
@@ -312,7 +313,7 @@ class _EventFormPageState extends State<EventFormPage> {
                         TextFormField(
                           controller: _budget,
                           decoration: const InputDecoration(
-                            labelText: 'Budget (\$)',
+                            labelText: 'Budget (LKR)',
                             hintText: 'e.g. 5000',
                             prefixIcon: Icon(
                               Icons.attach_money_rounded,
@@ -453,9 +454,12 @@ class _EventFormPageState extends State<EventFormPage> {
                   SizedBox(
                     width: double.infinity,
                     height: 52,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
+                      style: widget.isEditing
+                          ? AppButtonStyles.success()
+                          : AppButtonStyles.create(),
                       onPressed: _saving ? null : _save,
-                      child: _saving
+                      icon: _saving
                           ? const SizedBox(
                               height: 20,
                               width: 20,
@@ -465,9 +469,15 @@ class _EventFormPageState extends State<EventFormPage> {
                                     AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
-                          : Text(widget.isEditing
-                              ? 'Save changes'
-                              : 'Create event plan'),
+                          : Icon(
+                              widget.isEditing
+                                  ? Icons.check_rounded
+                                  : Icons.add_circle_outline_rounded,
+                              size: 18,
+                            ),
+                      label: Text(widget.isEditing
+                          ? 'Save changes'
+                          : 'Create event plan'),
                     ),
                   ),
                 ],
