@@ -17,6 +17,12 @@ public class VendorAvailabilityRepository : IVendorAvailabilityRepository
             .OrderBy(a => a.StartDateTime)
             .ToListAsync();
 
+    public async Task<IReadOnlyList<VendorAvailability>> ListBySourceBookingIdAsync(Guid bookingId) =>
+        await _db.VendorAvailabilities
+            .Where(a => a.SourceBookingId == bookingId)
+            .OrderBy(a => a.StartDateTime)
+            .ToListAsync();
+
     public Task<VendorAvailability?> GetByIdAsync(Guid id) =>
         _db.VendorAvailabilities.FirstOrDefaultAsync(a => a.Id == id);
 

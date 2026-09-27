@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -14,48 +13,31 @@ import TopSearchNavbar from '../../../shared/components/layout/TopSearchNavbar';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 import StatusBadge from '../../../shared/components/ui/StatusBadge';
 import {
+  formatBookingStatus,
   formatDateTime,
   formatQuotedPrice,
-  formatQuotationStatus,
-  useMyQuotations,
-} from '../api/quotationApi';
-import { useAcceptQuotation } from '../../bookings/api/bookingApi';
+  useMyBookings,
+} from '../api/bookingApi';
 
-export default function MyQuotationsPage() {
+export default function MyBookingsPage() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const isEventPlanner = useAuthStore((state) => state.hasRole('EVENT_PLANNER'));
   const isAdmin = useAuthStore((state) => state.hasRole('ADMIN'));
   const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
-  const { data: quotations = [], isLoading, isError, error } = useMyQuotations();
-  const acceptMutation = useAcceptQuotation();
-  const [actionError, setActionError] = useState('');
-  const [acceptingId, setAcceptingId] = useState(null);
+  const { data: bookings = [], isLoading, isError, error } = useMyBookings();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const handleAccept = async (quotationId) => {
-    setActionError('');
-    setAcceptingId(quotationId);
-    try {
-      const booking = await acceptMutation.mutateAsync(quotationId);
-      navigate(`/bookings/${booking.id}`);
-    } catch (err) {
-      setActionError(err?.response?.data?.message || err?.message || 'Failed to accept quotation.');
-    } finally {
-      setAcceptingId(null);
-    }
-  };
-
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 } }}>
       <Box sx={{ display: 'flex', gap: { xs: 2, md: 3 }, minHeight: 'calc(100vh - 32px)' }}>
         <CollapsibleSidebar
-          activeTab="my-quotations"
+          activeTab="my-bookings"
           showEvents={isAdmin}
           showMarketplace={isEventPlanner || isAdmin}
           showMyQuotations={isEventPlanner}
@@ -83,18 +65,13 @@ export default function MyQuotationsPage() {
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <TopSearchNavbar
             user={user}
-            title="My quotations"
-            subtitle="Accept responded quotes to create confirmed bookings"
+            title="My bookings"
+            subtitle="Confirmed vendor bookings for your events"
           />
 
-          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-            <Button variant="text" onClick={() => navigate('/marketplace')}>
-              Browse marketplace
-            </Button>
-            <Button variant="text" onClick={() => navigate('/bookings/mine')}>
-              My bookings
-            </Button>
-          </Stack>
+          <Button variant="text" sx={{ mb: 2 }} onClick={() => navigate('/quotations/mine')}>
+            Back to quotations
+          </Button>
 
           {isLoading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
@@ -103,62 +80,37 @@ export default function MyQuotationsPage() {
           )}
 
           {isError && (
-            <Alert severity="error">{error?.message || 'Failed to load quotations.'}</Alert>
+            <Alert severity="error">{error?.message || 'Failed to load bookings.'}</Alert>
           )}
 
-          {actionError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError('')}>
-              {actionError}
-            </Alert>
-          )}
-
-          {!isLoading && !isError && quotations.length === 0 && (
+          {!isLoading && !isError && bookings.length === 0 && (
             <SurfaceCard sx={{ p: 3 }}>
-              <Typography color="text.secondary">
-                You have not requested any quotations yet.
-              </Typography>
+              <Typography color="text.secondary">No bookings yet. Accept a quotation to create one.</Typography>
             </SurfaceCard>
           )}
 
           <Stack spacing={2} sx={{ maxWidth: 920 }}>
-            {quotations.map((q) => (
-              <SurfaceCard key={q.id} sx={{ p: 3 }}>
+            {bookings.map((b) => (
+              <SurfaceCard key={b.id} sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                   <Box>
-                    <Typography sx={{ fontWeight: 800, fontSize: 18 }}>{q.vendorBusinessName}</Typography>
-                    <Typography color="text.secondary">{q.serviceName}</Typography>
+                    <Typography sx={{ fontWeight: 800, fontSize: 18 }}>{b.vendorBusinessName}</Typography>
+                    <Typography color="text.secondary">{b.serviceName}</Typography>
                   </Box>
-                  <StatusBadge
-                    label={formatQuotationStatus(q.status)}
-                    status={q.status === 'REQUESTED' ? 'PENDING' : q.status === 'QUOTED' ? 'APPROVED' : q.status}
-                  />
+                  <StatusBadge label={formatBookingStatus(b.status)} status={b.status} />
                 </Box>
                 <Typography variant="body2" sx={{ mt: 1.5 }}>
-                  Event: {q.eventType || '—'} · Guests: {q.guestCount ?? '—'}
+                  Event: {b.eventType || '—'} · Guests: {b.guestCount ?? '—'}
                 </Typography>
                 <Typography variant="body2">
-                  Requested: {formatDateTime(q.requestedStartDateTime)} →{' '}
-                  {formatDateTime(q.requestedEndDateTime)}
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 1 }}>
-                  Message: {q.customerMessage || '—'}
+                  Schedule: {formatDateTime(b.startDateTime)} → {formatDateTime(b.endDateTime)}
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 1, fontWeight: 700 }}>
-                  Quoted price: {formatQuotedPrice(q.quotedPrice)}
+                  Agreed price: {formatQuotedPrice(b.agreedPrice)}
                 </Typography>
-                <Typography variant="body2">Vendor terms: {q.vendorTerms || '—'}</Typography>
-                {q.status === 'QUOTED' && (
-                  <Button
-                    variant="contained"
-                    sx={{ mt: 2, borderRadius: 9999 }}
-                    disabled={acceptMutation.isPending && acceptingId === q.id}
-                    onClick={() => handleAccept(q.id)}
-                  >
-                    {acceptMutation.isPending && acceptingId === q.id
-                      ? 'Accepting…'
-                      : 'Accept quotation'}
-                  </Button>
-                )}
+                <Button sx={{ mt: 1.5 }} onClick={() => navigate(`/bookings/${b.id}`)}>
+                  View details
+                </Button>
               </SurfaceCard>
             ))}
           </Stack>

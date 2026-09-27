@@ -50,6 +50,12 @@ public class VendorAvailabilityService : IVendorAvailabilityService
     {
         var vendor = await RequireVendorAsync(userId);
         var item = await RequireOwnedAsync(vendor.Id, availabilityId);
+        if (item.SourceBookingId.HasValue)
+        {
+            throw new InvalidOperationException(
+                "This availability period is reserved by a booking and cannot be edited manually.");
+        }
+
         var (start, end) = NormalizeRange(request.StartDateTime, request.EndDateTime);
         await EnsureNoOverlapAsync(vendor.Id, start, end, excludeId: item.Id);
 
@@ -66,6 +72,12 @@ public class VendorAvailabilityService : IVendorAvailabilityService
     {
         var vendor = await RequireVendorAsync(userId);
         var item = await RequireOwnedAsync(vendor.Id, availabilityId);
+        if (item.SourceBookingId.HasValue)
+        {
+            throw new InvalidOperationException(
+                "This availability period is reserved by a booking and cannot be deleted manually.");
+        }
+
         _availability.Remove(item);
         await _availability.SaveChangesAsync();
     }

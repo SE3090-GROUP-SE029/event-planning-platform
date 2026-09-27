@@ -1,48 +1,51 @@
-class QuotationModel {
+class BookingModel {
   final String id;
+  final String quotationId;
   final String eventId;
   final String? eventType;
   final int? guestCount;
   final DateTime? eventPreferredDate;
-  final String? eventRequirements;
   final String vendorId;
   final String vendorBusinessName;
   final String vendorServiceId;
   final String serviceName;
   final String requestedByUserId;
-  final DateTime requestedStartDateTime;
-  final DateTime requestedEndDateTime;
-  final String? customerMessage;
-  final double? quotedPrice;
+  final DateTime startDateTime;
+  final DateTime endDateTime;
+  final double agreedPrice;
   final String? vendorTerms;
   final String status;
-  final DateTime requestedAt;
-  final DateTime? respondedAt;
+  final String? cancellationReason;
+  final DateTime createdAt;
+  final DateTime? completedAt;
+  final DateTime? cancelledAt;
 
-  const QuotationModel({
+  const BookingModel({
     required this.id,
+    required this.quotationId,
     required this.eventId,
     required this.eventType,
     required this.guestCount,
     required this.eventPreferredDate,
-    required this.eventRequirements,
     required this.vendorId,
     required this.vendorBusinessName,
     required this.vendorServiceId,
     required this.serviceName,
     required this.requestedByUserId,
-    required this.requestedStartDateTime,
-    required this.requestedEndDateTime,
-    required this.customerMessage,
-    required this.quotedPrice,
+    required this.startDateTime,
+    required this.endDateTime,
+    required this.agreedPrice,
     required this.vendorTerms,
     required this.status,
-    required this.requestedAt,
-    required this.respondedAt,
+    required this.cancellationReason,
+    required this.createdAt,
+    required this.completedAt,
+    required this.cancelledAt,
   });
 
-  factory QuotationModel.fromJson(Map<String, dynamic> json) => QuotationModel(
+  factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
         id: '${json['id'] ?? ''}',
+        quotationId: '${json['quotationId'] ?? ''}',
         eventId: '${json['eventId'] ?? ''}',
         eventType: json['eventType']?.toString(),
         guestCount: json['guestCount'] is num
@@ -51,44 +54,34 @@ class QuotationModel {
         eventPreferredDate: json['eventPreferredDate'] != null
             ? DateTime.tryParse(json['eventPreferredDate'].toString())
             : null,
-        eventRequirements: json['eventRequirements']?.toString(),
         vendorId: '${json['vendorId'] ?? ''}',
         vendorBusinessName: json['vendorBusinessName']?.toString() ?? 'Vendor',
         vendorServiceId: '${json['vendorServiceId'] ?? ''}',
         serviceName: json['serviceName']?.toString() ?? 'Service',
         requestedByUserId: '${json['requestedByUserId'] ?? ''}',
-        requestedStartDateTime: DateTime.parse(
-          json['requestedStartDateTime'].toString(),
-        ),
-        requestedEndDateTime: DateTime.parse(
-          json['requestedEndDateTime'].toString(),
-        ),
-        customerMessage: json['customerMessage']?.toString(),
-        quotedPrice: json['quotedPrice'] is num
-            ? (json['quotedPrice'] as num).toDouble()
-            : double.tryParse('${json['quotedPrice'] ?? ''}'),
+        startDateTime: DateTime.parse(json['startDateTime'].toString()),
+        endDateTime: DateTime.parse(json['endDateTime'].toString()),
+        agreedPrice: json['agreedPrice'] is num
+            ? (json['agreedPrice'] as num).toDouble()
+            : double.tryParse('${json['agreedPrice'] ?? ''}') ?? 0,
         vendorTerms: json['vendorTerms']?.toString(),
-        status: json['status']?.toString() ?? 'REQUESTED',
-        requestedAt: DateTime.parse(json['requestedAt'].toString()),
-        respondedAt: json['respondedAt'] != null
-            ? DateTime.tryParse(json['respondedAt'].toString())
+        status: json['status']?.toString() ?? 'CONFIRMED',
+        cancellationReason: json['cancellationReason']?.toString(),
+        createdAt: DateTime.parse(json['createdAt'].toString()),
+        completedAt: json['completedAt'] != null
+            ? DateTime.tryParse(json['completedAt'].toString())
+            : null,
+        cancelledAt: json['cancelledAt'] != null
+            ? DateTime.tryParse(json['cancelledAt'].toString())
             : null,
       );
 
-  String get displayStatus {
-    if (status == 'REQUESTED') return 'Pending';
-    if (status == 'QUOTED') return 'Responded';
-    if (status == 'ACCEPTED') return 'Accepted';
-    return status;
-  }
-
-  String get displayQuotedPrice {
-    if (quotedPrice == null) return '—';
-    return 'Rs. ${quotedPrice!.toStringAsFixed(quotedPrice! % 1 == 0 ? 0 : 2)}';
+  String get displayAgreedPrice {
+    return 'Rs. ${agreedPrice.toStringAsFixed(agreedPrice % 1 == 0 ? 0 : 2)}';
   }
 
   String get displayRange {
-    return '${_fmt(requestedStartDateTime)} → ${_fmt(requestedEndDateTime)}';
+    return '${_fmt(startDateTime)} → ${_fmt(endDateTime)}';
   }
 
   static String _fmt(DateTime value) {

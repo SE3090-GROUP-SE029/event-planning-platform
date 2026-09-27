@@ -4,6 +4,7 @@ import apiClient from '../../../shared/api/apiClient';
 export function formatQuotationStatus(status) {
   if (status === 'REQUESTED') return 'Pending';
   if (status === 'QUOTED') return 'Responded';
+  if (status === 'ACCEPTED') return 'Accepted';
   return status || 'Unknown';
 }
 
