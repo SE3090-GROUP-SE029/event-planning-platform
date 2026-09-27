@@ -66,6 +66,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // Test feature service (correct namespace and class name)
 builder.Services.AddScoped<ITestService, TestService>();
+builder.Services.AddScoped<IAdminVendorApprovalService, AdminVendorApprovalService>();
 
 // C4 Guest Management — AI, email, registration, invitation, QR services
 builder.Services.AddGuestManagement(builder.Configuration);

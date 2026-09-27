@@ -232,7 +232,7 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
                     ),
                   ),
                   const PastelSectionHeader(title: 'Approved vendors'),
-                  if (_items.isEmpty)
+                  if (_error == null && _items.isEmpty)
                     const PastelCard(
                       padding: EdgeInsets.all(AppDimens.space20),
                       child: Text('No approved vendors match your filters.'),

@@ -6,6 +6,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -22,23 +23,49 @@ import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 import StatusBadge from '../../../shared/components/ui/StatusBadge';
 import { resolveVendorImageUrl } from '../../vendors/api/vendorApi';
-import { useAdminUserVendors } from '../api/adminDashboardApi';
+import VendorApprovalAction from '../components/VendorApprovalAction';
+import {
+  getVendorApprovalErrorMessage,
+  useAdminUserVendors,
+  useApproveAdminVendor,
+} from '../api/adminDashboardApi';
 import { tokens } from '../../../shared/theme/tokens';
 
 export default function AdminVendorsPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
+  const [approvingVendorId, setApprovingVendorId] = useState(null);
+  const [notice, setNotice] = useState(null);
   const vendorsQuery = useAdminUserVendors({ page: page + 1, pageSize, search });
+  const approvalMutation = useApproveAdminVendor();
   const { data, isLoading } = vendorsQuery;
   const vendors = data?.items || [];
   const filteredVendors = vendors;
+
+  const approveVendor = (vendor) => {
+    if (approvalMutation.isPending) return;
+    setApprovingVendorId(vendor.id);
+    approvalMutation.mutate(vendor.id, {
+      onSuccess: () => {
+        setNotice({ severity: 'success', message: `${vendor.businessName} approved.` });
+        setApprovingVendorId(null);
+      },
+      onError: (error) => {
+        setNotice({
+          severity: 'error',
+          message: getVendorApprovalErrorMessage(error),
+        });
+        setApprovingVendorId(null);
+      },
+    });
+  };
 
   return (
     <AppLayout
       activeTab="admin-vendors"
       title="Vendor Oversight"
-      subtitle="Review approved and active marketplace suppliers"
+      subtitle="Review vendor registrations and marketplace approval status"
       onSearch={setSearch}
     >
       <Box sx={{ mb: 3 }}>
@@ -96,6 +123,7 @@ export default function AdminVendorsPage() {
                   <TableCell>Contact</TableCell>
                   <TableCell>Address</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Action</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -128,6 +156,14 @@ export default function AdminVendorsPage() {
                       <TableCell>
                         <StatusBadge status={v.status} label={v.status} />
                       </TableCell>
+                      <TableCell>
+                        <VendorApprovalAction
+                          status={v.status}
+                          loading={approvalMutation.isPending && approvingVendorId === v.id}
+                          disabled={approvalMutation.isPending}
+                          onApprove={() => approveVendor(v)}
+                        />
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -150,6 +186,21 @@ export default function AdminVendorsPage() {
           />
         )}
       </SurfaceCard>
+      <Snackbar
+        open={Boolean(notice)}
+        autoHideDuration={6000}
+        onClose={() => setNotice(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={notice?.severity}
+          variant="filled"
+          onClose={() => setNotice(null)}
+          sx={{ width: '100%' }}
+        >
+          {notice?.message}
+        </Alert>
+      </Snackbar>
     </AppLayout>
   );
 }

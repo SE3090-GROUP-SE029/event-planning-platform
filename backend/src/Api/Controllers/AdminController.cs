@@ -11,7 +11,10 @@ namespace Api.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Policy = "AdminOnly")]
-public sealed class AdminController(IAdminReadService service, AppDbContext db) : ControllerBase
+public sealed class AdminController(
+    IAdminReadService service,
+    IAdminVendorApprovalService vendorApproval,
+    AppDbContext db) : ControllerBase
 {
     [HttpGet("analytics")]
     public Task<AdminAnalyticsResponse> Analytics(CancellationToken cancellationToken) =>
@@ -29,6 +32,24 @@ public sealed class AdminController(IAdminReadService service, AppDbContext db) 
     {
         try { return Ok(await service.ListVendorsAsync(query, cancellationToken)); }
         catch (ArgumentException ex) { return BadRequest(new { message = ex.Message }); }
+    }
+
+    [HttpPost("vendors/{vendorId:guid}/approve")]
+    public async Task<IActionResult> ApproveVendor(Guid vendorId)
+    {
+        try
+        {
+            await vendorApproval.ApproveAsync(vendorId);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpGet("plans")]

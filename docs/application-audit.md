@@ -14,7 +14,7 @@ excluded.
 | Authentication | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me` | Register/login/refresh/logout are anonymous; `me` requires an authenticated user | Implemented |
 | Events | `POST /api/events`, `GET /api/events`, `GET /api/events/{id}`, `PUT /api/events/{id}`, `DELETE /api/events/{id}` | Any authenticated role; ownership is enforced, while admins can list/read across users | Implemented |
 | Admin event review | `GET /api/admin/events`, `GET /api/admin/events/{id}` | `ADMIN` only | Implemented |
-| Admin analytics and read models | `GET /api/admin/analytics`, `GET /api/admin/users`, `GET /api/admin/vendors`, `GET /api/admin/plans`, `GET /api/admin/plans/{id}`, `GET /api/admin/health` | `ADMIN` only | Implemented |
+| Admin analytics and read models | `GET /api/admin/analytics`, `GET /api/admin/users`, `GET /api/admin/vendors`, `POST /api/admin/vendors/{vendorId}/approve`, `GET /api/admin/plans`, `GET /api/admin/plans/{id}`, `GET /api/admin/health` | `ADMIN` only | Implemented |
 | Vendor profile | `POST /api/vendors`, `GET /api/vendors/me`, `PUT /api/vendors/me` | `VENDOR` only | Implemented |
 | Diagnostic test API | `GET /api/test/ping`, `POST /api/test/message`, `GET /api/test/message/{id}` | Anonymous diagnostic endpoints | Implemented as a backend diagnostic surface; not a product feature |
 
@@ -37,6 +37,9 @@ excluded.
 - Admin user listings read `Users` and `UserRoles` directly; vendor listings read
   `Vendors` directly, including pending records. The health endpoint reports only
   API reachability and the result of an active database connectivity probe.
+- Admins can transition a pending vendor to approved through
+  `POST /api/admin/vendors/{vendorId}/approve`; non-pending vendors cannot be
+  approved again through this action.
 - Authorization policies: `AdminOnly`, `EventPlannerOnly`, and `VendorOnly`.
   The event controller currently permits all authenticated roles; the
   event-planner policy is registered but not applied by a controller.
