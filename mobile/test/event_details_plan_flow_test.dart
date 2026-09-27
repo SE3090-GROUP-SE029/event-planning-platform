@@ -189,6 +189,7 @@ AuthResponseModel _auth({
 EventModel _event() => EventModel(
       id: 'event-1',
       ownerId: 'owner-1',
+      eventName: 'Test event',
       eventType: EventType.other,
       guestCount: 50,
       budget: 1000,

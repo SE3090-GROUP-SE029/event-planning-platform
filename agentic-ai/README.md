@@ -18,6 +18,14 @@ primary model is tried first with each configured key, followed by each
 fallback model. API keys and model IDs must come from a secret manager or
 environment configuration; never put real credentials in `.env.example`.
 
+## ADK guest review and registration questions
+
+Guest review and registration-question agents use Google ADK with the same
+Gemini model, API-key rotation, and fallback-model settings. Each invocation
+uses a separate in-memory ADK session. `GUEST_AI_TIMEOUT_SECONDS` sets the
+request timeout and defaults to 110 seconds; no local model runtime or separate
+provider endpoint is needed.
+
 ## Gemini resilience
 
 Each Gemini operation logs its workflow node, active model, one-based API-key

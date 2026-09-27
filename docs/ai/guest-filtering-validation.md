@@ -1,6 +1,6 @@
 # C4 automated registration and event-specific questions
 
-C4 extends the existing registration backend and Google ADK/LiteLLM/Ollama integration. The AI now returns an automated `ACCEPTED` or `REJECTED` decision. ASP.NET owns validation, registration state, seats, waiting lists, invitations, QR codes, transactions, and all email delivery.
+C4 extends the existing registration backend and Google ADK/Gemini integration. The AI now returns an automated `ACCEPTED` or `REJECTED` decision. ASP.NET owns validation, registration state, seats, waiting lists, invitations, QR codes, transactions, and all email delivery.
 
 ## Registration flow
 
@@ -17,7 +17,7 @@ Only a completed `ACCEPTED` decision authorizes waiting-list promotion. Existing
 
 ## Question generation and selection
 
-The new `registration_question_agent.py` uses the same local `qwen3:8b` model, ADK runner, LiteLLM adapter, timeout, isolated sessions, and strict JSON parsing as guest filtering. Both agents have no tools. No additional framework or dependency is introduced.
+The new `registration_question_agent.py` uses the configured Gemini model through the Google ADK runner, with the same timeout, isolated sessions, and strict JSON parsing as guest filtering. Both agents have no tools.
 
 The question agent returns:
 
@@ -129,7 +129,7 @@ Decision/registration state commits before email delivery. Delivery failure pres
 
 ## Configuration and manual verification
 
-No new settings or packages are required. Reuse existing .NET 8/PostgreSQL, Python 3.12, Google ADK 2.9.1, LiteLLM 1.101.0, and Ollama `qwen3:8b`. Existing `GuestAi`, SMTP, and Python environment settings remain unchanged. Python defaults: `OLLAMA_MODEL=qwen3:8b`, `OLLAMA_API_BASE=http://127.0.0.1:11434`, `GUEST_AI_TIMEOUT_SECONDS=110`. The backend default timeout is 120 seconds with a lease 30 seconds longer; polling defaults to 5 seconds.
+The Python AI service uses Google ADK 2.10.0 and Google Gen AI 2.25.0 with the existing `GEMINI_API_KEY`, `GEMINI_API_KEYS`, `GEMINI_MODEL`, and `GEMINI_FALLBACK_MODELS` settings. `GUEST_AI_TIMEOUT_SECONDS` defaults to 110 seconds. Gemini quota failures rotate through configured keys and models; each ADK run gets an isolated in-memory session. The backend default timeout is 120 seconds with a lease 30 seconds longer; polling defaults to 5 seconds.
 
 A maintainer should review and apply the migration through the existing deployment process before running the updated backend on an application database:
 
@@ -137,14 +137,7 @@ A maintainer should review and apply the migration through the existing deployme
 dotnet ef database update --project backend/src/Infrastructure --startup-project backend/src/Api
 ```
 
-For a separately authorized manual real-model test, install the selected model if needed:
-
-```powershell
-ollama pull qwen3:8b
-ollama list
-```
-
-Then run the local Python service, backend, and existing SMTP configuration. Request suggestions as a real planner, review/select/publish questions, submit synthetic accepted/rejected examples, poll status, and inspect planner audit plus emails. Also test stopped Ollama and malformed/unavailable service behavior. Model installation was not performed by this update; real inference quality, prompt-injection resistance, and latency remain unverified. Deterministic fakes verify wiring, schemas, prompt construction, and orchestration, not semantic reliability of a live model.
+For a separately authorized manual real-model test, configure a Gemini API key and model in the service environment, then run the Python service, backend, and existing SMTP configuration. Request suggestions as a real planner, review/select/publish questions, submit synthetic accepted/rejected examples, poll status, and inspect planner audit plus emails. Also test quota exhaustion and unavailable-service behavior. Real inference quality, prompt-injection resistance, and latency remain unverified. Deterministic fakes verify wiring, schemas, prompt construction, and orchestration, not semantic reliability of a live model.
 
 ## Verification
 
@@ -158,22 +151,21 @@ dotnet test backend/backend.sln
 git diff --check
 ```
 
-Tests use isolated PostgreSQL clusters and local SMTP/Ollama protocol fakes. They do not connect to the application database, download a model, or send external email. Flow 1 tests now process deterministic acceptance before checking seats/invitations; the existing capacity, duplicate, cancellation, ordered promotion, RSVP, token, email, and testFeature assertions remain. Advisory-only cases were updated to the explicitly approved automated behavior.
+Tests use isolated PostgreSQL clusters and a local Gemini API fake. They do not connect to the application database, call an external model, or send external email. Flow 1 tests now process deterministic acceptance before checking seats/invitations; the existing capacity, duplicate, cancellation, ordered promotion, RSVP, token, email, and testFeature assertions remain. Advisory-only cases were updated to the explicitly approved automated behavior.
 
-Additional coverage includes transient suggestions, selection/publication freeze, required/optional and invalid answers, selected context and token privacy, both decisions, AI failure/retry, cancellation during inference, stale attempts, concurrent accepted results, legacy transitions, rejection delivery/retry, and pending-email recovery. Python exercises both agents through the actual ADK/LiteLLM adapter against fake local Ollama.
+Additional coverage includes transient suggestions, selection/publication freeze, required/optional and invalid answers, selected context and token privacy, both decisions, AI failure/retry, cancellation during inference, stale attempts, concurrent accepted results, legacy transitions, rejection delivery/retry, and pending-email recovery. Python exercises both agents through the actual ADK/Gemini adapter against a local Gemini API fake.
 
-Verified on 2026-09-17:
+Provider integration verification on 2026-09-27:
 
 | Check | Result |
 | --- | --- |
-| Full .NET build | Passed, zero errors; existing warnings remain. |
-| Backend unit tests | 65 passed, zero failures/skips. |
-| Backend integration tests | 58 passed, zero failures/skips, including Flow 1, testFeature, SMTP, and migration/model checks. |
-| Python tests | 55 passed, zero failures/skips; both agents exercise real ADK/LiteLLM with fake local Ollama. |
+| Full Python AI-service tests | 127 passed; ADK/Gemini uses a local API fake. |
+| Backend unit tests (guest review) | 41 passed. |
+| Backend integration tests (guest review and question endpoints) | 30 passed; one migration-constraint assertion failed and remains unresolved. |
 | `pip check` | No broken requirements found. |
-| `git diff --check` | Passed; untracked source files were checked for trailing whitespace separately. |
+| `git diff --check` | Passed. |
 
-Total: 178 passing automated tests. The final integration run followed fixes for MVC record validation metadata and explicit EF insertion of newly selected questions. No tests were skipped or weakened to conceal failures; the obsolete advisory-only decision cases were replaced by the approved two-decision contract.
+The integration failure is `NewMigrationMatchesTheModelAndEnforcesReviewConstraints`; migration/schema files were not changed as part of this provider update. The broader backend suite was not rerun for this change.
 
 Existing dependency-resolution warnings for unavailable exact .NET package versions and existing nullable/deprecation warnings are outside this update's scope.
 

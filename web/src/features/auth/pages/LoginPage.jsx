@@ -1,12 +1,11 @@
 import { useForm } from 'react-hook-form';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
   Container,
-  Divider,
   Paper,
   TextField,
   Typography,
@@ -68,16 +67,6 @@ export default function LoginPage() {
               {isPending ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
             </Button>
 
-            <Divider sx={{ my: 2.5, borderColor: 'rgba(25,25,28,0.08)' }} />
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-              <Typography variant="body2" sx={{ color: '#636369' }}>
-                Don’t have an account?
-              </Typography>
-              <Button component={Link} to="/register" variant="outlined" size="small" sx={{ borderRadius: 9999, fontWeight: 700 }}>
-                Register here
-              </Button>
-            </Box>
           </Box>
         </Paper>
       </Container>

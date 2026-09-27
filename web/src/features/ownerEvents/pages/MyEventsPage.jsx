@@ -36,7 +36,7 @@ function EventPlanCard({ event }) {
         <Stack spacing={1.5}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              {event.preferredVenue || 'Untitled event'}
+              {event.eventName || 'Untitled event'}
             </Typography>
             <Typography color="text.secondary">
               {String(event.eventType || 'Event').replaceAll('_', ' ')} · {event.guestCount} guests · {new Date(event.preferredDate).toLocaleDateString()}

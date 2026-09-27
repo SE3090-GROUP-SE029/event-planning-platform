@@ -19,6 +19,7 @@ class EventFormPage extends StatefulWidget {
 
 class _EventFormPageState extends State<EventFormPage> {
   final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
   final _guests = TextEditingController();
   final _budget = TextEditingController();
   final _venue = TextEditingController();
@@ -51,6 +52,7 @@ class _EventFormPageState extends State<EventFormPage> {
   void _populate() {
     final event = _event;
     if (event != null) {
+      _name.text = event.eventName;
       _type = event.eventType;
       _status = event.status;
       _date = event.preferredDate;
@@ -87,6 +89,7 @@ class _EventFormPageState extends State<EventFormPage> {
 
   @override
   void dispose() {
+    _name.dispose();
     _guests.dispose();
     _budget.dispose();
     _venue.dispose();
@@ -123,6 +126,7 @@ class _EventFormPageState extends State<EventFormPage> {
     final event = EventModel(
       id: _event?.id ?? '',
       ownerId: _auth!.userId,
+      eventName: _name.text.trim(),
       eventType: _type,
       guestCount: int.parse(_guests.text),
       budget: double.parse(_budget.text),
@@ -226,6 +230,19 @@ class _EventFormPageState extends State<EventFormPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        TextFormField(
+                          controller: _name,
+                          decoration: const InputDecoration(
+                            labelText: 'Event name',
+                            hintText: 'e.g. Smith family wedding',
+                          ),
+                          maxLength: 200,
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                                  ? 'Enter an event name'
+                                  : null,
+                        ),
+                        const SizedBox(height: AppDimens.space16),
                         Text(
                           'Event Type',
                           style: Theme.of(context).textTheme.titleSmall?.copyWith(

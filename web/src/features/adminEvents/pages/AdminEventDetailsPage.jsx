@@ -65,7 +65,8 @@ export default function AdminEventDetailsPage() {
                 </Typography>
                 <Grid container spacing={3}>
                   <Grid size={{ xs: 12, sm: 6 }}><Detail label="Event ID" value={event.id} /></Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}><Detail label="Event type" value={enumLabel(event.eventType, EVENT_TYPES.map((value) => value.replaceAll('_', ' ')))} /></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Detail label="Event name" value={event.eventName} /></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Detail label="Event type" value={enumLabel(event.eventType, EVENT_TYPES.map((value) => value.replaceAll('_', ' ')))} /></Grid>
                   <Grid size={{ xs: 12, sm: 6 }}><Detail label="Guest count" value={event.guestCount} /></Grid>
                   <Grid size={{ xs: 12, sm: 6 }}><Detail label="Status" value={enumLabel(event.status)} /></Grid>
                   <Grid size={{ xs: 12, sm: 6 }}><Detail label="Preferred venue" value={event.preferredVenue} /></Grid>
@@ -108,4 +109,3 @@ export default function AdminEventDetailsPage() {
     </Box>
   );
 }
-

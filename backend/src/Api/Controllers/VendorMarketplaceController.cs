@@ -7,7 +7,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/vendors/marketplace")]
-[Authorize]
+[Authorize(Roles = "EVENT_PLANNER,VENDOR")]
 public class VendorMarketplaceController : ControllerBase
 {
     private readonly IVendorMarketplaceService _marketplace;

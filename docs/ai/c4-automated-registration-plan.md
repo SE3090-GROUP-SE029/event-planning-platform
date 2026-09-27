@@ -6,7 +6,7 @@ Status: the user approved implementation and the migration after this inspection
 
 Read the current repository instructions, README, C4 documentation, Python agents/models/services, .NET registration and AI layers, email/QR implementation, dependency manifests, and Flow 1/AI tests. `docs/architecture.md` referenced by AGENTS.md does not exist; the README, feature documentation, and actual layered implementation provide the architecture evidence.
 
-The Python implementation already uses Google ADK 2.9.1, LiteLLM 1.101.0, Ollama, and `qwen3:8b`. It has strict output validation, bounded requests, sanitized errors, isolated ADK sessions, and a deterministic test using a local Ollama protocol fake. The README's older LangGraph label does not describe the implemented C4 agent.
+The Python implementation uses Google ADK with Gemini. It has strict output validation, bounded requests, sanitized errors, isolated ADK sessions, and a deterministic test using a local Gemini API fake. LangGraph remains the coordinator workflow for event planning.
 
 The backend already has registration forms, submissions, invitations, event-scoped database locks, an ordered waiting list, QR generation, SMTP delivery tracking, and planner ownership checks. `GuestAiReview` provides durable work, leases, attempt fencing, failure tracking, and retry/audit endpoints.
 
@@ -14,7 +14,7 @@ Currently, submission immediately allocates a seat and sends an invitation befor
 
 ## Proposed question and answer flow
 
-Add a question-suggestion agent alongside the existing filtering agent, using the same ADK/LiteLLM/Ollama integration and settings. Send only the event name and requirement notes. Return strict JSON containing `questions`, each with `question` and `required`.
+Add a question-suggestion agent alongside the existing filtering agent, using the same Google ADK/Gemini integration and settings. Send only the event name and requirement notes. Return strict JSON containing `questions`, each with `question` and `required`.
 
 Suggestions are transient. A planner explicitly submits a selected list for the existing draft form. Only saved selections are exposed after publication. Proposed bounds are at most 10 questions, 500 characters per question, and 4,000 characters per answer, following the existing bounded-list, reason-text, and event-notes conventions. Require strict booleans, nonblank question text, and valid bounded answers. Prompts prohibit hidden requirements, protected-trait inference, unnecessarily sensitive questions, and requests for credentials/payment details. Deterministic validation cannot prove semantic safety of every generated question; planner selection remains mandatory.
 
@@ -141,10 +141,10 @@ Add `backend/tests/Backend.IntegrationTests/RegistrationQuestionEndpointTests.cs
 
 Update advisory-specific assertions for the explicitly changed business behavior. Adapt Flow 1 setup to process deterministic fake acceptance before asserting confirmation, QR/email, cancellation, RSVP, capacity, and promotion outcomes; preserve those checks and the existing eligibility-policy extension coverage.
 
-Add acceptance/rejection orchestration, AI failure/retry, question generation, strict schemas, answer/context privacy, injection-as-data, publication boundaries, cancellation races, stale claims, concurrent capacity, rejection delivery/retry, and legacy transition tests. Continue exercising the real ADK/LiteLLM adapter against a local protocol fake. Such tests verify transport and prompt construction, not the real model's semantic reliability.
+Add acceptance/rejection orchestration, AI failure/retry, question generation, strict schemas, answer/context privacy, injection-as-data, publication boundaries, cancellation races, stale claims, concurrent capacity, rejection delivery/retry, and legacy transition tests. Continue exercising the real ADK/Gemini adapter against a local Gemini API fake. Such tests verify transport and prompt construction, not the real model's semantic reliability.
 
 Run `dotnet build`, `dotnet test`, Python `pytest`, `pip check`, and `git diff --check`, including testFeature and disposable-database migration/model checks. No new tests were run for this inspection-only phase.
 
-Real Qwen inference remains a separate manual verification. Document `ollama pull qwen3:8b`; do not execute it automatically or claim live-model success without testing.
+Real Gemini inference remains a separate manual verification. Do not make external provider calls automatically or claim live-model success without testing.
 
 The implementation stays on `jazeel`, without commits, pushes, PR creation, UI changes, existing-file deletion/renaming/moving, infrastructure changes, or application-database updates.

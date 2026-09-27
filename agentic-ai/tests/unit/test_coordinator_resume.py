@@ -55,7 +55,15 @@ def test_coordinator_resumes_after_quota_failure_without_repeating_completed_nod
 
     async def assess(_state: object) -> dict[str, list[object]]:
         calls["risks"] += 1
-        return {"identified_risks": []}
+        return {
+            "identified_risks": [
+                {
+                    "risk": "A booked supplier may become unavailable.",
+                    "severity": "Medium",
+                    "recommendation": "Confirm each booking and identify a backup.",
+                }
+            ]
+        }
 
     async def detect(_state: object) -> dict[str, list[object]]:
         calls["requirements"] += 1
@@ -82,7 +90,13 @@ def test_coordinator_resumes_after_quota_failure_without_repeating_completed_nod
         async with AsyncSqliteSaver.from_conn_string(":memory:") as checkpointer:
             await checkpointer.setup()
             event_id = str(uuid4())
-            event = {"name": "Gala", "budget": 1000, "guest_count": 100}
+            event = {
+                "name": "Gala",
+                "type": "CORPORATE",
+                "date": "2027-06-15T18:00:00",
+                "budget": 1000,
+                "guest_count": 100,
+            }
 
             with pytest.raises(CoordinatorProviderError) as error:
                 await execute_coordinator_agent(
@@ -102,6 +116,10 @@ def test_coordinator_resumes_after_quota_failure_without_repeating_completed_nod
             )
 
             assert result.service_categories == ["Catering"]
+            assert result.total_budget_allocated() == 1000.0
+            assert result.budget_allocation[0].percentage_of_total == 90.0
+            assert result.identified_risks[0].severity == "Medium"
+            assert len(result.proposed_timeline) == 3
             assert calls["analysis"] == 1
             assert calls["categories"] == 1
             assert calls["timeline"] == 1

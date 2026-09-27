@@ -47,7 +47,7 @@ jobs:
       - name: Unit tests
         run: dotnet test backend/backend.sln --no-restore --configuration Release --logger "trx" --results-directory ./TestResults
         env:
-          ConnectionStrings__Default: "Host=localhost;Database=app_test;Username=test;Password=test"
+          ConnectionStrings__DefaultConnection: "Host=localhost;Database=app_test;Username=test;Password=test"
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -98,7 +98,13 @@ jobs:
         with:
           flutter-version: '3.47.x'
           channel: 'stable'
-      - run: cp .env.example .env.local
+      - name: Prepare Flutter environment
+        run: |
+          if grep -Eiq '(^|_)(secret|token|password|passwd|api[_-]?key|private[_-]?key)(_|=)' .env.example; then
+            echo ".env.example contains secret-like settings; refusing to copy it."
+            exit 1
+          fi
+          cp .env.example .env.local
       - run: flutter pub get
       - run: flutter analyze
 
@@ -114,7 +120,13 @@ jobs:
         with:
           flutter-version: '3.47.x'
           channel: 'stable'
-      - run: cp .env.example .env.local
+      - name: Prepare Flutter environment
+        run: |
+          if grep -Eiq '(^|_)(secret|token|password|passwd|api[_-]?key|private[_-]?key)(_|=)' .env.example; then
+            echo ".env.example contains secret-like settings; refusing to copy it."
+            exit 1
+          fi
+          cp .env.example .env.local
       - run: flutter pub get
       - run: flutter test
 
@@ -153,9 +165,19 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - run: dotnet restore backend/backend.sln
-      - run: dotnet tool install --global dotnet-ef
+      - name: Build backend
+        run: dotnet build backend/backend.sln --configuration Release --no-restore
+      - name: Install EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 8.0.11
       - name: Apply all migrations to a scratch DB
-        run: dotnet ef database update --project backend/src/Api/Api.csproj --startup-project backend/src/Api/Api.csproj --connection "Host=localhost;Database=app_migrate_check;Username=test;Password=test"
+        run: >
+          dotnet ef database update
+          --project backend/src/Infrastructure/Infrastructure.csproj
+          --startup-project backend/src/Api/Api.csproj
+          --configuration Release
+          --no-build
+          --connection
+          "Host=localhost;Port=5432;Database=app_migrate_check;Username=test;******"
 
   integration-gate:
     if: always()

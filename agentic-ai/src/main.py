@@ -61,6 +61,7 @@ async def _prune_expired_checkpoints(checkpointer: AsyncSqliteSaver, ttl_hours: 
 async def lifespan(app: FastAPI):
     """Manage app startup/shutdown"""
     global backend_client
+    get_settings().get_cors_origins()
     try:
         configure_gemini()
     except GeminiConfigurationError:
@@ -105,7 +106,7 @@ app = FastAPI(
 # Add CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(get_settings().get_cors_origins()),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -120,6 +121,15 @@ app.include_router(coordinator_router)
 async def analysis_error_handler(request: Request, exception: AnalysisError):
     from fastapi.responses import JSONResponse
     return JSONResponse(status_code=exception.status_code, content={"code": exception.code})
+
+
+def _require_development_diagnostics(request: Request) -> None:
+    if (
+        get_settings().is_production
+        or request.client is None
+        or request.client.host not in {"127.0.0.1", "::1"}
+    ):
+        raise HTTPException(status_code=404, detail="Not Found")
 
 
 @app.post("/api/guest-reviews/analyze", response_model=GuestReviewResponse, tags=["Internal Guest Review"])
@@ -163,11 +173,12 @@ async def ai_ping(request: PingRequest):
 # ============================================================================
 
 @app.get("/api/test/backend-ping", tags=["Test - Backend Integration"])
-async def backend_ping():
+async def backend_ping(request: Request):
     """
     Test connectivity to the backend service.
     Calls backend's /api/test/ping endpoint and returns the result.
     """
+    _require_development_diagnostics(request)
     try:
         if backend_client is None:
             raise RuntimeError("Backend client is not initialized")
@@ -184,7 +195,7 @@ async def backend_ping():
         )
 
 @app.post("/api/test/ai-propose-message", response_model=MessageResponse, tags=["Test - Backend Integration"])
-async def ai_propose_message(request: MessageRequest):
+async def ai_propose_message(request: MessageRequest, http_request: Request):
     """
     AI proposes a message through the backend.
     
@@ -196,6 +207,7 @@ async def ai_propose_message(request: MessageRequest):
     
     This demonstrates bidirectional backend↔AI communication.
     """
+    _require_development_diagnostics(http_request)
     try:
         if backend_client is None:
             raise RuntimeError("Backend client is not initialized")
@@ -211,11 +223,12 @@ async def ai_propose_message(request: MessageRequest):
         )
 
 @app.get("/api/test/ai-retrieve-message/{message_id}", response_model=MessageResponse, tags=["Test - Backend Integration"])
-async def ai_retrieve_message(message_id: int):
+async def ai_retrieve_message(message_id: int, request: Request):
     """
     AI retrieves a message from the backend.
     Demonstrates AI querying the backend for existing data.
     """
+    _require_development_diagnostics(request)
     try:
         if backend_client is None:
             raise RuntimeError("Backend client is not initialized")
@@ -241,7 +254,7 @@ async def root():
         "name": "Event Planning AI Service",
         "version": "0.1.0",
         "status": "running",
-        "backend_url": os.getenv("BACKEND_API_URL", "http://localhost:5000"),
+        "backend_url": get_settings().backend_api_url,
         "docs_url": "/docs",
     }
 

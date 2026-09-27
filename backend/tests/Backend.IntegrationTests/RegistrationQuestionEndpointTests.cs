@@ -11,10 +11,11 @@ public class RegistrationQuestionEndpointTests(RegistrationHostFixture fixture) 
 {
     private static readonly CancellationToken Ct = CancellationToken.None;
     private static string Path(Guid eventId) => $"/api/events/{eventId}/registration-form";
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body = null, string? owner = RegistrationHostFixture.PlannerId, string role = "Planner")
+    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body = null, string? owner = "planner", string role = "EVENT_PLANNER")
     {
         using var request = new HttpRequestMessage(method, path);
-        if (owner is not null) request.Headers.Add("X-Test-Identity", RegistrationHostFixture.GuestOwnerGuid(owner).ToString());
+        if (owner is not null) request.Headers.Add("X-Test-Identity",
+            owner == "planner" ? RegistrationHostFixture.PlannerId : RegistrationHostFixture.GuestOwnerGuid(owner).ToString());
         request.Headers.Add("X-Test-Role", role);
         if (body is not null) request.Content = JsonContent.Create(body);
         return await fixture.Client.SendAsync(request);
@@ -23,7 +24,7 @@ public class RegistrationQuestionEndpointTests(RegistrationHostFixture fixture) 
     private async Task<Guid> DraftAsync()
     {
         fixture.Ai.Failure = null;
-        fixture.Ai.Decision = new(AiDecision.ACCEPTED, 0.9, ["Requirements met."], [], "qwen3:8b", "guest-filtering-v2");
+        fixture.Ai.Decision = new(AiDecision.ACCEPTED, 0.9, ["Requirements met."], [], "gemini-3.8-flash", "guest-filtering-v2");
         await fixture.DrainAiAsync();
         var e = await fixture.CreateEventAsync();
         await fixture.WithServiceAsync(s => s.CreateFormAsync(e.Id, RegistrationHostFixture.PlannerId, new(RegistrationHostFixture.Now.AddHours(-1), RegistrationHostFixture.Now.AddDays(1), 1), Ct));

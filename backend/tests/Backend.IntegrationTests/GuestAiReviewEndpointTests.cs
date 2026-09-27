@@ -13,7 +13,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
     private static readonly CancellationToken Ct = CancellationToken.None;
     private static readonly TimeSpan Lease = TimeSpan.FromMinutes(3);
     private static GuestAiDecision Decision(AiDecision recommendation = AiDecision.ACCEPTED)
-        => new(recommendation, 0.85, ["Evidence-based test recommendation."], recommendation == AiDecision.ACCEPTED ? [] : ["MANUAL_VERIFICATION"], "qwen3:8b", "guest-filtering-v2");
+        => new(recommendation, 0.85, ["Evidence-based test recommendation."], recommendation == AiDecision.ACCEPTED ? [] : ["MANUAL_VERIFICATION"], "gemini-3.8-flash", "guest-filtering-v2");
 
     private async Task DrainAsync()
     {
@@ -41,10 +41,11 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
     private static string Path(Guid eventId, long id, bool retry = false)
         => $"/api/events/{eventId}/registration-form/registrations/{id}/" + (retry ? "retry-ai-review" : "ai-review");
 
-    private async Task<HttpResponseMessage> SendAsync(string path, bool retry = false, string? owner = RegistrationHostFixture.PlannerId, string role = "Planner")
+    private async Task<HttpResponseMessage> SendAsync(string path, bool retry = false, string? owner = "planner", string role = "EVENT_PLANNER")
     {
         using var request = new HttpRequestMessage(retry ? HttpMethod.Post : HttpMethod.Get, path);
-        if (owner is not null) request.Headers.Add("X-Test-Identity", owner);
+        if (owner is not null) request.Headers.Add("X-Test-Identity",
+            owner == "planner" ? RegistrationHostFixture.PlannerId : owner);
         request.Headers.Add("X-Test-Role", role);
         return await fixture.Client.SendAsync(request);
     }
@@ -115,7 +116,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
     {
         var (_, publicId) = await PrepareAsync();
         var receipt = await SubmitAsync(publicId);
-        fixture.Ai.Decision = new(AiDecision.ACCEPTED, 0.7, ["Missing optional details do not contradict any event requirement."], [], "qwen3:8b", "guest-filtering-v2");
+        fixture.Ai.Decision = new(AiDecision.ACCEPTED, 0.7, ["Missing optional details do not contradict any event requirement."], [], "gemini-3.8-flash", "guest-filtering-v2");
         await DrainAsync();
         await using var db = fixture.CreateDb();
         Assert.Equal(AiDecision.ACCEPTED, (await db.GuestAiReviews.SingleAsync(r => r.RegistrationSubmissionId == receipt.Registration.Id)).Decision);
@@ -243,7 +244,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         var otherContext = await fixture.WithAiRepositoryAsync(r => r.ContextAsync(otherReceipt.Registration.Id, Ct));
         Assert.Empty(otherContext.Comparisons);
         Assert.False(otherContext.ComparisonsLimited);
-        Assert.Equal(other.RequirementNotes, otherContext.Event.RequirementNotes);
+        Assert.Equal(other.Requirements, otherContext.Event.RequirementNotes);
     }
 
     [Fact]
@@ -406,7 +407,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
             review.Recommendation = AiRecommendation.ELIGIBLE;
             review.Confidence = 0.9;
             review.Reasons = ["Historical advice only"];
-            review.Model = "qwen3:8b";
+            review.Model = "gemini-3.8-flash";
             review.PromptVersion = "guest-filtering-v1";
             review.AnalyzedAt = fixture.Clock.GetUtcNow();
             await db.SaveChangesAsync();

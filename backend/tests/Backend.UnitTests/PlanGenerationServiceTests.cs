@@ -28,6 +28,7 @@ public sealed class PlanGenerationServiceTests
         var plan = await service.GeneratePlanAsync(eventEntity.Id);
 
         Assert.Equal(eventOwner, plan.CreatedById);
+        Assert.Equal(eventEntity.EventName, plan.EventSnapshot.EventName);
         Assert.Equal(PlanStatus.PendingPlannerReview, plan.Status);
         Assert.Same(plan, planRepository.AddedPlan);
         Assert.Equal(1, aiClient.CallCount);
@@ -153,6 +154,7 @@ public sealed class PlanGenerationServiceTests
         {
             Id = Guid.NewGuid(),
             OwnerId = ownerId,
+            EventName = "Planning test event",
             EventType = EventType.WEDDING,
             GuestCount = 50,
             Budget = 1000m,

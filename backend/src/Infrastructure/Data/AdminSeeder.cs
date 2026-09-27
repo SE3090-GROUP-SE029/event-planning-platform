@@ -14,19 +14,15 @@ public static class AdminSeeder
     public static async Task SeedAdminAsync(
         AppDbContext db,
         IPasswordHasher passwordHasher,
-        IConfiguration configuration,
+        AdminSeedOptions options,
         ILogger logger)
     {
-        var adminEmail = configuration["AdminSeed:Email"] 
-            ?? configuration["ADMIN_EMAIL"] 
-            ?? "admin@planit.com";
-
-        var adminPassword = configuration["AdminSeed:Password"] 
-            ?? configuration["ADMIN_PASSWORD"];
+        var adminEmail = options.Email;
+        var adminPassword = options.Password;
 
         if (string.IsNullOrWhiteSpace(adminPassword))
         {
-            logger.LogWarning("Admin user seeding skipped: No password provided in configuration ('AdminSeed:Password' or 'ADMIN_PASSWORD').");
+            logger.LogWarning("Admin user seeding skipped: No password provided in configuration ('AdminSeed:Password').");
             return;
         }
 
@@ -71,16 +67,13 @@ public static class AdminSeeder
             return;
         }
 
-        var firstName = configuration["AdminSeed:FirstName"] ?? "System";
-        var lastName = configuration["AdminSeed:LastName"] ?? "Administrator";
-
         var adminUser = new User
         {
             Id = Guid.NewGuid(),
             Email = normalizedEmail,
             PasswordHash = passwordHasher.Hash(adminPassword),
-            FirstName = firstName,
-            LastName = lastName,
+            FirstName = options.FirstName,
+            LastName = options.LastName,
             CreatedAt = DateTime.UtcNow,
             IsActive = true
         };
@@ -100,5 +93,15 @@ public static class AdminSeeder
         await db.SaveChangesAsync();
 
         logger.LogInformation("Admin user '{Email}' successfully seeded with ADMIN role.", normalizedEmail);
+    }
+
+    public static Task SeedAdminAsync(
+        AppDbContext db,
+        IPasswordHasher passwordHasher,
+        IConfiguration configuration,
+        ILogger logger)
+    {
+        var options = configuration.GetSection("AdminSeed").Get<AdminSeedOptions>() ?? new AdminSeedOptions();
+        return SeedAdminAsync(db, passwordHasher, options, logger);
     }
 }

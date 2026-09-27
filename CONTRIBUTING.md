@@ -31,8 +31,8 @@ git branch
 # Backend
 cd backend
 dotnet restore
-dotnet ef database update
-dotnet run
+dotnet ef database update --project src/Infrastructure --startup-project src/Api
+dotnet run --project src/Api
 
 # Web (new terminal)
 cd web
@@ -51,6 +51,23 @@ source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 python -m uvicorn src.main:app --reload
 ```
+
+### Backend configuration
+
+The API loads local settings from `backend/src/Api/appsettings.json` and
+`appsettings.Development.json` through the standard ASP.NET Core configuration
+providers. This includes the database connection, JWT, admin seed, SMTP, guest
+AI, and Agentic AI sections; a local `.env` file is not read. The EF Core design-
+time factory loads the same JSON settings, so the migration command above does
+not require a manually exported connection-string variable.
+
+Keep developer-specific credentials out of committed settings. Use .NET User
+Secrets for local secrets when needed, and inject production secrets through
+the deployment platform's environment/configuration provider. Environment
+variables may override JSON values in production. `ASPNETCORE_HTTPS_PORT` is
+only a hosting-provided HTTPS port, while `TEST_POSTGRES_BIN` is only an
+integration-test path override.
+
 5. Run tests before every commit
 
 ```

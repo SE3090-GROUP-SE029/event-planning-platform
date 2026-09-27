@@ -62,8 +62,8 @@ git pull origin dev
 # Backend
 cd backend
 dotnet restore
-dotnet ef database update
-dotnet run
+dotnet ef database update --project src/Infrastructure --startup-project src/Api
+dotnet run --project src/Api
 
 # Web (new terminal)
 cd web

@@ -320,7 +320,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
     {
         var (eventDetails, publicId) = await PublishedAsync();
         var receipt = await SubmitAsync(publicId, 1);
-        fixture.Clock.UtcNow = eventDetails.EventEndDate;
+        fixture.Clock.UtcNow = eventDetails.PreferredDate.Add(eventDetails.EventDuration);
         var status = await StatusAsync(receipt);
         Assert.Equal(JsonValueKind.Null, status.GetProperty("invitationToken").ValueKind);
         var response = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/invitations/validate",

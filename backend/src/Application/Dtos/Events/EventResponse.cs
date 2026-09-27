@@ -6,6 +6,7 @@ public class EventResponse
 {
     public Guid Id { get; set; }
     public Guid OwnerId { get; set; }
+    public string EventName { get; set; } = default!;
     public EventType EventType { get; set; }
     public int GuestCount { get; set; }
     public decimal Budget { get; set; }

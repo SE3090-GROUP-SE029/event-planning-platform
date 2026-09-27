@@ -16,7 +16,7 @@ public class GuestAiReviewTests
         string[]? reasons = null, string[]? flags = null) => JsonSerializer.Serialize(new
         {
             decision = recommendation, confidence = confidence ?? 0.9, reasons = reasons ?? ["Supplied information is consistent."],
-            flags = flags ?? [], model = "qwen3:8b", promptVersion = "guest-filtering-v2"
+            flags = flags ?? [], model = "gemini-3.8-flash", promptVersion = "guest-filtering-v2"
         });
 
     private static AiClient Client(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send, int timeout = 120)
@@ -33,7 +33,7 @@ public class GuestAiReviewTests
         var decision = await Client(Result(recommendation)).AnalyzeAsync(Context, CancellationToken.None);
         Assert.Equal(recommendation, decision.Decision.ToString());
         Assert.Equal(0.9, decision.Confidence);
-        Assert.Equal("qwen3:8b", decision.Model);
+        Assert.Equal("gemini-3.8-flash", decision.Model);
     }
 
     public static IEnumerable<object[]> MalformedResponses()

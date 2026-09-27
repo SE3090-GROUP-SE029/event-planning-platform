@@ -13,7 +13,7 @@ public class PlannerAccessFilter : IAuthorizationFilter
         var user = context.HttpContext.User;
         if (user.Identity?.IsAuthenticated != true)
             context.Result = new UnauthorizedObjectResult(new { code = "authentication_required", error = "Planner authentication is required." });
-        else if (!user.IsInRole("Planner") || string.IsNullOrWhiteSpace(user.FindFirstValue(ClaimTypes.NameIdentifier)))
+        else if (!user.IsInRole("EVENT_PLANNER") || string.IsNullOrWhiteSpace(user.FindFirstValue(ClaimTypes.NameIdentifier)))
             context.Result = new ObjectResult(new { code = "planner_required", error = "A planner identity is required." }) { StatusCode = 403 };
     }
 }

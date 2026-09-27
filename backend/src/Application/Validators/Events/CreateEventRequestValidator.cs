@@ -7,6 +7,10 @@ public class CreateEventRequestValidator : AbstractValidator<CreateEventRequest>
 {
     public CreateEventRequestValidator()
     {
+        RuleFor(request => request.EventName)
+            .NotEmpty()
+            .MaximumLength(200);
+
         RuleFor(request => request.EventType)
             .NotNull()
             .IsInEnum();
@@ -22,5 +26,8 @@ public class CreateEventRequestValidator : AbstractValidator<CreateEventRequest>
 
         RuleFor(request => request.PreferredDate)
             .GreaterThan(_ => DateTime.UtcNow);
+
+        RuleFor(request => request.EventDuration)
+            .GreaterThan(TimeSpan.Zero);
     }
 }

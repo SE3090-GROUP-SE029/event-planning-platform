@@ -57,7 +57,7 @@ public sealed class EventSnapshot
     {
         ArgumentNullException.ThrowIfNull(evt);
         return new EventSnapshot(
-            evt.PreferredVenue ?? "Not specified",
+            evt.EventName,
             evt.EventType,
             evt.PreferredDate,
             evt.PreferredVenue ?? "Not specified",

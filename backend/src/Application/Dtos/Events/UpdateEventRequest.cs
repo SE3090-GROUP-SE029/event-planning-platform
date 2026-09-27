@@ -4,6 +4,7 @@ namespace Application.Dtos.Events;
 
 public class UpdateEventRequest
 {
+    public string EventName { get; set; } = default!;
     public EventType? EventType { get; set; }
     public int GuestCount { get; set; }
     public decimal Budget { get; set; }

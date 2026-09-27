@@ -7,8 +7,9 @@ using Api.Controllers;
 using Api.GuestManagement;
 using Application.GuestManagement;
 using Application.Services;
-using Application.TestSerivce;
+using Application.Services.Test;
 using Domain.Entities;
+using Domain.Enums;
 using Infrastructure.Data;
 using Infrastructure.ExternalServices;
 using Microsoft.AspNetCore.Builder;
@@ -52,14 +53,18 @@ public class RegistrationHostFixture : IAsyncLifetime
         }.ConnectionString;
         await using (var db = CreateDb()) await db.Database.MigrateAsync();
 
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = "Testing",
+            ContentRootPath = dataDirectory
+        });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole();
         builder.Logging.SetMinimumLevel(LogLevel.Error);
         builder.Services.AddControllers().AddApplicationPart(typeof(RegistrationFormsController).Assembly);
         builder.Services.AddGuestManagement(builder.Configuration);
-        builder.Services.AddScoped<ITestService, TestSerivce>();
+        builder.Services.AddScoped<ITestService, TestService>();
         builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(ConnectionString));
         builder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(Clock));
         builder.Services.Replace(ServiceDescriptor.Singleton<IInvitationEmailSender>(Email));
@@ -73,7 +78,7 @@ public class RegistrationHostFixture : IAsyncLifetime
         {
             if (context.Request.Headers.TryGetValue("X-Test-Identity", out var identity))
             {
-                var role = context.Request.Headers["X-Test-Role"].FirstOrDefault() ?? "Planner";
+                var role = context.Request.Headers["X-Test-Role"].FirstOrDefault() ?? "EVENT_PLANNER";
                 context.User = new ClaimsPrincipal(new ClaimsIdentity(
                     [new Claim(ClaimTypes.NameIdentifier, identity.ToString()), new Claim(ClaimTypes.Role, role)], "TestOnly"));
             }
@@ -97,8 +102,10 @@ public class RegistrationHostFixture : IAsyncLifetime
         Email.ThrowOnSend = false;
         var eventDetails = new Event
         {
-            OwnerId = GuestOwnerGuid(owner), EventName = "Guest Management Integration Event", Requirements = "Test description",
-            PreferredVenue = "Colombo", PreferredDate = Now.AddDays(10).UtcDateTime, EventDuration = TimeSpan.FromHours(3),
+            OwnerId = GuestOwnerGuid(owner), EventName = "Guest Management Integration Event",
+            EventType = EventType.CORPORATE, GuestCount = 1, Budget = 1000,
+            Requirements = "Test description", PreferredVenue = "Colombo",
+            PreferredDate = Now.AddDays(10).UtcDateTime, EventDuration = TimeSpan.FromHours(3),
             CreatedAt = Now.UtcDateTime, UpdatedAt = Now.UtcDateTime
         };
         await using var db = CreateDb();
@@ -216,7 +223,7 @@ public class RecordingAiClient : IGuestAiClient, IRegistrationQuestionClient
         return Task.FromResult(new QuestionSuggestions([new("Why would you like to attend?", false)]));
     }
     public ConcurrentQueue<GuestAiContext> Contexts { get; } = new();
-    public GuestAiDecision Decision { get; set; } = new(Domain.Enums.AiDecision.ACCEPTED, 0.9, ["No issue found in supplied data."], [], "qwen3:8b", "guest-filtering-v2");
+    public GuestAiDecision Decision { get; set; } = new(Domain.Enums.AiDecision.ACCEPTED, 0.9, ["No issue found in supplied data."], [], "gemini-3.8-flash", "guest-filtering-v2");
     public Exception? Failure { get; set; }
     public Func<CancellationToken, Task>? BeforeReturn { get; set; }
 

@@ -70,7 +70,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               backgroundColor: AppColors.success,
             ),
           );
-          Navigator.of(context).pushReplacementNamed('/dashboard');
+          Navigator.of(context)
+              .pushNamedAndRemoveUntil('/dashboard', (_) => false);
         },
         error: (error, _) {
           ScaffoldMessenger.of(context).showSnackBar(

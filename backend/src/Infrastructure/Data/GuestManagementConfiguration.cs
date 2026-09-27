@@ -31,16 +31,6 @@ public static class GuestManagementConfiguration
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<Event>(entity =>
-        {
-            entity.ToTable("Events", table => table.HasCheckConstraint("CK_Events_Dates", "\"EventEndDate\" > \"EventStartDate\""));
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.CreatedByUserId).IsRequired().HasMaxLength(200);
-            entity.Property(e => e.EventName).IsRequired().HasMaxLength(200);
-            entity.Property(e => e.RequirementNotes).HasMaxLength(4000);
-            entity.Property(e => e.PreferredLocation).HasMaxLength(500);
-        });
-
         modelBuilder.Entity<RegistrationForm>(entity =>
         {
             entity.ToTable("RegistrationForms", table =>

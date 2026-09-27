@@ -30,7 +30,6 @@ public class AppDbContext : DbContext
     public DbSet<VendorGalleryImage> VendorGalleryImages => Set<VendorGalleryImage>();
     public DbSet<VendorAvailability> VendorAvailabilities => Set<VendorAvailability>();
     public DbSet<Quotation> Quotations => Set<Quotation>();
-    public DbSet<Event> Events => Set<Event>();
     public DbSet<EventPlanDraft> EventPlanDrafts => Set<EventPlanDraft>();
 
     // Dev Scheduling DbSets
@@ -42,7 +41,6 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
         
-        // Note: Event entity configuration will conflict here until C4 adaptation is complete.
         GuestManagementConfiguration.Configure(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
     }
