@@ -424,9 +424,40 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           width: double.infinity,
                           child: ElevatedButton.icon(
                             onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
+                              PageRouteBuilder(
+                                transitionDuration:
+                                    const Duration(milliseconds: 280),
+                                reverseTransitionDuration:
+                                    const Duration(milliseconds: 250),
+                                pageBuilder: (_, animation, __) =>
                                     EventSchedulePage(eventId: event.id),
+                                transitionsBuilder: (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  child,
+                                ) {
+                                  final curvedAnimation = CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutCubic,
+                                    reverseCurve: Curves.easeInCubic,
+                                  );
+
+                                  return FadeTransition(
+                                    opacity: curvedAnimation,
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(0.08, 0.0),
+                                        end: Offset.zero,
+                                      ).chain(
+                                        CurveTween(
+                                          curve: Curves.easeOutCubic,
+                                        ),
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                             icon: const Icon(Icons.calendar_today_outlined),

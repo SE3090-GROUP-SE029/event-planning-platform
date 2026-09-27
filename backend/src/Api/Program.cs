@@ -75,18 +75,23 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured."),
         npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
-builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
-var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
-var jwtKey = builder.Configuration["Jwt:Key"]
-    ?? builder.Configuration["Jwt:Secret"]
-    ?? builder.Configuration["JwtSettings:Secret"]
-    ?? "FallbackSuperSecretKeyForDevelopmentTesting1234567890!@#$";
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? builder.Configuration["JwtSettings:Issuer"];
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? builder.Configuration["JwtSettings:Audience"];
-// JWT configuration (required by dev authentication)
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
     ?? throw new InvalidOperationException("The Jwt configuration section is missing.");
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? builder.Configuration["Jwt:Secret"]
+    ?? builder.Configuration["JwtSettings:Secret"]
+    ?? jwtSettings.Secret
+    ?? throw new InvalidOperationException("The Jwt secret is missing.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+    ?? builder.Configuration["JwtSettings:Issuer"]
+    ?? jwtSettings.Issuer
+    ?? "EventPlanningPlatform";
+var jwtAudience = builder.Configuration["Jwt:Audience"]
+    ?? builder.Configuration["JwtSettings:Audience"]
+    ?? jwtSettings.Audience
+    ?? "EventPlanningPlatform";
+
 builder.Services.Configure<AdminSeedOptions>(builder.Configuration.GetSection("AdminSeed"));
 builder.Services.Configure<AgenticAiOptions>(builder.Configuration.GetSection("AgenticAI"));
 var agenticAiOptions = builder.Configuration.GetSection("AgenticAI").Get<AgenticAiOptions>()
