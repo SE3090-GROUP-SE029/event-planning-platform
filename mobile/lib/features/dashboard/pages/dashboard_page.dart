@@ -10,6 +10,7 @@ import '../../../shared/widgets/pastel_list_item.dart';
 import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../onboarding/providers/onboarding_provider.dart';
 import '../../vendors/widgets/vendor_dashboard_overview.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -68,8 +69,15 @@ class DashboardPage extends ConsumerWidget {
                   onTap: () async {
                     await ref.read(authNotifierProvider.notifier).logout();
                     if (context.mounted) {
+                      final onboardingState =
+                          ref.read(onboardingCompletionProvider);
                       Navigator.of(context)
-                          .pushNamedAndRemoveUntil('/login', (_) => false);
+                          .pushNamedAndRemoveUntil(
+                        onboardingState.value == false
+                            ? '/onboarding'
+                            : '/login',
+                        (_) => false,
+                      );
                     }
                   },
                   borderRadius: BorderRadius.circular(AppDimens.radiusMedium),

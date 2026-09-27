@@ -7,6 +7,7 @@ import '../api/auth_repository.dart';
 import '../models/auth_response_model.dart';
 import '../models/login_request_model.dart';
 import '../models/register_request_model.dart';
+import '../../onboarding/providers/onboarding_provider.dart';
 
 final sessionStoreProvider = Provider<SessionStore>((ref) {
   return SecureSessionStore();
@@ -78,11 +79,26 @@ class AuthNotifier extends AsyncNotifier<AuthResponseModel?> {
   Future<void> logout() async {
     final session = state.value;
     state = const AsyncLoading();
+    Object? logoutError;
+    StackTrace? logoutStackTrace;
     try {
       await _repository.logout(session?.refreshToken ?? '');
-      state = const AsyncData(null);
+    } catch (error, stackTrace) {
+      logoutError = error;
+      logoutStackTrace = stackTrace;
+    }
+
+    try {
+      await ref.read(onboardingCompletionProvider.notifier).reset();
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
+      return;
+    }
+
+    if (logoutError != null) {
+      state = AsyncError(logoutError, logoutStackTrace!);
+    } else {
+      state = const AsyncData(null);
     }
   }
 

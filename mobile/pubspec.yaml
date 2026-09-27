@@ -28,3 +28,4 @@ flutter:
   assets:
     - .env.local
     - .env.example
+    - assets/illustrations/

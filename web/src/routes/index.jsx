@@ -6,11 +6,12 @@ import AdminEventManagementPage from '../features/adminEvents/pages/AdminEventMa
 import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetailsPage';
 import AdminPlanDashboardPage from '../features/adminPlans/pages/AdminPlanDashboardPage';
 import AdminPlanDetailsPage from '../features/adminPlans/pages/AdminPlanDetailsPage';
+import LandingPage from '../features/landing/pages/LandingPage';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/dashboard" replace />,
+    element: <LandingPage />,
   },
   {
     path: '/login',
