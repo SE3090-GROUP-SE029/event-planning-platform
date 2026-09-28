@@ -8,9 +8,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { useAuthStore } from '../../../shared/store/authStore';
-import CollapsibleSidebar from '../../../shared/components/layout/CollapsibleSidebar';
-import TopSearchNavbar from '../../../shared/components/layout/TopSearchNavbar';
+import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 import StatusBadge from '../../../shared/components/ui/StatusBadge';
 import {
@@ -19,82 +17,26 @@ import {
   formatQuotationStatus,
   useMyQuotations,
 } from '../api/quotationApi';
-import { useAcceptQuotation } from '../../bookings/api/bookingApi';
 
 export default function MyQuotationsPage() {
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
-  const isEventPlanner = useAuthStore((state) => state.hasRole('EVENT_PLANNER'));
-  const isAdmin = useAuthStore((state) => state.hasRole('ADMIN'));
-  const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
-  const { data: quotations = [], isLoading, isError, error } = useMyQuotations();
-  const acceptMutation = useAcceptQuotation();
   const [actionError, setActionError] = useState('');
-  const [acceptingId, setAcceptingId] = useState(null);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const handleAccept = async (quotationId) => {
-    setActionError('');
-    setAcceptingId(quotationId);
-    try {
-      const booking = await acceptMutation.mutateAsync(quotationId);
-      navigate(`/bookings/${booking.id}`);
-    } catch (err) {
-      setActionError(err?.response?.data?.message || err?.message || 'Failed to accept quotation.');
-    } finally {
-      setAcceptingId(null);
-    }
+  const { data: quotations = [], isLoading, isError, error } = useMyQuotations();
+  const acceptMutation = { isPending: false };
+  const handleAccept = (quotationId) => {
+    setActionError(`Unable to accept quotation ${quotationId}.`);
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 } }}>
-      <Box sx={{ display: 'flex', gap: { xs: 2, md: 3 }, minHeight: 'calc(100vh - 32px)' }}>
-        <CollapsibleSidebar
-          activeTab="my-quotations"
-          showEvents={isAdmin}
-          showMarketplace={isEventPlanner || isAdmin}
-          showMyQuotations={isEventPlanner}
-          showMyBookings={isEventPlanner}
-          showVendorProfile={isVendor}
-          showVendorServices={isVendor}
-          showVendorAvailability={isVendor}
-          showVendorQuotations={isVendor}
-          showVendorBookings={isVendor}
-          onSelectTab={(tab) => {
-            if (tab === 'dashboard') navigate('/dashboard');
-            if (tab === 'events') navigate('/admin/events');
-            if (tab === 'marketplace') navigate('/marketplace');
-            if (tab === 'my-quotations') navigate('/quotations/mine');
-            if (tab === 'my-bookings') navigate('/bookings/mine');
-            if (tab === 'vendor-profile') navigate('/vendor/profile');
-            if (tab === 'vendor-services') navigate('/vendor/services');
-            if (tab === 'vendor-availability') navigate('/vendor/availability');
-            if (tab === 'vendor-quotations') navigate('/vendor/quotations');
-            if (tab === 'vendor-bookings') navigate('/vendor/bookings');
-          }}
-          onLogout={handleLogout}
-        />
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <TopSearchNavbar
-            user={user}
-            title="My quotations"
-            subtitle="Accept responded quotes to create confirmed bookings"
-          />
-
-          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-            <Button variant="text" onClick={() => navigate('/marketplace')}>
-              Browse marketplace
-            </Button>
-            <Button variant="text" onClick={() => navigate('/bookings/mine')}>
-              My bookings
-            </Button>
-          </Stack>
+    <AppLayout
+      activeTab="my-quotations"
+      title="My quotations"
+      subtitle="View-only status of your vendor quotation requests"
+    >
+      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 1 }}>
+        <Button variant="text" sx={{ mb: 2 }} onClick={() => navigate('/marketplace')}>
+          Browse marketplace
+        </Button>
 
           {isLoading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
@@ -151,10 +93,10 @@ export default function MyQuotationsPage() {
                   <Button
                     variant="contained"
                     sx={{ mt: 2, borderRadius: 9999 }}
-                    disabled={acceptMutation.isPending && acceptingId === q.id}
+                    disabled={acceptMutation.isPending}
                     onClick={() => handleAccept(q.id)}
                   >
-                    {acceptMutation.isPending && acceptingId === q.id
+                    {acceptMutation.isPending
                       ? 'Accepting…'
                       : 'Accept quotation'}
                   </Button>
@@ -163,7 +105,6 @@ export default function MyQuotationsPage() {
             ))}
           </Stack>
         </Box>
-      </Box>
-    </Box>
+    </AppLayout>
   );
 }

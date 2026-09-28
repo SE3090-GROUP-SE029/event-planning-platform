@@ -16,9 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import { useAuthStore } from '../../../shared/store/authStore';
-import CollapsibleSidebar from '../../../shared/components/layout/CollapsibleSidebar';
-import TopSearchNavbar from '../../../shared/components/layout/TopSearchNavbar';
+import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 import {
   resolveVendorImageUrl,
@@ -44,11 +42,6 @@ function formatStartingPrice(price, pricingType) {
 
 export default function VendorMarketplacePage() {
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
-  const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
-  const isAdmin = useAuthStore((state) => state.hasRole('ADMIN'));
-  const isEventPlanner = useAuthStore((state) => state.hasRole('EVENT_PLANNER'));
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -67,45 +60,15 @@ export default function VendorMarketplacePage() {
   const items = data?.items ?? [];
   const totalPages = data?.totalPages || 0;
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 } }}>
-      <Box sx={{ display: 'flex', gap: { xs: 2, md: 3 }, minHeight: 'calc(100vh - 32px)' }}>
-        <CollapsibleSidebar
-          activeTab="marketplace"
-          showEvents={isAdmin}
-          showMarketplace
-          showMyQuotations={isEventPlanner}
-          showMyBookings={isEventPlanner}
-          showVendorProfile={isVendor}
-          showVendorServices={isVendor}
-          showVendorAvailability={isVendor}
-          showVendorQuotations={isVendor}
-          showVendorBookings={isVendor}
-          onSelectTab={(tab) => {
-            if (tab === 'dashboard') navigate('/dashboard');
-            if (tab === 'events') navigate('/admin/events');
-            if (tab === 'marketplace') navigate('/marketplace');
-            if (tab === 'my-quotations') navigate('/quotations/mine');
-            if (tab === 'my-bookings') navigate('/bookings/mine');
-            if (tab === 'vendor-profile') navigate('/vendor/profile');
-            if (tab === 'vendor-services') navigate('/vendor/services');
-            if (tab === 'vendor-availability') navigate('/vendor/availability');
-            if (tab === 'vendor-quotations') navigate('/vendor/quotations');
-            if (tab === 'vendor-bookings') navigate('/vendor/bookings');
-          }}
-          onLogout={handleLogout}
-        />
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <TopSearchNavbar user={user} title="Vendor Marketplace" subtitle="Discover approved vendors for your events" />
-
-          <SurfaceCard sx={{ p: 2.5, mb: 3 }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+    <AppLayout
+      activeTab="marketplace"
+      title="Vendor Marketplace"
+      subtitle="Discover approved vendors for your events"
+    >
+      <Box sx={{ maxWidth: 1400, mx: 'auto', mt: 1 }}>
+        <SurfaceCard sx={{ p: 2.5, mb: 3 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
               <TextField
                 fullWidth
                 size="small"
@@ -252,7 +215,6 @@ export default function VendorMarketplacePage() {
             </Box>
           )}
         </Box>
-      </Box>
-    </Box>
+    </AppLayout>
   );
 }

@@ -9,6 +9,7 @@ import 'package:mobile/features/auth/models/register_request_model.dart';
 import 'package:mobile/features/auth/models/refresh_request_model.dart';
 import 'package:mobile/features/auth/providers/auth_providers.dart';
 import 'package:mobile/core/api/session_store.dart';
+import 'package:mobile/features/onboarding/providers/onboarding_provider.dart';
 
 void main() {
   test('login exposes AsyncData with the authenticated session', () async {
@@ -43,10 +44,15 @@ void main() {
 
   test('logout clears the current user', () async {
     final repository = FakeAuthRepository();
+    final onboardingStore = MemoryOnboardingStore()..complete = true;
     final container = ProviderContainer(
-      overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        authRepositoryProvider.overrideWithValue(repository),
+        onboardingStoreProvider.overrideWithValue(onboardingStore),
+      ],
     );
     addTearDown(container.dispose);
+    await container.read(onboardingCompletionProvider.future);
     final notifier = container.read(authNotifierProvider.notifier);
 
     await notifier.login('user@test.com', 'password');
@@ -54,6 +60,7 @@ void main() {
 
     expect(container.read(currentUserProvider), isNull);
     expect(repository.loggedOutToken, 'refresh-token');
+    expect(onboardingStore.complete, isFalse);
   });
 
   test('refreshToken replaces the current session', () async {
@@ -147,5 +154,17 @@ class MemorySessionStore implements SessionStore {
   @override
   Future<void> clearSession() async {
     session = null;
+  }
+}
+
+class MemoryOnboardingStore implements OnboardingStore {
+  bool complete = false;
+
+  @override
+  Future<bool> isComplete() async => complete;
+
+  @override
+  Future<void> setComplete(bool value) async {
+    complete = value;
   }
 }

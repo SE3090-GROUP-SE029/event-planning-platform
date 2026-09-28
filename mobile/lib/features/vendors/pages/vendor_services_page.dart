@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/pastel_bottom_nav_bar.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
@@ -235,6 +237,11 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
       appBar: AppBar(
         title: const Text('Vendor services'),
       ),
+      bottomNavigationBar: PastelBottomNavBar.roleBased(
+        context: context,
+        session: _auth,
+        currentIndex: 1,
+      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
@@ -336,22 +343,39 @@ class _VendorServicesPageState extends State<VendorServicesPage> {
                           SizedBox(
                             width: double.infinity,
                             height: 48,
-                            child: ElevatedButton(
+                            child: ElevatedButton.icon(
+                              style: _editingId == null
+                                  ? AppButtonStyles.create()
+                                  : AppButtonStyles.success(),
                               onPressed: _saving ? null : _save,
-                              child: Text(_editingId == null
-                                  ? 'Add service'
-                                  : 'Save changes'),
+                              icon: Icon(
+                                _editingId == null
+                                    ? Icons.add_rounded
+                                    : Icons.check_rounded,
+                                size: 18,
+                              ),
+                              label: Text(_editingId == null
+                                  ? 'Add Service'
+                                  : 'Save Changes'),
                             ),
                           ),
                           if (_editingId != null) ...[
                             const SizedBox(height: AppDimens.space8),
-                            TextButton(
-                              onPressed: _clearForm,
-                              child: const Text('Cancel edit'),
-                            ),
-                            TextButton(
-                              onPressed: _clearPriceFields,
-                              child: const Text('Clear price'),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: _clearForm,
+                                  icon: const Icon(Icons.close_rounded, size: 16),
+                                  label: const Text('Cancel edit'),
+                                ),
+                                const SizedBox(width: 8),
+                                TextButton.icon(
+                                  onPressed: _clearPriceFields,
+                                  icon: const Icon(Icons.cleaning_services_rounded, size: 16),
+                                  label: const Text('Clear price'),
+                                ),
+                              ],
                             ),
                           ],
                         ],

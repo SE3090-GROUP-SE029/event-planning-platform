@@ -4,28 +4,35 @@ using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Repositories;
 
 public class VendorMarketplaceRepository : IVendorMarketplaceRepository
 {
     private readonly AppDbContext _db;
+    private readonly ILogger<VendorMarketplaceRepository> _logger;
 
-    public VendorMarketplaceRepository(AppDbContext db) => _db = db;
+    public VendorMarketplaceRepository(AppDbContext db, ILogger<VendorMarketplaceRepository> logger)
+    {
+        _db = db;
+        _logger = logger;
+    }
 
     public async Task<(IReadOnlyList<MarketplaceVendorListItemResponse> Items, int TotalCount)> SearchApprovedAsync(
         VendorMarketplaceQuery query,
         BusinessCategory? categoryFilter)
     {
-        var vendors = _db.Vendors
-            .AsNoTracking()
-            .Where(v => v.Status == VendorStatus.APPROVED);
+        var allVendors = _db.Vendors.AsNoTracking();
+        var approvedVendors = allVendors.Where(v => v.Status == VendorStatus.APPROVED);
+        var vendors = approvedVendors;
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var search = query.Search.Trim().ToLowerInvariant();
             vendors = vendors.Where(v => v.BusinessName.ToLower().Contains(search));
         }
+        var afterSearch = vendors;
 
         if (categoryFilter.HasValue)
         {
@@ -67,6 +74,33 @@ public class VendorMarketplaceRepository : IVendorMarketplaceRepository
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync();
+
+        if (totalCount == 0)
+        {
+            var databaseCount = await allVendors.CountAsync();
+            var approvedCount = await approvedVendors.CountAsync();
+            var afterSearchCount = await afterSearch.CountAsync();
+            _logger.LogInformation(
+                "Vendor marketplace returned no matches. DatabaseVendors={DatabaseVendors}, " +
+                "ApprovedVendors={ApprovedVendors}, AfterSearch={AfterSearch}, " +
+                "AfterCategory={AfterCategory}, Page={Page}, PageSize={PageSize}. " +
+                "Marketplace list does not filter vendors by service availability.",
+                databaseCount,
+                approvedCount,
+                afterSearchCount,
+                totalCount,
+                query.Page,
+                query.PageSize);
+        }
+        else if (pageItems.Count == 0)
+        {
+            _logger.LogInformation(
+                "Vendor marketplace page is empty although matches exist. " +
+                "FilteredVendors={FilteredVendors}, Page={Page}, PageSize={PageSize}.",
+                totalCount,
+                query.Page,
+                query.PageSize);
+        }
 
         var items = pageItems.Select(x => new MarketplaceVendorListItemResponse
         {

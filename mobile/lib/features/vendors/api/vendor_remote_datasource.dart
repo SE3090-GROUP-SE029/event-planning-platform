@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/api/dio_client.dart';
 import '../models/marketplace_vendor_model.dart';
@@ -314,22 +315,55 @@ class VendorRemoteDataSource {
     int pageSize = 10,
   }) async {
     try {
+      final queryParameters = <String, dynamic>{
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (category != null && category.isNotEmpty) 'category': category,
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+        'page': page,
+        'pageSize': pageSize,
+      };
+      if (kDebugMode) {
+        final requestUri = Uri.parse(dio.options.baseUrl)
+            .resolve('/api/vendors/marketplace')
+            .replace(
+              queryParameters: queryParameters.map(
+                (key, value) => MapEntry(key, value.toString()),
+              ),
+            );
+        debugPrint('[VendorMarketplace] GET $requestUri');
+        debugPrint(
+          '[VendorMarketplace] headers: '
+          'Content-Type=<configured>, Authorization=Bearer <redacted>',
+        );
+      }
       final response = await dio.get(
         '/api/vendors/marketplace',
-        queryParameters: {
-          if (search != null && search.isNotEmpty) 'search': search,
-          if (category != null && category.isNotEmpty) 'category': category,
-          'sortBy': sortBy,
-          'sortOrder': sortOrder,
-          'page': page,
-          'pageSize': pageSize,
-        },
+        queryParameters: queryParameters,
         options: _auth(accessToken),
       );
+      if (kDebugMode) {
+        final data = response.data;
+        final items = data is Map<String, dynamic> ? data['items'] : null;
+        final totalCount =
+            data is Map<String, dynamic> ? data['totalCount'] : null;
+        debugPrint(
+          '[VendorMarketplace] response: status=${response.statusCode}, '
+          'itemCount=${items is List ? items.length : 'missing'}, '
+          'totalCount=${totalCount ?? 'missing'}',
+        );
+      }
       return MarketplaceVendorListResult.fromJson(
         response.data as Map<String, dynamic>,
       );
     } on DioException catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          '[VendorMarketplace] request failed: '
+          'status=${e.response?.statusCode ?? 'none'}, '
+          'message=${e.message ?? 'unknown'}',
+        );
+      }
       throw _handleError(e);
     }
   }

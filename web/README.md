@@ -1,17 +1,26 @@
-# React + Vite
+# Web app
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The web client uses React, Vite, React Router, Material UI, and the shared Plan It theme.
 
-Currently, two official plugins are available:
+## Mobile app download link
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The public landing page loads its mobile download link at runtime from [`public/app-config.json`](./public/app-config.json). Set `mobileAppDownloadUrl` to the HTTPS download or app-store URL. The file is fetched without browser caching, so the deployed static file can be updated without rebuilding the client.
 
-## React Compiler
+If the setting is empty, download buttons remain disabled and the page explains that the link is not available yet. If loading fails, the page shows an error and a retry control.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Local development
 
-## Expanding the ESLint configuration
+```sh
+npm install
+npm run dev
+npm test
+npm run build
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-123
+Landing-page illustrations are bundled under `public/assets/illustrations/` and sourced from Storyset's Amico set:
+
+- [Team work](https://storyset.com/illustration/team-work/amico)
+- [Business plan](https://storyset.com/illustration/business-plan/amico)
+- [Mobile marketing](https://storyset.com/illustration/mobile-marketing/amico)
+
+The landing page includes Storyset attribution. Update the source map in `src/features/landing/components/storysetIllustrations.js` when replacing artwork.

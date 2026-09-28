@@ -84,7 +84,12 @@ class MarketplaceVendorListResult {
   });
 
   factory MarketplaceVendorListResult.fromJson(Map<String, dynamic> json) {
-    final rawItems = json['items'] as List<dynamic>? ?? [];
+    final rawItems = json['items'];
+    if (rawItems is! List<dynamic>) {
+      throw const FormatException(
+        'Marketplace response must include an items array.',
+      );
+    }
     return MarketplaceVendorListResult(
       items: rawItems
           .map((item) =>

@@ -1,121 +1,70 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import LoginPage from '../features/auth/pages/LoginPage';
-import DashboardPage from '../features/dashboard/pages/DashboardPage';
-import ProtectedRoute from '../shared/components/ProtectedRoute';
-import AdminEventManagementPage from '../features/adminEvents/pages/AdminEventManagementPage';
-import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetailsPage';
-import AdminPlanDashboardPage from '../features/adminPlans/pages/AdminPlanDashboardPage';
-import AdminPlanDetailsPage from '../features/adminPlans/pages/AdminPlanDetailsPage';
-import AdminVendorDirectoryPage from '../features/adminVendors/pages/AdminVendorDirectoryPage';
-import AdminVendorDetailsPage from '../features/adminVendors/pages/AdminVendorDetailsPage';
-import VendorProfilePage from '../features/vendors/pages/VendorProfilePage';
-import VendorServicesPage from '../features/vendors/pages/VendorServicesPage';
-import VendorAvailabilityPage from '../features/vendors/pages/VendorAvailabilityPage';
-import VendorMarketplacePage from '../features/vendors/pages/VendorMarketplacePage';
-import VendorMarketplaceDetailPage from '../features/vendors/pages/VendorMarketplaceDetailPage';
-import RequestQuotationPage from '../features/quotations/pages/RequestQuotationPage';
-import MyQuotationsPage from '../features/quotations/pages/MyQuotationsPage';
-import VendorQuotationsPage from '../features/quotations/pages/VendorQuotationsPage';
-import VendorQuotationDetailPage from '../features/quotations/pages/VendorQuotationDetailPage';
-import MyBookingsPage from '../features/bookings/pages/MyBookingsPage';
-import VendorBookingsPage from '../features/bookings/pages/VendorBookingsPage';
-import BookingDetailPage from '../features/bookings/pages/BookingDetailPage';
+import {
+  AdminAnalyticsRoute,
+  AdminDashboardRoute,
+  AdminEventDetailsRoute,
+  AdminEventsRoute,
+  AdminPlanDetailsRoute,
+  AdminPlansRoute,
+  AdminSystemRoute,
+  AdminUsersRoute,
+  AdminVendorsRoute,
+  LandingRoute,
+  LoginRoute,
+} from './routeElements';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/dashboard" replace />,
+    element: <LandingRoute />,
   },
   {
     path: '/login',
-    element: <LoginPage />,
+    element: <LoginRoute />,
   },
   {
     path: '/register',
-    element: <Navigate to="/login" replace />,
+    element: <Navigate to="/" replace />,
   },
   {
-    path: '/dashboard',
-    element: (
-      <ProtectedRoute>
-        <DashboardPage />
-      </ProtectedRoute>
-    ),
+    path: '/admin/dashboard',
+    element: <AdminDashboardRoute />,
+  },
+  {
+    path: '/admin/analytics',
+    element: <AdminAnalyticsRoute />,
+  },
+  {
+    path: '/admin/users',
+    element: <AdminUsersRoute />,
   },
   {
     path: '/admin/events',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminEventManagementPage /></ProtectedRoute>,
+    element: <AdminEventsRoute />,
   },
   {
     path: '/admin/events/:id',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminEventDetailsPage /></ProtectedRoute>,
-  },
-  {
-    path: '/admin/plans',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDashboardPage /></ProtectedRoute>,
-  },
-  {
-    path: '/admin/plans/:id',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDetailsPage /></ProtectedRoute>,
+    element: <AdminEventDetailsRoute />,
   },
   {
     path: '/admin/vendors',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminVendorDirectoryPage /></ProtectedRoute>,
+    element: <AdminVendorsRoute />,
   },
   {
-    path: '/admin/vendors/:id',
-    element: <ProtectedRoute requiredRole="ADMIN"><AdminVendorDetailsPage /></ProtectedRoute>,
+    path: '/admin/plans',
+    element: <AdminPlansRoute />,
   },
   {
-    path: '/marketplace',
-    element: <ProtectedRoute><VendorMarketplacePage /></ProtectedRoute>,
+    path: '/admin/plans/:id',
+    element: <AdminPlanDetailsRoute />,
   },
   {
-    path: '/marketplace/:vendorId',
-    element: <ProtectedRoute><VendorMarketplaceDetailPage /></ProtectedRoute>,
+    path: '/admin/system',
+    element: <AdminSystemRoute />,
   },
   {
-    path: '/marketplace/:vendorId/request-quotation',
-    element: <ProtectedRoute requiredRole="EVENT_PLANNER"><RequestQuotationPage /></ProtectedRoute>,
+    path: '*',
+    element: <Navigate to="/" replace />,
   },
-  {
-    path: '/quotations/mine',
-    element: <ProtectedRoute requiredRole="EVENT_PLANNER"><MyQuotationsPage /></ProtectedRoute>,
-  },
-  {
-    path: '/bookings/mine',
-    element: <ProtectedRoute requiredRole="EVENT_PLANNER"><MyBookingsPage /></ProtectedRoute>,
-  },
-  {
-    path: '/bookings/:id',
-    element: <ProtectedRoute><BookingDetailPage /></ProtectedRoute>,
-  },
-  {
-    path: '/vendor/profile',
-    element: <ProtectedRoute requiredRole="VENDOR"><VendorProfilePage /></ProtectedRoute>,
-  },
-  {
-    path: '/vendor/services',
-    element: <ProtectedRoute requiredRole="VENDOR"><VendorServicesPage /></ProtectedRoute>,
-  },
-  {
-    path: '/vendor/availability',
-    element: <ProtectedRoute requiredRole="VENDOR"><VendorAvailabilityPage /></ProtectedRoute>,
-  },
-  {
-    path: '/vendor/quotations',
-    element: <ProtectedRoute requiredRole="VENDOR"><VendorQuotationsPage /></ProtectedRoute>,
-  },
-  {
-    path: '/vendor/quotations/:id',
-    element: <ProtectedRoute requiredRole="VENDOR"><VendorQuotationDetailPage /></ProtectedRoute>,
-  },
-  {
-    path: '/vendor/bookings',
-    element: <ProtectedRoute requiredRole="VENDOR"><VendorBookingsPage /></ProtectedRoute>,
-  },
-  {
-    path: '/vendor/bookings/:id',
-    element: <ProtectedRoute requiredRole="VENDOR"><BookingDetailPage vendorMode /></ProtectedRoute>,
-  },
+  
 ]);

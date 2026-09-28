@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
@@ -179,7 +180,8 @@ class _VendorMarketplaceDetailPageState
                                 const SizedBox(height: AppDimens.space14),
                                 SizedBox(
                                   width: double.infinity,
-                                  child: ElevatedButton(
+                                  child: ElevatedButton.icon(
+                                    style: AppButtonStyles.primary(),
                                     onPressed: vendor.services.isEmpty
                                         ? null
                                         : () => Navigator.of(context).pushNamed(
@@ -189,7 +191,10 @@ class _VendorMarketplaceDetailPageState
                                                 'vendorId': vendor.id,
                                               },
                                             ),
-                                    child: const Text('Request quotation'),
+                                    icon: const Icon(
+                                        Icons.request_quote_rounded,
+                                        size: 18),
+                                    label: const Text('Request Quotation'),
                                   ),
                                 ),
                               ],

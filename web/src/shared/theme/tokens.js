@@ -4,12 +4,9 @@ export const tokens = {
     surface: '#FFFFFF',
     surfaceMuted: '#EFECE3',
     cardCream: '#FAF7EF',
-
-    // Obsidian
     obsidian: '#19191C',
     obsidianHover: '#28282D',
     obsidianSubtle: '#383840',
-
     // Signature Pastels
     pastelPink: '#F9BFD8',
     pastelPinkLight: '#FDEEF5',
@@ -36,6 +33,11 @@ export const tokens = {
     pastelLavenderText: '#391652',
     pastelLavenderBorder: '#CAADEA',
 
+    pastelPeach: '#FCD8C1',
+    pastelPeachLight: '#FFF1E6',
+    pastelPeachText: '#4D260D',
+    pastelPeachBorder: '#F5BE9E',
+
     // Text
     textPrimary: '#1E1E22',
     textSecondary: '#636369',
@@ -54,5 +56,11 @@ export const tokens = {
     soft: '0px 4px 20px rgba(40, 30, 20, 0.04)',
     card: '0px 8px 30px rgba(28, 25, 20, 0.06)',
     active: '0px 12px 36px rgba(25, 25, 28, 0.12)',
+  },
+  spacing: {
+    page: { xs: 2, md: 3 },
+    section: { xs: 5, md: 8 },
+    card: { xs: 2, md: 3 },
+    form: 2,
   },
 };

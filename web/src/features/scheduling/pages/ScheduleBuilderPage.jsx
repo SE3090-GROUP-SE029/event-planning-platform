@@ -1,14 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
 import { scheduleApi } from '../api/scheduleApi';
 import { ConflictAlertBanner } from '../components/ConflictAlertBanner';
 import { AddActivityModal } from '../components/AddActivityModal';
+import AppLayout from '../../../shared/components/layout/AppLayout';
+import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 
 const ACTIVITY_STATUS_OPTIONS = [
-  { value: 0, label: 'Scheduled', badgeColor: '#E0F2FE', textColor: '#0369A1' },
-  { value: 1, label: 'In Progress', badgeColor: '#FEF3C7', textColor: '#B45309' },
-  { value: 2, label: 'Completed', badgeColor: '#DCFCE7', textColor: '#15803D' },
-  { value: 3, label: 'Skipped', badgeColor: '#FEE2E2', textColor: '#B91C1C' }
+  { value: 0, label: 'Scheduled', badgeColor: '#EEF5FC', textColor: '#153251' },
+  { value: 1, label: 'In Progress', badgeColor: '#FEF8E4', textColor: '#3E340B' },
+  { value: 2, label: 'Completed', badgeColor: '#F0F6EC', textColor: '#20361A' },
+  { value: 3, label: 'Skipped', badgeColor: '#FDEEF5', textColor: '#481931' },
 ];
 
 const normalizeStatus = (status) => {
@@ -25,7 +42,7 @@ const normalizeStatus = (status) => {
     inprogress: 1,
     inprogresss: 1,
     completed: 2,
-    skipped: 3
+    skipped: 3,
   };
 
   return mapping[normalized] ?? 0;
@@ -33,17 +50,21 @@ const normalizeStatus = (status) => {
 
 export const ScheduleBuilderPage = () => {
   const { eventId } = useParams();
+  const navigate = useNavigate();
+  const [inputEventId, setInputEventId] = useState(eventId || '');
   const [schedule, setSchedule] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(eventId));
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const loadSchedule = async () => {
+  const loadSchedule = async (idToLoad) => {
+    const id = idToLoad || eventId;
+    if (!id) return;
     try {
       setLoading(true);
-      const data = await scheduleApi.getScheduleByEventId(eventId);
+      const data = await scheduleApi.getScheduleByEventId(id);
       setSchedule(data);
       setError(null);
     } catch (err) {
@@ -54,52 +75,54 @@ export const ScheduleBuilderPage = () => {
   };
 
   useEffect(() => {
-    if (!eventId) return;
-
+    if (!eventId) return undefined;
     let cancelled = false;
 
-    const fetchSchedule = async () => {
-      try {
-        setLoading(true);
-        const data = await scheduleApi.getScheduleByEventId(eventId);
+    scheduleApi.getScheduleByEventId(eventId)
+      .then((data) => {
         if (!cancelled) {
           setSchedule(data);
           setError(null);
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!cancelled) {
           setError(err?.response?.data?.message || 'Failed to load event schedule.');
         }
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) {
           setLoading(false);
         }
-      }
-    };
-
-    fetchSchedule();
+      });
 
     return () => {
       cancelled = true;
     };
   }, [eventId]);
 
+  const handleOpenEventId = (e) => {
+    e.preventDefault();
+    if (inputEventId.trim()) {
+      navigate(`/events/${inputEventId.trim()}/schedule`);
+    }
+  };
+
   const handleAddActivity = async (payload) => {
     if (!schedule?.id) return;
     await scheduleApi.addActivity(schedule.id, payload);
-    await loadSchedule();
+    await loadSchedule(eventId);
   };
 
   const handleStatusChange = async (activityId, nextStatus) => {
     if (!schedule) return;
 
-    const previousSchedule = schedule;
-    setSchedule({
-      ...previousSchedule,
-      activities: (previousSchedule.activities || []).map((activity) =>
-        activity.id === activityId ? { ...activity, status: nextStatus } : activity
-      )
-    });
+    const previousSchedule = { ...schedule };
+    const updatedActivities = schedule.activities.map((item) =>
+      item.id === activityId ? { ...item, status: nextStatus } : item
+    );
+
+    setSchedule({ ...schedule, activities: updatedActivities });
 
     try {
       await scheduleApi.updateActivityStatus(activityId, nextStatus);
@@ -113,7 +136,8 @@ export const ScheduleBuilderPage = () => {
     return (schedule?.activities || [])
       .filter((activity) => {
         const statusValue = normalizeStatus(activity.status);
-        const matchesQuery = !filterQuery ||
+        const matchesQuery =
+          !filterQuery ||
           (activity.title && activity.title.toLowerCase().includes(filterQuery.toLowerCase())) ||
           (activity.description && activity.description.toLowerCase().includes(filterQuery.toLowerCase()));
         const matchesStatus = statusFilter === 'all' || String(statusValue) === String(statusFilter);
@@ -123,174 +147,202 @@ export const ScheduleBuilderPage = () => {
       .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
   }, [schedule, filterQuery, statusFilter]);
 
-  if (loading) return <div style={{ padding: '24px' }}>Loading schedule...</div>;
-  if (error) return <div style={{ padding: '24px', color: '#EF4444' }}>Error: {error}</div>;
-
   return (
-    <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', gap: '16px' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '24px', color: '#0F172A' }}>Event Schedule Builder</h1>
-          <p style={{ margin: '4px 0 0 0', color: '#64748B', fontSize: '14px' }}>
-            Event ID: {eventId}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => scheduleApi.downloadIcsFile(schedule?.event?.name || 'Event', schedule?.activities || [])}
-            style={{
-              backgroundColor: '#0F766E',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '10px 16px',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-          >
-            Export Calendar (.ics)
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            style={{
-              backgroundColor: '#0284C7',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '10px 16px',
-              fontWeight: 500,
-              cursor: 'pointer'
-            }}
-          >
-            + Add Activity
-          </button>
-        </div>
-      </div>
+    <AppLayout
+      activeTab="schedule"
+      title="Event Schedule Builder"
+      subtitle={eventId ? `Schedule for Event #${eventId}` : 'Manage event timeline & activities'}
+    >
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.04em', mb: 0.5 }}>
+          Event Schedule
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Track timeline milestones, detect conflicting activity times, and export calendar feeds.
+        </Typography>
+      </Box>
 
-      <ConflictAlertBanner conflicts={schedule?.conflicts || []} />
+      {/* Selector if no eventId in route */}
+      {!eventId && (
+        <SurfaceCard sx={{ p: 3, mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <CalendarMonthIcon sx={{ color: '#19191C' }} />
+            <Typography variant="h5" sx={{ fontWeight: 800 }}>
+              Load Event Schedule
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enter an existing Event ID to inspect its activity timeline.
+          </Typography>
+          <Box component="form" onSubmit={handleOpenEventId} sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+            <TextField
+              size="small"
+              placeholder="Enter Event GUID"
+              value={inputEventId}
+              onChange={(e) => setInputEventId(e.target.value)}
+              sx={{ flex: 1, minWidth: 260 }}
+            />
+            <Button
+              variant="contained"
+              type="submit"
+              sx={{ borderRadius: 9999, px: 3, bgcolor: '#19191C', color: '#FFFFFF' }}
+            >
+              Open Schedule
+            </Button>
+          </Box>
+        </SurfaceCard>
+      )}
 
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <input
-          type="text"
-          placeholder="Search activities..."
-          value={filterQuery}
-          onChange={(event) => setFilterQuery(event.target.value)}
-          style={{
-            width: '100%',
-            maxWidth: '320px',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            border: '1px solid #CBD5E1'
-          }}
-        />
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      )}
 
-        <select
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
-          style={{
-            padding: '8px 12px',
-            borderRadius: '6px',
-            border: '1px solid #CBD5E1',
-            backgroundColor: '#fff'
-          }}
-        >
-          <option value="all">All statuses</option>
-          {ACTIVITY_STATUS_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>
+          {error}
+        </Alert>
+      )}
 
-      <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '20px' }}>
-        {filteredActivities.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#94A3B8', margin: '32px 0' }}>
-            No activities match the current filters. Click "+ Add Activity" to begin building your timeline.
-          </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {filteredActivities.map((activity) => {
-              const statusValue = normalizeStatus(activity.status);
-              const selectedStatus = ACTIVITY_STATUS_OPTIONS.find((option) => option.value === statusValue) || ACTIVITY_STATUS_OPTIONS[0];
+      {eventId && !loading && (
+        <Stack spacing={2.5}>
+          {/* Action Bar */}
+          <SurfaceCard sx={{ p: 2.5 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  {schedule?.event?.name || 'Scheduled Activities'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Event ID: {eventId}
+                </Typography>
+              </Box>
 
-              return (
-                <div
-                  key={activity.id}
-                  style={{
-                    borderLeft: '4px solid #0284C7',
-                    padding: '12px 16px',
-                    backgroundColor: '#F8FAFC',
-                    borderRadius: '0 8px 8px 0',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '16px',
-                    flexWrap: 'wrap'
-                  }}
+              <Stack direction="row" spacing={1.5}>
+                <Button
+                  variant="outlined"
+                  startIcon={<FileDownloadOutlinedIcon />}
+                  onClick={() => scheduleApi.downloadIcsFile(schedule?.event?.name || 'Event', schedule?.activities || [])}
+                  sx={{ borderRadius: 9999, px: 2.5 }}
                 >
-                  <div style={{ flex: 1, minWidth: '220px' }}>
-                    <h4 style={{ margin: '0 0 4px 0', color: '#1E293B', fontSize: '16px' }}>{activity.title}</h4>
-                    {activity.description && (
-                      <p style={{ margin: '0 0 6px 0', color: '#64748B', fontSize: '13px' }}>{activity.description}</p>
-                    )}
-                    <span style={{ fontSize: '12px', color: '#0284C7', fontWeight: 500 }}>
-                      {new Date(activity.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} - {' '}
-                      {new Date(activity.endTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                    </span>
-                  </div>
+                  Export (.ics)
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddCircleOutlineRoundedIcon />}
+                  onClick={() => setIsModalOpen(true)}
+                  sx={{ borderRadius: 9999, px: 2.5, bgcolor: '#19191C', color: '#FFFFFF' }}
+                >
+                  Add Activity
+                </Button>
+              </Stack>
+            </Box>
+          </SurfaceCard>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                    <span
-                      style={{
-                        display: 'inline-flex',
+          <ConflictAlertBanner conflicts={schedule?.conflicts || []} />
+
+          {/* Filters */}
+          <SurfaceCard sx={{ p: 2 }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: 'center' }}>
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Search activities by title or notes"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+              />
+              <Select
+                size="small"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                sx={{ minWidth: 160 }}
+              >
+                <MenuItem value="all">All Statuses</MenuItem>
+                {ACTIVITY_STATUS_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                ))}
+              </Select>
+            </Stack>
+          </SurfaceCard>
+
+          {/* Activities List */}
+          <SurfaceCard sx={{ p: 3 }}>
+            {filteredActivities.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography color="text.secondary">
+                  No activities found. Click &quot;Add Activity&quot; to begin building your timeline.
+                </Typography>
+              </Box>
+            ) : (
+              <Stack spacing={2}>
+                {filteredActivities.map((act) => {
+                  const statusVal = normalizeStatus(act.status);
+                  const opt = ACTIVITY_STATUS_OPTIONS.find((o) => o.value === statusVal) || ACTIVITY_STATUS_OPTIONS[0];
+
+                  return (
+                    <Box
+                      key={act.id}
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        backgroundColor: '#FAF7EF',
+                        borderLeft: `4px solid ${opt.textColor}`,
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '4px 8px',
-                        borderRadius: '999px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        backgroundColor: selectedStatus.badgeColor,
-                        color: selectedStatus.textColor
+                        flexWrap: 'wrap',
+                        gap: 2,
                       }}
                     >
-                      {selectedStatus.label}
-                    </span>
+                      <Box sx={{ flex: 1, minWidth: 200 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>{act.title}</Typography>
+                        {act.description && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            {act.description}
+                          </Typography>
+                        )}
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: '#636369', mt: 0.5, display: 'block' }}>
+                          {new Date(act.startTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} →{' '}
+                          {new Date(act.endTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </Typography>
+                      </Box>
 
-                    <select
-                      value={statusValue}
-                      onChange={(event) => handleStatusChange(activity.id, Number(event.target.value))}
-                      style={{
-                        minWidth: '160px',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #CBD5E1',
-                        backgroundColor: '#fff'
-                      }}
-                    >
-                      {ACTIVITY_STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Chip
+                          size="small"
+                          label={opt.label}
+                          sx={{ bgcolor: opt.badgeColor, color: opt.textColor, fontWeight: 700 }}
+                        />
+                        <Select
+                          size="small"
+                          value={statusVal}
+                          onChange={(e) => handleStatusChange(act.id, Number(e.target.value))}
+                          sx={{ height: 32, fontSize: '0.8rem', bgcolor: '#FFFFFF' }}
+                        >
+                          {ACTIVITY_STATUS_OPTIONS.map((o) => (
+                            <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+                          ))}
+                        </Select>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
+          </SurfaceCard>
+        </Stack>
+      )}
 
-                    {activity.assignedVendorId && (
-                      <span style={{ fontSize: '12px', background: '#E0F2FE', color: '#0369A1', padding: '4px 8px', borderRadius: '4px' }}>
-                        Vendor Assigned
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <AddActivityModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onAddActivity={handleAddActivity} />
-    </div>
+      {isModalOpen && (
+        <AddActivityModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={handleAddActivity}
+        />
+      )}
+    </AppLayout>
   );
 };
+
+export default ScheduleBuilderPage;

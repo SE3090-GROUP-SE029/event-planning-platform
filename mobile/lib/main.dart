@@ -3,6 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/api/dio_client.dart';
+import 'core/theme/app_colors.dart';
+import 'core/theme/app_dimens.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/api/auth_repository.dart';
 import 'features/auth/models/auth_response_model.dart';
@@ -17,6 +19,8 @@ import 'features/events/models/event_model.dart';
 import 'features/events/pages/event_details_page.dart';
 import 'features/events/pages/event_form_page.dart';
 import 'features/events/pages/event_list_page.dart';
+import 'features/onboarding/pages/onboarding_page.dart';
+import 'features/onboarding/providers/onboarding_provider.dart';
 import 'features/plans/pages/plan_review_page.dart';
 import 'features/quotations/pages/my_quotations_page.dart';
 import 'features/quotations/pages/request_quotation_page.dart';
@@ -65,6 +69,10 @@ const _authenticatedRoutes = {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ProviderScope(child: MyApp()));
+}
+
+final startupConfigurationProvider = FutureProvider<String?>((ref) async {
   String? startupError;
   try {
     await dotenv.load(fileName: '.env.local');
@@ -81,8 +89,8 @@ Future<void> main() async {
   } on FormatException catch (error) {
     startupError = error.message;
   }
-  runApp(ProviderScope(child: MyApp(startupError: startupError)));
-}
+  return startupError;
+});
 
 class MyApp extends ConsumerWidget {
   final String? startupError;
@@ -100,6 +108,32 @@ class MyApp extends ConsumerWidget {
       );
     }
 
+    final configurationState = ref.watch(startupConfigurationProvider);
+    if (configurationState.isLoading) {
+      return MaterialApp(
+        title: 'Plan It',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.pastelTheme,
+        home: const _StartupScreen(),
+      );
+    }
+    if (configurationState.hasError) {
+      return MaterialApp(
+        title: 'Plan It',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.pastelTheme,
+        home: _StartupProblem(message: configurationState.error.toString()),
+      );
+    }
+    if (configurationState.value != null) {
+      return MaterialApp(
+        title: 'Plan It',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.pastelTheme,
+        home: _StartupProblem(message: configurationState.value!),
+      );
+    }
+
     ref.listen(authNotifierProvider, (previous, next) {
       final error = next.error;
       if (error is LogoutFailureException) {
@@ -114,19 +148,31 @@ class MyApp extends ConsumerWidget {
     });
 
     final authState = ref.watch(authNotifierProvider);
+    final onboardingState = ref.watch(onboardingCompletionProvider);
+    final session = authState.value;
+    final Widget home;
+    if (authState.isLoading || onboardingState.isLoading) {
+      home = const _StartupScreen();
+    } else if (onboardingState.hasError) {
+      home = _StartupProblem(message: onboardingState.error.toString());
+    } else if (authState.hasError &&
+        authState.error is! LogoutFailureException) {
+      home = _StartupProblem(message: authState.error.toString());
+    } else if (session != null) {
+      home = const DashboardPage();
+    } else if (authState.error is LogoutFailureException ||
+        onboardingState.value == false) {
+      home = const OnboardingPage();
+    } else {
+      home = const LoginPage();
+    }
+
     return MaterialApp(
       title: 'Plan It',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.pastelTheme,
       scaffoldMessengerKey: _rootScaffoldMessengerKey,
-      home: authState.when(
-        data: (session) =>
-            session == null ? const LoginPage() : const DashboardPage(),
-        loading: () => const _StartupScreen(),
-        error: (error, _) => error is LogoutFailureException
-            ? const LoginPage()
-            : _StartupProblem(message: error.toString()),
-      ),
+      home: home,
       onGenerateRoute: (settings) =>
           _generateRoute(settings, ref.read(authNotifierProvider).value),
     );
@@ -142,6 +188,13 @@ class MyApp extends ConsumerWidget {
         settings: settings,
         builder: (_) =>
             name == '/login' ? const LoginPage() : const RegisterPage(),
+      );
+    }
+
+    if (name == '/onboarding' && session != null) {
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const DashboardPage(),
       );
     }
 
@@ -191,6 +244,7 @@ class MyApp extends ConsumerWidget {
 
 final Map<String, WidgetBuilder> _pageBuilders = {
   '/dashboard': (_) => const DashboardPage(),
+  '/onboarding': (_) => const OnboardingPage(),
   '/events': (_) => const EventListPage(),
   '/events/create': (_) => const EventFormPage(),
   '/events/details': (_) => const EventDetailsPage(),
@@ -350,8 +404,39 @@ class _StartupScreen extends StatelessWidget {
   const _StartupScreen();
 
   @override
-  Widget build(BuildContext context) => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: AppColors.canvas,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: AppColors.pastelPinkLight,
+                  borderRadius: BorderRadius.circular(AppDimens.radiusLarge),
+                ),
+                child: const Icon(
+                  Icons.event_available_rounded,
+                  color: AppColors.pastelPinkText,
+                  size: 38,
+                ),
+              ),
+              const SizedBox(height: AppDimens.space16),
+              Text(
+                'Plan It',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: AppDimens.space20),
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+            ],
+          ),
+        ),
       );
 }
 

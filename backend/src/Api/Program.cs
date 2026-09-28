@@ -2,6 +2,7 @@ using System.Text;
 using Application.Common.Interfaces;
 using Application.Dtos.Events;
 using Application.Services.Auth;
+using Application.Services.Admin;
 using Application.Services.Bookings;
 using Application.Services.Events;
 using Application.Services.Quotations;
@@ -66,6 +67,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // Test feature service (correct namespace and class name)
 builder.Services.AddScoped<ITestService, TestService>();
+builder.Services.AddScoped<IAdminVendorApprovalService, AdminVendorApprovalService>();
 
 // C4 Guest Management — AI, email, registration, invitation, QR services
 builder.Services.AddGuestManagement(builder.Configuration);
@@ -121,6 +123,8 @@ builder.Services.AddScoped<IVendorAnalysisAiClient, VendorAnalysisAiClient>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IAdminVendorService, AdminVendorService>();
+builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
+builder.Services.AddScoped<IAdminReadService, AdminReadService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IEventPlanDraftRepository, EventPlanDraftRepository>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();

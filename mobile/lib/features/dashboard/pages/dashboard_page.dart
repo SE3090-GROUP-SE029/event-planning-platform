@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pastel_bottom_nav_bar.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_icon_badge.dart';
@@ -10,6 +11,7 @@ import '../../../shared/widgets/pastel_list_item.dart';
 import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../onboarding/providers/onboarding_provider.dart';
 import '../../vendors/widgets/vendor_dashboard_overview.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -25,23 +27,14 @@ class DashboardPage extends ConsumerWidget {
     final name = email.split('@').first;
     final displayName = name.isNotEmpty
         ? '${name[0].toUpperCase()}${name.substring(1)}'
-        : 'Planner';
+        : (isVendor ? 'Vendor' : 'Planner');
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
-      bottomNavigationBar: PastelBottomNavBar(
+      bottomNavigationBar: PastelBottomNavBar.roleBased(
+        context: context,
+        session: session,
         currentIndex: 0,
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.of(context).pushNamed('/events', arguments: session);
-          } else if (index == 2 && isVendor) {
-            Navigator.of(context)
-                .pushNamed('/vendors/profile', arguments: session);
-          }
-        },
-        onCenterActionTap: () {
-          Navigator.of(context).pushNamed('/events/create', arguments: session);
-        },
       ),
       body: SafeArea(
         child: ListView(
@@ -68,8 +61,14 @@ class DashboardPage extends ConsumerWidget {
                   onTap: () async {
                     await ref.read(authNotifierProvider.notifier).logout();
                     if (context.mounted) {
-                      Navigator.of(context)
-                          .pushNamedAndRemoveUntil('/login', (_) => false);
+                      final onboardingState =
+                          ref.read(onboardingCompletionProvider);
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        onboardingState.value == false
+                            ? '/onboarding'
+                            : '/login',
+                        (_) => false,
+                      );
                     }
                   },
                   borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
@@ -93,7 +92,7 @@ class DashboardPage extends ConsumerWidget {
             ),
             const SizedBox(height: AppDimens.space18),
 
-            // Profile Header Card inspired directly by reference
+            // Profile Header Card
             PastelCard(
               padding: const EdgeInsets.all(AppDimens.space20),
               child: Column(
@@ -106,16 +105,24 @@ class DashboardPage extends ConsumerWidget {
                         width: 72,
                         height: 72,
                         decoration: BoxDecoration(
-                          color: AppColors.pastelPinkLight,
+                          color: isVendor
+                              ? AppColors.pastelGreenLight
+                              : AppColors.pastelPinkLight,
                           borderRadius: BorderRadius.circular(22),
                           border: Border.all(
-                            color: const Color(0x20F9BFD8),
+                            color: isVendor
+                                ? const Color(0x20C4DDB8)
+                                : const Color(0x20F9BFD8),
                             width: 1.5,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.person_rounded,
-                          color: AppColors.pastelPinkText,
+                        child: Icon(
+                          isVendor
+                              ? Icons.storefront_rounded
+                              : Icons.person_rounded,
+                          color: isVendor
+                              ? AppColors.pastelGreenText
+                              : AppColors.pastelPinkText,
                           size: 38,
                         ),
                       ),
@@ -164,7 +171,7 @@ class DashboardPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppDimens.space16),
 
-                  // Olive Ribbon Pill (inspired by reference olive ribbon)
+                  // Olive Ribbon Pill
                   PastelRibbonBanner(
                     icon: Icons.shield_outlined,
                     title: session?.userId.isNotEmpty == true
@@ -176,13 +183,103 @@ class DashboardPage extends ConsumerWidget {
               ),
             ),
 
-            if (isVendor && session != null)
+            // Role-Specific Overview Section
+            if (isVendor && session != null) ...[
               VendorDashboardOverview(session: session),
+            ] else if (isEventPlanner) ...[
+              // Event Planner Dashboard Overview
+              const PastelSectionHeader(title: 'Planning Hub'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricCard(
+                      title: 'Events',
+                      value: 'My Events',
+                      subtitle: 'Active plans',
+                      icon: Icons.calendar_month_rounded,
+                      bgColor: AppColors.pastelBlueLight,
+                      textColor: AppColors.pastelBlueText,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/events', arguments: session),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildMetricCard(
+                      title: 'AI Planning',
+                      value: 'AI Plans',
+                      subtitle: 'Smart assistance',
+                      icon: Icons.auto_awesome,
+                      bgColor: AppColors.pastelPinkLight,
+                      textColor: AppColors.pastelPinkText,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/events', arguments: session),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricCard(
+                      title: 'Vendors',
+                      value: 'Marketplace',
+                      subtitle: 'Explore services',
+                      icon: Icons.storefront_rounded,
+                      bgColor: AppColors.pastelYellowLight,
+                      textColor: AppColors.pastelYellowText,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/marketplace', arguments: session),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildMetricCard(
+                      title: 'Quotations',
+                      value: 'My Quotes',
+                      subtitle: 'Track proposals',
+                      icon: Icons.receipt_long_rounded,
+                      bgColor: AppColors.pastelLavenderLight,
+                      textColor: AppColors.pastelLavenderText,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/quotations/mine', arguments: session),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimens.space14),
+              // Planner Quick Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: AppButtonStyles.create(),
+                      onPressed: () => Navigator.of(context)
+                          .pushNamed('/events/create', arguments: session),
+                      icon: const Icon(Icons.add_circle_outline_rounded,
+                          size: 18),
+                      label: const Text('Create Event'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: AppButtonStyles.primary(),
+                      onPressed: () => Navigator.of(context)
+                          .pushNamed('/marketplace', arguments: session),
+                      icon: const Icon(Icons.storefront_outlined, size: 18),
+                      label: const Text('Find Vendors'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
 
             // Section: Workspace
             const PastelSectionHeader(title: 'Workspace'),
 
-            // Card Group containing items (matching reference "Clinical profile" card)
+            // Card Group containing items
             PastelCard(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppDimens.space16,
@@ -190,22 +287,22 @@ class DashboardPage extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  PastelListItem(
-                    icon: Icons.event_available_rounded,
-                    iconVariant: PastelIconVariant.pink,
-                    title: 'Events',
-                    subtitle: 'Create, review, edit, and manage your event plans',
-                    showDivider: true,
-                    onTap: () => Navigator.of(context)
-                        .pushNamed('/events', arguments: session),
-                  ),
                   if (isEventPlanner) ...[
+                    PastelListItem(
+                      icon: Icons.event_available_rounded,
+                      iconVariant: PastelIconVariant.pink,
+                      title: 'Events',
+                      subtitle:
+                          'Create, review, edit, and manage your event plans',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/events', arguments: session),
+                    ),
                     PastelListItem(
                       icon: Icons.store_mall_directory_outlined,
                       iconVariant: PastelIconVariant.olive,
                       title: 'Vendor Marketplace',
-                      subtitle:
-                          'Browse approved vendors, services, and prices',
+                      subtitle: 'Browse approved vendors, services, and prices',
                       showDivider: true,
                       onTap: () => Navigator.of(context)
                           .pushNamed('/marketplace', arguments: session),
@@ -214,7 +311,8 @@ class DashboardPage extends ConsumerWidget {
                       icon: Icons.receipt_long_outlined,
                       iconVariant: PastelIconVariant.blue,
                       title: 'My quotations',
-                      subtitle: 'Track pending and responded quotation requests',
+                      subtitle:
+                          'Track pending and responded quotation requests',
                       showDivider: true,
                       onTap: () => Navigator.of(context)
                           .pushNamed('/quotations/mine', arguments: session),
@@ -231,30 +329,43 @@ class DashboardPage extends ConsumerWidget {
                   ],
                   if (isVendor) ...[
                     PastelListItem(
-                      icon: Icons.storefront_rounded,
-                      iconVariant: PastelIconVariant.olive,
-                      title: 'Vendor profile',
-                      subtitle:
-                          'Update the business profile linked to your account',
-                      showDivider: true,
+                      icon: Icons.add_circle_outline_rounded,
+                      iconVariant: PastelIconVariant.yellow,
+                      title: 'Plan new event',
+                      subtitle: 'Start a new event planning journey',
+                      showDivider: false,
                       onTap: () => Navigator.of(context)
-                          .pushNamed('/vendors/profile', arguments: session),
+                          .pushNamed('/events/create', arguments: session),
                     ),
+                  ],
+                  if (isVendor) ...[
                     PastelListItem(
                       icon: Icons.handyman_outlined,
                       iconVariant: PastelIconVariant.blue,
                       title: 'Vendor services',
-                      subtitle: 'Add, edit, and remove the services you offer',
+                      subtitle: 'Add, edit, and manage the services you offer',
                       showDivider: true,
                       onTap: () => Navigator.of(context)
                           .pushNamed('/vendors/services', arguments: session),
+                    ),
+                    PastelListItem(
+                      icon: Icons.request_quote_outlined,
+                      iconVariant: PastelIconVariant.yellow,
+                      title: 'Quotation requests',
+                      subtitle:
+                          'Review and respond to client quotation requests',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/vendors/quotations',
+                        arguments: session,
+                      ),
                     ),
                     PastelListItem(
                       icon: Icons.schedule_outlined,
                       iconVariant: PastelIconVariant.pink,
                       title: 'Vendor availability',
                       subtitle:
-                          'Set when your business is available for events',
+                          'Set when your business is available for bookings',
                       showDivider: true,
                       onTap: () => Navigator.of(context).pushNamed(
                         '/vendors/availability',
@@ -305,6 +416,17 @@ class DashboardPage extends ConsumerWidget {
                     onTap: () => Navigator.of(context)
                         .pushNamed('/events/create', arguments: session),
                   ),
+                  if (isVendor)
+                    PastelListItem(
+                      icon: Icons.storefront_rounded,
+                      iconVariant: PastelIconVariant.olive,
+                      title: 'Vendor profile',
+                      subtitle:
+                          'Update the business profile linked to your account',
+                      showDivider: false,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/vendors/profile', arguments: session),
+                    ),
                 ],
               ),
             ),
@@ -321,24 +443,16 @@ class DashboardPage extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  if (isVendor)
-                    const PastelListItem(
-                      icon: Icons.security_rounded,
-                      iconVariant: PastelIconVariant.blue,
-                      title: 'Account status',
-                      subtitle: 'Verified vendor permissions',
-                      countBadge: 'Active',
-                      showDivider: true,
-                    )
-                  else
-                    const PastelListItem(
-                      icon: Icons.security_rounded,
-                      iconVariant: PastelIconVariant.blue,
-                      title: 'Account status',
-                      subtitle: 'Verified planner permissions',
-                      countBadge: 'Active',
-                      showDivider: true,
-                    ),
+                  PastelListItem(
+                    icon: Icons.security_rounded,
+                    iconVariant: PastelIconVariant.blue,
+                    title: 'Account status',
+                    subtitle: isVendor
+                        ? 'Verified vendor permissions'
+                        : 'Verified planner permissions',
+                    countBadge: 'Active',
+                    showDivider: true,
+                  ),
                   const PastelListItem(
                     icon: Icons.help_outline_rounded,
                     iconVariant: PastelIconVariant.lavender,
@@ -347,6 +461,73 @@ class DashboardPage extends ConsumerWidget {
                     showDivider: false,
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color bgColor,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(icon, color: textColor, size: 22),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 12,
+                  color: AppColors.textMuted,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 10,
               ),
             ),
           ],
