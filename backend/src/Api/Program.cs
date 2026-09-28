@@ -2,6 +2,7 @@ using System.Text;
 using Application.Common.Interfaces;
 using Application.Dtos.Events;
 using Application.Services.Auth;
+using Application.Services.Admin;
 using Application.Services.Bookings;
 using Application.Services.Events;
 using Application.Services.Quotations;
@@ -24,6 +25,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Infrastructure.Services.Planning;
+using Infrastructure.Services.Scheduling;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,6 +67,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // Test feature service (correct namespace and class name)
 builder.Services.AddScoped<ITestService, TestService>();
+builder.Services.AddScoped<IAdminVendorApprovalService, AdminVendorApprovalService>();
 
 // C4 Guest Management — AI, email, registration, invitation, QR services
 builder.Services.AddGuestManagement(builder.Configuration);
@@ -126,6 +129,8 @@ builder.Services.AddScoped<IQuotationService, QuotationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
+builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
+builder.Services.AddScoped<IAdminReadService, AdminReadService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IEventPlanDraftRepository, EventPlanDraftRepository>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -134,6 +139,7 @@ builder.Services.AddScoped<ICoordinatorPlanValidationService, CoordinatorPlanVal
 builder.Services.AddScoped<IPlanGenerationService, PlanGenerationService>();
 builder.Services.AddScoped<IPlanDecisionService, PlanDecisionService>();
 builder.Services.AddScoped<IAgenticAiClient, AgenticAiClient>();
+builder.Services.AddScoped<IScheduleAiClient, ScheduleAiClient>();
 builder.Services.AddHttpClient("AgenticAI", client =>
 {
     client.BaseAddress = new Uri(agenticAiOptions.BaseUrl);
@@ -145,12 +151,6 @@ builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestVal
 builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 builder.Services.AddScoped<ConflictDetectionService>();
 builder.Services.AddScoped<ScheduleService>();
-
-// Component 3: Scheduling Registrations
-builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
-builder.Services.AddScoped<ConflictDetectionService>();
-builder.Services.AddScoped<ScheduleService>();
-
 
 builder.Services.AddAuthentication(options =>
     {

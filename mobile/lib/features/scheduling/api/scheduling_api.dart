@@ -29,4 +29,18 @@ class SchedulingApi {
       throw Exception(message);
     }
   }
+
+  Future<EventSchedule> generateAiSchedule(String scheduleId) async {
+    try {
+      final response = await dio.post('/api/schedules/$scheduleId/generate-ai');
+      return EventSchedule.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      final dynamic data = e.response?.data;
+      final message = data is Map
+          ? (data['message'] as String? ??
+              'We could not generate the schedule with AI right now.')
+          : 'We could not generate the schedule with AI right now.';
+      throw Exception(message);
+    }
+  }
 }

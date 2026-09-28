@@ -62,6 +62,21 @@ public class SchedulesController : ControllerBase
 
         return Ok(updatedActivity);
     }
+
+    [HttpPost("{scheduleId:guid}/generate-ai")]
+    [Authorize]
+    public async Task<IActionResult> GenerateAiSchedule(Guid scheduleId, CancellationToken ct)
+    {
+        try
+        {
+            var updatedSchedule = await _scheduleService.GenerateScheduleWithAiAsync(scheduleId, ct);
+            return Ok(updatedSchedule);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
 }
 
 public record UpdateActivityStatusRequest(ActivityStatus Status);

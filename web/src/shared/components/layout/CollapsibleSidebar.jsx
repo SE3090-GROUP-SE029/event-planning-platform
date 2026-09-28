@@ -1,85 +1,70 @@
-﻿import { useState } from 'react';
-import { Box, IconButton, Typography } from '@mui/material';
+import { useState } from 'react';
+import {
+  Box,
+  Button,
+  IconButton,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import HomeFilledIcon from '@mui/icons-material/HomeFilled';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import FaceIcon from '@mui/icons-material/Face';
-import HandymanOutlinedIcon from '@mui/icons-material/HandymanOutlined';
-import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
-import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined';
-import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
-import BookOnlineOutlinedIcon from '@mui/icons-material/BookOnlineOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
-import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
+import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
+import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
+import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
+import { tokens } from '../../theme/tokens';
 
-const Icons = {
-  Dashboard: () => <HomeFilledIcon />,
-  Events: () => <EventAvailableIcon />,
-  Schedule: () => <CalendarMonthIcon />,
-  Marketplace: () => <StorefrontOutlinedIcon />,
-  MyQuotations: () => <ReceiptLongOutlinedIcon />,
-  MyBookings: () => <BookOnlineOutlinedIcon />,
-  Profile: () => <FaceIcon />,
-  Services: () => <HandymanOutlinedIcon />,
-  Availability: () => <ScheduleOutlinedIcon />,
-  Plans: () => <AssignmentOutlinedIcon />,
-  VendorQuotations: () => <RequestQuoteOutlinedIcon />,
-  VendorBookings: () => <BookOnlineOutlinedIcon />,
-  Logout: () => <MeetingRoomIcon />,
-  ChevronLeft: () => <ChevronLeftIcon />,
-  ChevronRight: () => <ChevronRightIcon />,
-};
+const adminItems = [
+  { id: 'dashboard', label: 'Dashboard', path: '/admin/dashboard', icon: HomeFilledIcon },
+  { id: 'analytics', label: 'Analytics', path: '/admin/analytics', icon: InsightsOutlinedIcon },
+  { id: 'users', label: 'Users', path: '/admin/users', icon: PeopleAltOutlinedIcon },
+  { id: 'vendors', label: 'Vendors', path: '/admin/vendors', icon: StorefrontOutlinedIcon },
+  { id: 'events', label: 'Events', path: '/admin/events', icon: EventAvailableIcon },
+  { id: 'plans', label: 'AI Plans', path: '/admin/plans', icon: AutoAwesomeOutlinedIcon },
+  { id: 'system', label: 'Monitoring', path: '/admin/system', icon: DnsOutlinedIcon },
+];
 
-export default function CollapsibleSidebar({
-  activeTab = 'dashboard',
-  showEvents = false,
-  showSchedule = true,
-  showMarketplace = false,
-  showMyQuotations = false,
-  showMyBookings = false,
-  showVendorProfile = false,
-  showVendorServices = false,
-  showVendorAvailability = false,
-  showVendorQuotations = false,
-  showVendorBookings = false,
-  showPlanMonitoring = false,
-  onSelectTab,
-  onLogout,
-}) {
+export default function CollapsibleSidebar({ activeTab, onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
-  const items = [
-    { id: 'dashboard', label: 'Dashboard', icon: Icons.Dashboard },
-    ...(showEvents ? [{ id: 'events', label: 'Events', icon: Icons.Events }] : []),
-    ...(showSchedule ? [{ id: 'schedule', label: 'Schedule', icon: Icons.Schedule }] : []),
-    ...(showMarketplace ? [{ id: 'marketplace', label: 'Marketplace', icon: Icons.Marketplace }] : []),
-    ...(showMyQuotations ? [{ id: 'my-quotations', label: 'My quotations', icon: Icons.MyQuotations }] : []),
-    ...(showMyBookings ? [{ id: 'my-bookings', label: 'My bookings', icon: Icons.MyBookings }] : []),
-    ...(showVendorProfile ? [{ id: 'vendor-profile', label: 'Vendor profile', icon: Icons.Profile }] : []),
-    ...(showVendorServices ? [{ id: 'vendor-services', label: 'Services', icon: Icons.Services }] : []),
-    ...(showVendorAvailability ? [{ id: 'vendor-availability', label: 'Availability', icon: Icons.Availability }] : []),
-    ...(showVendorQuotations ? [{ id: 'vendor-quotations', label: 'Quotation requests', icon: Icons.VendorQuotations }] : []),
-    ...(showVendorBookings ? [{ id: 'vendor-bookings', label: 'Bookings', icon: Icons.VendorBookings }] : []),
-    ...(showPlanMonitoring ? [{ id: 'plans', label: 'Plan monitoring', icon: Icons.Plans }] : []),
-  ];
+  const location = useLocation();
+  const navigate = useNavigate();
+  const storeLogout = useAuthStore((state) => state.logout);
+
+  const handleLogout = () => {
+    if (onLogout) {
+      onLogout();
+      return;
+    }
+    storeLogout();
+    navigate('/');
+  };
 
   return (
     <Box
+      component="aside"
       sx={{
-        width: collapsed ? 84 : 220,
-        background: 'linear-gradient(180deg, #19191C 0%, #1F1F24 100%)',
-        color: '#FFFFFF',
-        borderRadius: '28px',
-        p: '18px 12px 14px',
+        width: collapsed ? 76 : 232,
+        bgcolor: tokens.colors.surface,
+        color: tokens.colors.textPrimary,
+        borderRadius: tokens.radius.card,
+        border: `1px solid ${tokens.colors.borderLight}`,
+        p: 1.5,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        transition: 'width 0.25s ease',
+        transition: 'width 0.2s ease',
         flexShrink: 0,
-        boxShadow: '0 18px 40px rgba(17, 16, 20, 0.18)',
+        boxShadow: tokens.shadows.soft,
         minHeight: 'calc(100vh - 32px)',
+        position: { md: 'sticky' },
+        top: { md: 16 },
+        alignSelf: 'flex-start',
       }}
     >
       <Box>
@@ -88,119 +73,128 @@ export default function CollapsibleSidebar({
             display: 'flex',
             alignItems: 'center',
             justifyContent: collapsed ? 'center' : 'space-between',
-            mb: 3.5,
-            px: collapsed ? 0 : 1.25,
+            mb: 3,
+            px: 0.5,
           }}
         >
           {!collapsed && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+            <Box
+              component={NavLink}
+              to="/admin/dashboard"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                color: tokens.colors.textPrimary,
+                textDecoration: 'none',
+              }}
+            >
               <Box
                 sx={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #F9BFD8 0%, #FDEEF5 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#19191C',
+                  width: 34,
+                  height: 34,
+                  borderRadius: tokens.radius.sm,
+                  bgcolor: tokens.colors.pastelBlue,
+                  color: tokens.colors.pastelBlueText,
+                  display: 'grid',
+                  placeItems: 'center',
                   fontWeight: 800,
-                  fontSize: 12,
                 }}
               >
                 P
               </Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.04em' }}>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
                 Plan It
               </Typography>
             </Box>
           )}
           <IconButton
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
             onClick={() => setCollapsed((value) => !value)}
             size="small"
             sx={{
-              backgroundColor: '#F9BFD8',
-              color: '#19191C',
-              width: 28,
-              height: 28,
-              borderRadius: '50%',
-              '&:hover': { backgroundColor: '#F5C9DF' },
+              bgcolor: tokens.colors.pastelBlueLight,
+              color: tokens.colors.pastelBlueText,
+              '&:hover': { bgcolor: tokens.colors.pastelBlue },
             }}
           >
-            {collapsed ? <Icons.ChevronRight /> : <Icons.ChevronLeft />}
+            {collapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
           </IconButton>
         </Box>
 
-        <Typography
-          sx={{
-            fontSize: 10,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.12em',
-            color: '#86868D',
-            px: 1,
-            mb: 1.2,
-          }}
-        >
-          Workspace
-        </Typography>
+        {!collapsed && (
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: tokens.colors.textMuted,
+              px: 1,
+              mb: 1,
+            }}
+          >
+            Administration
+          </Typography>
+        )}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          {items.map((item) => {
+        <Box component="nav" aria-label="Admin navigation" sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {adminItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
-
-            return (
+            const isActive = activeTab
+              ? activeTab === item.id || (item.id === 'vendors' && activeTab === 'admin-vendors')
+              : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+            const link = (
               <Box
+                component={NavLink}
                 key={item.id}
-                onClick={() => onSelectTab?.(item.id)}
+                to={item.path}
+                aria-current={isActive ? 'page' : undefined}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1.4,
-                  px: 1.5,
-                  py: 1.2,
-                  borderRadius: '14px',
-                  cursor: 'pointer',
-                  backgroundColor: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  color: isActive ? '#FFFFFF' : '#AEAEB2',
+                  gap: 1.25,
+                  px: 1.25,
+                  py: 1.1,
+                  minHeight: 44,
+                  borderRadius: tokens.radius.sm,
+                  textDecoration: 'none',
+                  bgcolor: isActive ? tokens.colors.pastelBlueLight : 'transparent',
+                  color: isActive ? tokens.colors.pastelBlueText : tokens.colors.textSecondary,
                   justifyContent: collapsed ? 'center' : 'flex-start',
-                  border: isActive ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.06)', color: '#FFFFFF' },
+                  '&:hover': { bgcolor: tokens.colors.pastelBlueLight },
                 }}
               >
-                <Box sx={{ fontSize: 18, lineHeight: 1 }}>{<Icon />}</Box>
+                <Icon fontSize="small" />
                 {!collapsed && (
-                  <Typography sx={{ color: isActive ? '#FFFFFF' : '#AEAEB2', fontSize: 13.5, fontWeight: isActive ? 700 : 500 }}>
+                  <Typography sx={{ color: 'inherit', fontSize: 14, fontWeight: isActive ? 700 : 500 }}>
                     {item.label}
                   </Typography>
                 )}
               </Box>
             );
+            return collapsed ? (
+              <Tooltip key={item.id} title={item.label} placement="right">
+                {link}
+              </Tooltip>
+            ) : link;
           })}
         </Box>
       </Box>
 
-      <Box
-        onClick={onLogout}
+      <Button
+        onClick={handleLogout}
+        startIcon={!collapsed && <MeetingRoomIcon fontSize="small" />}
+        aria-label={collapsed ? 'Sign out' : undefined}
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 1.5,
-          py: 1.2,
-          borderRadius: '14px',
-          cursor: 'pointer',
-          color: '#A0A0A8',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          transition: 'all 0.2s ease',
-          '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.44)', color: '#FFFFFF' },
+          minHeight: 44,
+          color: tokens.colors.textSecondary,
+          '&:hover': { bgcolor: tokens.colors.pastelPinkLight, color: tokens.colors.pastelPinkText },
         }}
       >
-        <Icons.Logout />
-        {!collapsed && <Typography sx={{ color: '#AEAEB2', fontSize: 13.5, fontWeight: 500 }}>Sign out</Typography>}
-      </Box>
+        {collapsed ? <MeetingRoomIcon fontSize="small" /> : 'Sign out'}
+      </Button>
     </Box>
   );
 }

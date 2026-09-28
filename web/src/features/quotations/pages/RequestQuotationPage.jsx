@@ -14,8 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useAuthStore } from '../../../shared/store/authStore';
-import CollapsibleSidebar from '../../../shared/components/layout/CollapsibleSidebar';
-import TopSearchNavbar from '../../../shared/components/layout/TopSearchNavbar';
+import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
 import { useVendorMarketplaceDetail } from '../../vendors/api/vendorApi';
 import {
@@ -28,11 +27,7 @@ export default function RequestQuotationPage() {
   const { vendorId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
   const isEventPlanner = useAuthStore((state) => state.hasRole('EVENT_PLANNER'));
-  const isAdmin = useAuthStore((state) => state.hasRole('ADMIN'));
-  const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
 
   const { data: vendor, isLoading: vendorLoading, isError: vendorError, error: vendorErr } =
     useVendorMarketplaceDetail(vendorId);
@@ -48,11 +43,6 @@ export default function RequestQuotationPage() {
   const [formError, setFormError] = useState('');
 
   const services = useMemo(() => vendor?.services || [], [vendor]);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,40 +73,15 @@ export default function RequestQuotationPage() {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 } }}>
-      <Box sx={{ display: 'flex', gap: { xs: 2, md: 3 }, minHeight: 'calc(100vh - 32px)' }}>
-        <CollapsibleSidebar
-          activeTab="marketplace"
-          showEvents={isAdmin}
-          showMarketplace
-          showMyQuotations={isEventPlanner}
-          showMyBookings={isEventPlanner}
-          showVendorProfile={isVendor}
-          showVendorServices={isVendor}
-          showVendorAvailability={isVendor}
-          showVendorQuotations={isVendor}
-          showVendorBookings={isVendor}
-          onSelectTab={(tab) => {
-            if (tab === 'dashboard') navigate('/dashboard');
-            if (tab === 'events') navigate('/admin/events');
-            if (tab === 'marketplace') navigate('/marketplace');
-            if (tab === 'my-quotations') navigate('/quotations/mine');
-            if (tab === 'my-bookings') navigate('/bookings/mine');
-            if (tab === 'vendor-profile') navigate('/vendor/profile');
-            if (tab === 'vendor-services') navigate('/vendor/services');
-            if (tab === 'vendor-availability') navigate('/vendor/availability');
-            if (tab === 'vendor-quotations') navigate('/vendor/quotations');
-            if (tab === 'vendor-bookings') navigate('/vendor/bookings');
-          }}
-          onLogout={handleLogout}
-        />
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <TopSearchNavbar user={user} title="Request quotation" subtitle="Send a request to this vendor" />
-
-          <Button variant="text" sx={{ mb: 2 }} onClick={() => navigate(`/marketplace/${vendorId}`)}>
-            ← Back to vendor details
-          </Button>
+    <AppLayout
+      activeTab="marketplace"
+      title="Request quotation"
+      subtitle="Send a request to this vendor"
+    >
+      <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 1 }}>
+        <Button variant="text" sx={{ mb: 2 }} onClick={() => navigate(`/marketplace/${vendorId}`)}>
+          ← Back to vendor details
+        </Button>
 
           {(vendorLoading || eventsLoading) && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6 }}>
@@ -231,7 +196,6 @@ export default function RequestQuotationPage() {
             </SurfaceCard>
           )}
         </Box>
-      </Box>
-    </Box>
+    </AppLayout>
   );
 }

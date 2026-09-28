@@ -15,6 +15,14 @@ public class ScheduleRepository : IScheduleRepository
         _context = context;
     }
 
+    public async Task<EventSchedule?> GetByIdAsync(Guid scheduleId, CancellationToken cancellationToken = default)
+    {
+        return await _context.EventSchedules
+            .Include(s => s.Activities)
+            .Include(s => s.Conflicts)
+            .FirstOrDefaultAsync(s => s.Id == scheduleId, cancellationToken);
+    }
+
     public async Task<EventSchedule?> GetByEventIdAsync(Guid eventId, CancellationToken cancellationToken = default)
     {
         return await _context.EventSchedules

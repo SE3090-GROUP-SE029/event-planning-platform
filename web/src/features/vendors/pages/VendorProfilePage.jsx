@@ -156,7 +156,7 @@ export default function VendorProfilePage() {
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
             Business logo
           </Typography>
-          <Stack alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
+          <Stack spacing={1.5} sx={{ mb: 3, alignItems: 'center' }}>
             <Avatar
               src={imageUrl || undefined}
               sx={{ width: 112, height: 112, bgcolor: '#E8E4DA', color: '#19191C', fontSize: 42 }}

@@ -28,7 +28,12 @@ class EventSchedulePage extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () => notifier.refresh(),
         child: scheduleAsync.when(
-          data: (schedule) => _buildScheduleBody(context, schedule, notifier),
+          data: (schedule) => _buildScheduleBody(
+            context,
+            schedule,
+            notifier,
+            isLoading: scheduleAsync.isLoading,
+          ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stackTrace) {
             return Center(
@@ -76,8 +81,9 @@ class EventSchedulePage extends ConsumerWidget {
   Widget _buildScheduleBody(
     BuildContext context,
     EventSchedule schedule,
-    ScheduleNotifier notifier,
-  ) {
+    ScheduleNotifier notifier, {
+    required bool isLoading,
+  }) {
     final sortedActivities = [...schedule.activities]
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
     final unresolvedConflicts = schedule.conflicts
@@ -116,12 +122,69 @@ class EventSchedulePage extends ConsumerWidget {
         ],
         if (sortedActivities.isEmpty)
           SizedBox(
-            height: 220,
+            height: 260,
             child: Center(
-              child: Text(
-                'No activities scheduled yet.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textSecondary,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.auto_awesome,
+                      size: 48,
+                      color: AppColors.pastelLavenderText,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No activities scheduled yet',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Let AI build a timeline from your event details and vendor availability.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              try {
+                                await notifier.generateWithAi(schedule.id);
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      error.toString().replaceFirst(
+                                        'Exception: ',
+                                        '',
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                      icon: isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.auto_awesome_rounded),
+                      label: const Text('Generate Schedule with AI'),
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -5,6 +5,7 @@ using Domain.Enums;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 
 namespace Backend.UnitTests;
@@ -24,7 +25,7 @@ public class VendorMarketplaceServiceTests
 
     private static VendorMarketplaceService CreateService(AppDbContext db) =>
         new(
-            new VendorMarketplaceRepository(db),
+            new VendorMarketplaceRepository(db, NullLogger<VendorMarketplaceRepository>.Instance),
             new VendorOfferingRepository(db),
             new VendorGalleryImageRepository(db),
             new VendorAvailabilityRepository(db));

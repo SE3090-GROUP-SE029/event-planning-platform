@@ -1,17 +1,29 @@
-# mobile
+# Plan It mobile app
 
-A new Flutter project.
+The Flutter app uses named routes, Riverpod state, secure storage for authentication sessions, and SharedPreferences for onboarding completion.
 
-## Getting Started
+## Startup and onboarding
 
-This project is a starting point for a Flutter application.
+On launch, the branded startup screen remains visible while the existing auth session and the `onboarding_completed` preference load. A valid authenticated session opens the dashboard. A new user sees the three onboarding slides; after skipping or completing them, the app opens sign in and remembers that onboarding was completed. A returning signed-out user goes directly to sign in.
 
-A few resources to get you started if this is your first Flutter project:
+Signing out clears the secure auth session and resets `onboarding_completed` to `false`, so onboarding appears next. This preference also survives an app restart.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Illustrations
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Onboarding uses local Storyset Amico PNG assets in `assets/illustrations/`, so illustrations work offline. Sources:
+
+- [Team work](https://storyset.com/illustration/team-work/amico)
+- [Business plan](https://storyset.com/illustration/business-plan/amico)
+- [Mobile marketing](https://storyset.com/illustration/mobile-marketing/amico)
+
+The onboarding screen displays Storyset attribution. See `lib/features/onboarding/widgets/storyset_illustration.dart` to replace the local image mappings.
+
+## Local development
+
+Configure `API_BASE_URL` in `mobile/.env.local`, then run:
+
+```sh
+flutter pub get
+flutter run
+flutter test
+```

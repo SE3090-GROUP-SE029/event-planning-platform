@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/pastel_card.dart';
+import '../../../shared/widgets/pastel_icon_badge.dart';
+import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
 import '../api/vendor_remote_datasource.dart';
@@ -73,15 +76,30 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: AppDimens.space16),
-        child: Center(child: CircularProgressIndicator()),
+        padding: EdgeInsets.symmetric(vertical: AppDimens.space24),
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.obsidianBlack),
+          ),
+        ),
       );
     }
 
     if (_error != null) {
       return PastelCard(
         padding: const EdgeInsets.all(AppDimens.space16),
-        child: Text(_error!, style: const TextStyle(color: AppColors.error)),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.error),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -89,23 +107,58 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PastelSectionHeader(title: 'Vendor overview'),
+          const PastelSectionHeader(title: 'Vendor setup'),
           PastelCard(
             padding: const EdgeInsets.all(AppDimens.space20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Set up your vendor profile to start listing services.',
-                  style: TextStyle(color: AppColors.textSecondary),
+                const Row(
+                  children: [
+                    PastelIconBadge(
+                      icon: Icons.storefront_rounded,
+                      variant: PastelIconVariant.olive,
+                      size: 48,
+                      iconSize: 24,
+                    ),
+                    SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Create your business profile',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Set up your vendor profile to start listing services and receiving quotes.',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppDimens.space12),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pushNamed(
-                    '/vendors/profile',
-                    arguments: widget.session,
+                const SizedBox(height: AppDimens.space16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: AppButtonStyles.create(),
+                    onPressed: () => Navigator.of(context).pushNamed(
+                      '/vendors/profile',
+                      arguments: widget.session,
+                    ),
+                    icon: const Icon(Icons.add_business_rounded),
+                    label: const Text('Create Profile'),
                   ),
-                  child: const Text('Create profile'),
                 ),
               ],
             ),
@@ -121,7 +174,79 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const PastelSectionHeader(title: 'Vendor overview'),
+        // Vendor Metrics Grid
+        const PastelSectionHeader(title: 'Business overview'),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                title: 'Services',
+                value: '${_services.length}',
+                subtitle: 'Active offerings',
+                icon: Icons.handyman_rounded,
+                bgColor: AppColors.pastelBlueLight,
+                textColor: AppColors.pastelBlueText,
+                onTap: () => Navigator.of(context).pushNamed(
+                  '/vendors/services',
+                  arguments: widget.session,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                title: 'Requests',
+                value: 'Quotes',
+                subtitle: 'Inquiries',
+                icon: Icons.request_quote_rounded,
+                bgColor: AppColors.pastelYellowLight,
+                textColor: AppColors.pastelYellowText,
+                onTap: () => Navigator.of(context).pushNamed(
+                  '/vendors/quotations',
+                  arguments: widget.session,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                title: 'Availability',
+                value: 'Schedule',
+                subtitle: 'Manage dates',
+                icon: Icons.schedule_rounded,
+                bgColor: AppColors.pastelLavenderLight,
+                textColor: AppColors.pastelLavenderText,
+                onTap: () => Navigator.of(context).pushNamed(
+                  '/vendors/availability',
+                  arguments: widget.session,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                title: 'Status',
+                value: _profile!.status,
+                subtitle: _profile!.category,
+                icon: Icons.verified_rounded,
+                bgColor: AppColors.pastelGreenLight,
+                textColor: AppColors.pastelGreenText,
+                onTap: () => Navigator.of(context).pushNamed(
+                  '/vendors/profile',
+                  arguments: widget.session,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: AppDimens.space14),
+
+        // Business Profile Summary Card
         PastelCard(
           padding: const EdgeInsets.all(AppDimens.space20),
           child: Column(
@@ -130,13 +255,16 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 30,
+                    radius: 28,
                     backgroundColor: AppColors.pastelGreenLight,
                     backgroundImage:
                         imageUrl != null ? NetworkImage(imageUrl) : null,
                     child: imageUrl == null
-                        ? const Icon(Icons.storefront_rounded,
-                            color: AppColors.pastelGreenText)
+                        ? const Icon(
+                            Icons.storefront_rounded,
+                            color: AppColors.pastelGreenText,
+                            size: 26,
+                          )
                         : null,
                   ),
                   const SizedBox(width: AppDimens.space14),
@@ -149,13 +277,16 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 18,
+                            letterSpacing: -0.3,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           '${_profile!.category} · ${_profile!.status}',
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
+                            fontSize: 13,
                           ),
                         ),
                         Text(
@@ -170,125 +301,266 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
                   ),
                 ],
               ),
-              const SizedBox(height: AppDimens.space14),
+              const SizedBox(height: AppDimens.space16),
+
+              // Action Buttons Row with pastel styling
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pushNamed(
-                        '/vendors/profile',
-                        arguments: widget.session,
-                      ),
-                      child: const Text('Edit Profile'),
-                    ),
-                  ),
-                  const SizedBox(width: AppDimens.space8),
-                  Expanded(
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
+                      style: AppButtonStyles.primary(),
                       onPressed: () => Navigator.of(context).pushNamed(
                         '/vendors/services',
                         arguments: widget.session,
                       ),
-                      child: const Text('Manage Services'),
+                      icon: const Icon(Icons.handyman_outlined, size: 16),
+                      label: const Text('Services'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: AppButtonStyles.warning(),
+                      onPressed: () => Navigator.of(context).pushNamed(
+                        '/vendors/quotations',
+                        arguments: widget.session,
+                      ),
+                      icon: const Icon(Icons.request_quote_outlined, size: 16),
+                      label: const Text('Requests'),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: AppDimens.space8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pushNamed(
-                    '/vendors/quotations',
-                    arguments: widget.session,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: AppButtonStyles.outline(),
+                      onPressed: () => Navigator.of(context).pushNamed(
+                        '/vendors/profile',
+                        arguments: widget.session,
+                      ),
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Edit Profile'),
+                    ),
                   ),
-                  child: const Text('Quotation requests'),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: AppButtonStyles.create(),
+                      onPressed: () => Navigator.of(context).pushNamed(
+                        '/vendors/availability',
+                        arguments: widget.session,
+                      ),
+                      icon: const Icon(Icons.event_available_outlined, size: 16),
+                      label: const Text('Availability'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-        const PastelSectionHeader(title: 'Business images'),
-        PastelCard(
-          padding: const EdgeInsets.all(AppDimens.space16),
-          child: _gallery.isEmpty
-              ? const Text(
-                  'No business images yet. Add them from Edit Profile.',
-                  style: TextStyle(color: AppColors.textSecondary),
-                )
-              : Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: _gallery.map((image) {
-                    final url = VendorRemoteDataSource.resolveImageUrl(
-                        image.imageUrl);
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: url == null
-                          ? Container(
-                              width: 110,
-                              height: 84,
-                              color: AppColors.pastelGreenLight,
-                            )
-                          : Image.network(
-                              url,
-                              width: 110,
-                              height: 84,
-                              fit: BoxFit.cover,
-                            ),
-                    );
-                  }).toList(),
-                ),
-        ),
+
+        // Services Summary Section
         const PastelSectionHeader(title: 'Services summary'),
         PastelCard(
           padding: const EdgeInsets.all(AppDimens.space20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '${_services.length} service${_services.length == 1 ? '' : 's'} listed',
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${_services.length} service${_services.length == 1 ? '' : 's'} listed',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  PastelPillBadge(
+                    text: '${_services.length}',
+                    style: PastelBadgeStyle.blue,
+                  ),
+                ],
               ),
               const SizedBox(height: AppDimens.space12),
               if (recent.isEmpty)
-                const Text(
-                  'No services yet.',
-                  style: TextStyle(color: AppColors.textSecondary),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'No services listed yet. Add your services so planners can request quotations.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                 )
               else
                 ...recent.map(
                   (service) => Padding(
                     padding: const EdgeInsets.only(bottom: AppDimens.space10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          service.serviceName,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        Text(
-                          service.description ?? 'No description',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 13,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted,
+                        borderRadius:
+                            BorderRadius.circular(AppDimens.radiusMedium),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  service.serviceName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                if (service.description != null &&
+                                    service.description!.isNotEmpty)
+                                  Text(
+                                    service.description!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                          Text(
+                            service.displayPrice,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pushNamed(
-                  '/vendors/services',
-                  arguments: widget.session,
+              const SizedBox(height: AppDimens.space8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: AppButtonStyles.primary(),
+                  onPressed: () => Navigator.of(context).pushNamed(
+                    '/vendors/services',
+                    arguments: widget.session,
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Manage & Add Services'),
                 ),
-                child: const Text('Manage Services'),
               ),
             ],
           ),
         ),
+
+        // Business Images Section
+        if (_gallery.isNotEmpty) ...[
+          const PastelSectionHeader(title: 'Business images'),
+          PastelCard(
+            padding: const EdgeInsets.all(AppDimens.space16),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _gallery.map((image) {
+                final url =
+                    VendorRemoteDataSource.resolveImageUrl(image.imageUrl);
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: url == null
+                      ? Container(
+                          width: 100,
+                          height: 80,
+                          color: AppColors.pastelGreenLight,
+                        )
+                      : Image.network(
+                          url,
+                          width: 100,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color bgColor,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(AppDimens.radiusCard),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(icon, color: textColor, size: 22),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 12,
+                  color: AppColors.textMuted,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

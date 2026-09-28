@@ -141,18 +141,10 @@ class _EventListPageState extends ConsumerState<EventListPage> {
           const SizedBox(width: AppDimens.space16),
         ],
       ),
-      bottomNavigationBar: PastelBottomNavBar(
+      bottomNavigationBar: PastelBottomNavBar.roleBased(
+        context: context,
+        session: _auth,
         currentIndex: 1,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.of(context).pop();
-          } else if (index == 2 && _auth!.roles.contains('VENDOR')) {
-            Navigator.of(context)
-                .pushNamed('/vendors/profile', arguments: _auth);
-          }
-        },
-        onCenterActionTap: () =>
-            Navigator.pushNamed(context, '/events/create', arguments: _auth),
       ),
       body: RefreshIndicator(
         color: AppColors.obsidianBlack,

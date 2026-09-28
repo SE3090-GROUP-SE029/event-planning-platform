@@ -3,6 +3,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/pastel_bottom_nav_bar.dart';
 import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
@@ -269,6 +271,11 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       appBar: AppBar(
         title:
             Text(_hasProfile ? 'Edit vendor profile' : 'Create vendor profile'),
+      ),
+      bottomNavigationBar: PastelBottomNavBar.roleBased(
+        context: context,
+        session: _auth,
+        currentIndex: 3,
       ),
       body: _loading
           ? const Center(
@@ -552,21 +559,30 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                     SizedBox(
                       width: double.infinity,
                       height: 52,
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
+                        style: _hasProfile
+                            ? AppButtonStyles.success()
+                            : AppButtonStyles.create(),
                         onPressed: _saving ? null : _save,
-                        child: _saving
+                        icon: _saving
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
+                                      AppColors.pastelGreenText),
                                 ),
                               )
-                            : Text(_hasProfile
-                                ? 'Save changes'
-                                : 'Create profile'),
+                            : Icon(
+                                _hasProfile
+                                    ? Icons.check_circle_outline_rounded
+                                    : Icons.add_business_rounded,
+                                size: 18,
+                              ),
+                        label: Text(_hasProfile
+                            ? 'Save changes'
+                            : 'Create profile'),
                       ),
                     ),
 

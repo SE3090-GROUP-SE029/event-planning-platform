@@ -67,4 +67,9 @@ class ScheduleNotifier extends AsyncNotifier<EventSchedule> {
       state = AsyncValue.data(current);
     }
   }
+
+  Future<void> generateWithAi(String scheduleId) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _api.generateAiSchedule(scheduleId));
+  }
 }

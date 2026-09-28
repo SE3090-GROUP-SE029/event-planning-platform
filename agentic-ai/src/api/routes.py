@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.agents.scheduling_agent import SchedulingAgent
 from src.coordinator_agent.execution import (
     CoordinatorExecutionError,
     CoordinatorProviderError,
@@ -15,8 +16,15 @@ from src.coordinator_agent.execution import (
     execute_coordinator_agent,
 )
 from src.coordinator_agent.models import CoordinatorPlanOutput
+from src.gemini_client.client import GeminiClient
+from src.models.scheduling_models import (
+    GenerateScheduleRequest,
+    GenerateScheduleResponse,
+    ScheduleState,
+)
 
 router = APIRouter(prefix="/api/coordinator", tags=["Coordinator"])
+schedule_router = APIRouter(prefix="/api/schedules", tags=["Scheduling"])
 logger = logging.getLogger(__name__)
 _PROVIDER_MESSAGES = {
     "quota_exhausted": "Gemini quota is exhausted. Retry later.",
@@ -140,4 +148,52 @@ async def generate_coordinator_plan(
         raise HTTPException(
             status_code=500,
             detail="Plan generation failed. Please try again later.",
+        ) from exc
+
+
+@schedule_router.post(
+    "/generate",
+    response_model=GenerateScheduleResponse,
+    status_code=200,
+    tags=["Scheduling"],
+)
+async def generate_schedule(
+    request: GenerateScheduleRequest,
+    http_request: Request,
+) -> GenerateScheduleResponse:
+    """Generate a structured event schedule from the backend request payload."""
+
+    gemini_client = getattr(http_request.app.state, "gemini_client", None) or GeminiClient()
+    agent = SchedulingAgent(gemini_client)
+
+    state = ScheduleState(
+        event_id=request.event_id,
+        title=request.title,
+        event_type=request.event_type,
+        date=request.date,
+        start_time=request.start_time,
+        end_time=request.end_time,
+        guest_count=request.guest_count,
+        requirements=request.requirements,
+    )
+
+    try:
+        return await agent.run(state)
+    except TimeoutError as exc:
+        logger.warning("Schedule generation timed out for event %s", request.event_id)
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "code": "provider_timeout",
+                "message": "Schedule generation took too long. Please try again.",
+            },
+        ) from exc
+    except Exception as exc:
+        logger.exception("Schedule generation failed for event %s", request.event_id)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "schedule_generation_failed",
+                "message": "Schedule generation failed. Please try again later.",
+            },
         ) from exc
