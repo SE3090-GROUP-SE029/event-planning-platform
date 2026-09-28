@@ -122,6 +122,22 @@ class _PlanReviewPageState extends ConsumerState<PlanReviewPage> {
             icon: const Icon(Icons.refresh),
             label: const Text('Regenerate plan'),
           ),
+        if (!isAdmin && plan.status == PlanStatus.approved) ...[
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).pushNamed(
+                '/recommendations',
+                arguments: {
+                  'eventId': plan.eventId,
+                  'planId': plan.id,
+                },
+              );
+            },
+            icon: const Icon(Icons.storefront_outlined),
+            label: const Text('Recommend vendors'),
+          ),
+        ],
       ]),
     );
   }

@@ -12,6 +12,7 @@ public class BookingService : IBookingService
     private readonly IVendorRepository _vendors;
     private readonly IVendorOfferingRepository _offerings;
     private readonly IVendorAvailabilityRepository _availability;
+    private readonly IVendorRatingRepository _ratings;
     private readonly IEventRepository _events;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -21,6 +22,7 @@ public class BookingService : IBookingService
         IVendorRepository vendors,
         IVendorOfferingRepository offerings,
         IVendorAvailabilityRepository availability,
+        IVendorRatingRepository ratings,
         IEventRepository events,
         IUnitOfWork unitOfWork)
     {
@@ -29,6 +31,7 @@ public class BookingService : IBookingService
         _vendors = vendors;
         _offerings = offerings;
         _availability = availability;
+        _ratings = ratings;
         _events = events;
         _unitOfWork = unitOfWork;
     }
@@ -388,6 +391,7 @@ public class BookingService : IBookingService
         vendor ??= await _vendors.GetByIdAsync(booking.VendorId);
         var offering = await _offerings.GetByIdAsync(booking.VendorServiceId);
         var eventEntity = await _events.GetByIdAsync(booking.EventId);
+        var hasReview = await _ratings.ExistsForBookingAsync(booking.Id);
 
         return new BookingResponse
         {
@@ -411,7 +415,8 @@ public class BookingService : IBookingService
             CreatedAt = booking.CreatedAt,
             UpdatedAt = booking.UpdatedAt,
             CompletedAt = booking.CompletedAt,
-            CancelledAt = booking.CancelledAt
+            CancelledAt = booking.CancelledAt,
+            HasReview = hasReview
         };
     }
 }

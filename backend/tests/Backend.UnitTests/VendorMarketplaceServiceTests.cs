@@ -27,7 +27,8 @@ public class VendorMarketplaceServiceTests
             new VendorMarketplaceRepository(db),
             new VendorOfferingRepository(db),
             new VendorGalleryImageRepository(db),
-            new VendorAvailabilityRepository(db));
+            new VendorAvailabilityRepository(db),
+            new VendorRatingRepository(db));
 
     private static async Task<Vendor> SeedVendorAsync(
         AppDbContext db,

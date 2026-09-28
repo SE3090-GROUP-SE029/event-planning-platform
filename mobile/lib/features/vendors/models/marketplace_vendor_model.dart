@@ -7,6 +7,8 @@ class MarketplaceVendorSummary {
   final String? profileImageUrl;
   final double? startingPrice;
   final String? startingPricingType;
+  final double? averageRating;
+  final int reviewCount;
 
   MarketplaceVendorSummary({
     required this.id,
@@ -17,6 +19,8 @@ class MarketplaceVendorSummary {
     required this.profileImageUrl,
     required this.startingPrice,
     required this.startingPricingType,
+    required this.averageRating,
+    required this.reviewCount,
   });
 
   factory MarketplaceVendorSummary.fromJson(Map<String, dynamic> json) {
@@ -30,6 +34,12 @@ class MarketplaceVendorSummary {
       startingPrice:
           json['startingPrice'] == null ? null : (json['startingPrice'] as num).toDouble(),
       startingPricingType: json['startingPricingType'] as String?,
+      averageRating: json['averageRating'] == null
+          ? null
+          : (json['averageRating'] as num).toDouble(),
+      reviewCount: json['reviewCount'] is num
+          ? (json['reviewCount'] as num).toInt()
+          : int.tryParse('${json['reviewCount'] ?? ''}') ?? 0,
     );
   }
 
@@ -48,6 +58,13 @@ class MarketplaceVendorSummary {
       default:
         return amount;
     }
+  }
+
+  String get displayRating {
+    if (reviewCount <= 0 || averageRating == null) {
+      return 'No reviews yet';
+    }
+    return '★ ${averageRating!.toStringAsFixed(1)} ($reviewCount)';
   }
 }
 
@@ -183,6 +200,8 @@ class MarketplaceVendorDetail {
   final String address;
   final String? profileImageUrl;
   final String? websiteUrl;
+  final double? averageRating;
+  final int reviewCount;
   final List<MarketplaceGalleryItem> images;
   final List<MarketplaceServiceItem> services;
   final List<MarketplaceAvailabilityItem> availability;
@@ -195,6 +214,8 @@ class MarketplaceVendorDetail {
     required this.address,
     required this.profileImageUrl,
     required this.websiteUrl,
+    required this.averageRating,
+    required this.reviewCount,
     required this.images,
     required this.services,
     required this.availability,
@@ -209,6 +230,12 @@ class MarketplaceVendorDetail {
       address: json['address'] as String? ?? '',
       profileImageUrl: json['profileImageUrl'] as String?,
       websiteUrl: json['websiteUrl'] as String?,
+      averageRating: json['averageRating'] == null
+          ? null
+          : (json['averageRating'] as num).toDouble(),
+      reviewCount: json['reviewCount'] is num
+          ? (json['reviewCount'] as num).toInt()
+          : int.tryParse('${json['reviewCount'] ?? ''}') ?? 0,
       images: (json['images'] as List<dynamic>? ?? [])
           .map((item) =>
               MarketplaceGalleryItem.fromJson(item as Map<String, dynamic>))
@@ -222,5 +249,12 @@ class MarketplaceVendorDetail {
               item as Map<String, dynamic>))
           .toList(),
     );
+  }
+
+  String get displayRating {
+    if (reviewCount <= 0 || averageRating == null) {
+      return 'No reviews yet';
+    }
+    return '★ ${averageRating!.toStringAsFixed(1)} ($reviewCount)';
   }
 }

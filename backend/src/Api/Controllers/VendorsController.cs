@@ -16,17 +16,20 @@ public class VendorsController : ControllerBase
     private readonly IVendorOfferingService _offeringService;
     private readonly IVendorGalleryService _galleryService;
     private readonly IVendorAvailabilityService _availabilityService;
+    private readonly IVendorAnalyticsService _analyticsService;
 
     public VendorsController(
         IVendorService vendorService,
         IVendorOfferingService offeringService,
         IVendorGalleryService galleryService,
-        IVendorAvailabilityService availabilityService)
+        IVendorAvailabilityService availabilityService,
+        IVendorAnalyticsService analyticsService)
     {
         _vendorService = vendorService;
         _offeringService = offeringService;
         _galleryService = galleryService;
         _availabilityService = availabilityService;
+        _analyticsService = analyticsService;
     }
 
     [HttpPost]
@@ -54,6 +57,19 @@ public class VendorsController : ControllerBase
         {
             var result = await _vendorService.GetMyProfileAsync(GetCurrentUserId());
             return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("me/analytics")]
+    public async Task<ActionResult<VendorAnalyticsResponse>> GetMyAnalytics()
+    {
+        try
+        {
+            return Ok(await _analyticsService.GetMyAnalyticsAsync(GetCurrentUserId()));
         }
         catch (KeyNotFoundException ex)
         {

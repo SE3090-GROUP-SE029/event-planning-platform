@@ -80,6 +80,28 @@ public class VendorMarketplaceRepository : IVendorMarketplaceRepository
             StartingPricingType = x.StartingPricingType?.ToString()
         }).ToList();
 
+        var aggregates = await _db.VendorRatings
+            .AsNoTracking()
+            .Where(r => items.Select(i => i.Id).Contains(r.VendorId))
+            .GroupBy(r => r.VendorId)
+            .Select(g => new
+            {
+                VendorId = g.Key,
+                Average = g.Average(r => (decimal)r.Rating),
+                Count = g.Count()
+            })
+            .ToListAsync();
+
+        var byVendor = aggregates.ToDictionary(a => a.VendorId);
+        foreach (var item in items)
+        {
+            if (byVendor.TryGetValue(item.Id, out var stats))
+            {
+                item.AverageRating = Math.Round(stats.Average, 2, MidpointRounding.AwayFromZero);
+                item.ReviewCount = stats.Count;
+            }
+        }
+
         return (items, totalCount);
     }
 

@@ -8,6 +8,7 @@ const STATUS_STYLES = {
   CANCELLED: { bg: '#7a3b37', color: '#FDE4E1' },
   APPROVED: { bg: '#214b3b', color: '#E2F5EA' },
   PENDING: { bg: '#6e5221', color: '#FFF3D6' },
+  SUSPEND: { bg: '#7a3b37', color: '#FDE4E1' },
   REJECTED: { bg: '#7a3b37', color: '#FDE4E1' },
 };
 

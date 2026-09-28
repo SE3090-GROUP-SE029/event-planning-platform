@@ -81,7 +81,14 @@ export default function AdminEventManagementPage() {
       <CollapsibleSidebar
         activeTab="events"
         showEvents
-        onSelectTab={(tab) => tab === 'dashboard' && navigate('/dashboard')}
+        showVendors
+        showPlanMonitoring
+        onSelectTab={(tab) => {
+          if (tab === 'dashboard') navigate('/dashboard');
+          if (tab === 'events') navigate('/admin/events');
+          if (tab === 'vendors') navigate('/admin/vendors');
+          if (tab === 'plans') navigate('/admin/plans');
+        }}
         onLogout={() => {
           logout();
           navigate('/login');

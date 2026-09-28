@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/api/dio_client.dart';
 import '../models/marketplace_vendor_model.dart';
+import '../models/vendor_analytics_model.dart';
 import '../models/vendor_availability_model.dart';
 import '../models/vendor_gallery_image_model.dart';
 import '../models/vendor_profile_model.dart';
@@ -43,6 +44,20 @@ class VendorRemoteDataSource {
       if (e.response?.statusCode == 404) {
         return null;
       }
+      throw _handleError(e);
+    }
+  }
+
+  Future<VendorAnalyticsModel> getMyAnalytics(String accessToken) async {
+    try {
+      final response = await dio.get(
+        '/api/vendors/me/analytics',
+        options: _auth(accessToken),
+      );
+      return VendorAnalyticsModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
       throw _handleError(e);
     }
   }

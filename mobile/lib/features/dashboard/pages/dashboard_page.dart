@@ -283,6 +283,18 @@ class DashboardPage extends ConsumerWidget {
                         arguments: session,
                       ),
                     ),
+                    PastelListItem(
+                      icon: Icons.insights_outlined,
+                      iconVariant: PastelIconVariant.olive,
+                      title: 'Analytics',
+                      subtitle:
+                          'Bookings, revenue, ratings, and quotation summary',
+                      showDivider: true,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/vendors/analytics',
+                        arguments: session,
+                      ),
+                    ),
                   ],
                   PastelListItem(
                     icon: Icons.add_circle_outline_rounded,

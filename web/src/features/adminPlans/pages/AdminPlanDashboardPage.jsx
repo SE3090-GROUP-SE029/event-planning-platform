@@ -75,10 +75,12 @@ export default function AdminPlanDashboardPage() {
       <CollapsibleSidebar
         activeTab="plans"
         showEvents
+        showVendors
         showPlanMonitoring
         onSelectTab={(tab) => {
           if (tab === 'dashboard') navigate('/dashboard');
           if (tab === 'events') navigate('/admin/events');
+          if (tab === 'vendors') navigate('/admin/vendors');
           if (tab === 'plans') navigate('/admin/plans');
         }}
         onLogout={handleLogout}

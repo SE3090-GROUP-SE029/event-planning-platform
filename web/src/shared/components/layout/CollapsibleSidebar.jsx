@@ -11,6 +11,7 @@ import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import BookOnlineOutlinedIcon from '@mui/icons-material/BookOnlineOutlined';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
@@ -18,6 +19,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 const Icons = {
   Dashboard: () => <HomeFilledIcon />,
   Events: () => <EventAvailableIcon />,
+  Vendors: () => <GroupsOutlinedIcon />,
   Schedule: () => <CalendarMonthIcon />,
   Marketplace: () => <StorefrontOutlinedIcon />,
   MyQuotations: () => <ReceiptLongOutlinedIcon />,
@@ -36,6 +38,7 @@ const Icons = {
 export default function CollapsibleSidebar({
   activeTab = 'dashboard',
   showEvents = false,
+  showVendors = false,
   showSchedule = true,
   showMarketplace = false,
   showMyQuotations = false,
@@ -53,6 +56,7 @@ export default function CollapsibleSidebar({
   const items = [
     { id: 'dashboard', label: 'Dashboard', icon: Icons.Dashboard },
     ...(showEvents ? [{ id: 'events', label: 'Events', icon: Icons.Events }] : []),
+    ...(showVendors ? [{ id: 'vendors', label: 'Vendors', icon: Icons.Vendors }] : []),
     ...(showSchedule ? [{ id: 'schedule', label: 'Schedule', icon: Icons.Schedule }] : []),
     ...(showMarketplace ? [{ id: 'marketplace', label: 'Marketplace', icon: Icons.Marketplace }] : []),
     ...(showMyQuotations ? [{ id: 'my-quotations', label: 'My quotations', icon: Icons.MyQuotations }] : []),

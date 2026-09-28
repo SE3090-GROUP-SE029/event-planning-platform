@@ -208,6 +208,7 @@ export default function DashboardPage() {
         <CollapsibleSidebar
           activeTab="dashboard"
           showEvents={isAdmin}
+          showVendors={isAdmin}
           showSchedule={true}
           showPlanMonitoring={isAdmin}
           showMarketplace={showMarketplace}
@@ -221,6 +222,7 @@ export default function DashboardPage() {
           onSelectTab={(tab) => {
             if (tab === 'dashboard') navigate('/dashboard');
             if (tab === 'events') navigate('/admin/events');
+            if (tab === 'vendors') navigate('/admin/vendors');
             if (tab === 'schedule') {
               const eventId = prompt('Enter Event ID to open schedule:');
               if (eventId?.trim()) navigate(`/events/${eventId.trim()}/schedule`);

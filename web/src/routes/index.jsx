@@ -6,6 +6,8 @@ import AdminEventManagementPage from '../features/adminEvents/pages/AdminEventMa
 import AdminEventDetailsPage from '../features/adminEvents/pages/AdminEventDetailsPage';
 import AdminPlanDashboardPage from '../features/adminPlans/pages/AdminPlanDashboardPage';
 import AdminPlanDetailsPage from '../features/adminPlans/pages/AdminPlanDetailsPage';
+import AdminVendorDirectoryPage from '../features/adminVendors/pages/AdminVendorDirectoryPage';
+import AdminVendorDetailsPage from '../features/adminVendors/pages/AdminVendorDetailsPage';
 import VendorProfilePage from '../features/vendors/pages/VendorProfilePage';
 import VendorServicesPage from '../features/vendors/pages/VendorServicesPage';
 import VendorAvailabilityPage from '../features/vendors/pages/VendorAvailabilityPage';
@@ -55,6 +57,14 @@ export const router = createBrowserRouter([
   {
     path: '/admin/plans/:id',
     element: <ProtectedRoute requiredRole="ADMIN"><AdminPlanDetailsPage /></ProtectedRoute>,
+  },
+  {
+    path: '/admin/vendors',
+    element: <ProtectedRoute requiredRole="ADMIN"><AdminVendorDirectoryPage /></ProtectedRoute>,
+  },
+  {
+    path: '/admin/vendors/:id',
+    element: <ProtectedRoute requiredRole="ADMIN"><AdminVendorDetailsPage /></ProtectedRoute>,
   },
   {
     path: '/marketplace',

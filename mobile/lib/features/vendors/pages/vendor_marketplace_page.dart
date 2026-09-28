@@ -252,6 +252,11 @@ class _VendorMarketplacePageState extends State<VendorMarketplacePage> {
                                   color: AppColors.textSecondary,
                                 ),
                               ),
+                              const SizedBox(height: 4),
+                              Text(
+                                vendor.displayRating,
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
                               const SizedBox(height: 6),
                               Text(
                                 vendor.shortDescription ??

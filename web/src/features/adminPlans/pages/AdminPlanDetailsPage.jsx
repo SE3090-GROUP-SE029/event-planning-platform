@@ -18,7 +18,7 @@ export default function AdminPlanDetailsPage() {
   const name = plan?.eventSnapshot?.eventName || 'Plan details';
 
   return <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F3E9', p: { xs: 1.5, md: 2.5 }, gap: { xs: 2, md: 3 } }}>
-    <CollapsibleSidebar activeTab="plans" showEvents showPlanMonitoring onSelectTab={(value) => value === 'events' ? navigate('/admin/events') : value === 'dashboard' ? navigate('/dashboard') : navigate('/admin/plans')} onLogout={() => { logout(); navigate('/login'); }} />
+    <CollapsibleSidebar activeTab="plans" showEvents showVendors showPlanMonitoring onSelectTab={(value) => value === 'events' ? navigate('/admin/events') : value === 'vendors' ? navigate('/admin/vendors') : value === 'dashboard' ? navigate('/dashboard') : navigate('/admin/plans')} onLogout={() => { logout(); navigate('/login'); }} />
     <Box sx={{ flex: 1, minWidth: 0 }}>
       <Button startIcon={<ArrowBackOutlinedIcon />} onClick={() => navigate('/admin/plans')} sx={{ mb: 1 }}>Back to plans</Button>
       {query.isLoading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>}
