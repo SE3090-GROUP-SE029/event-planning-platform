@@ -1,4 +1,4 @@
-﻿import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Alert, Box, Button, CircularProgress, Grid, Stack, Typography } from '@mui/material';
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
@@ -74,6 +74,27 @@ export default function AdminEventDetailsPage() {
           sx={{ borderRadius: 9999, px: 2.5 }}
         >
           Upload Guest List
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => navigate(`/admin/events/${id}/guests`)}
+          sx={{ borderRadius: 9999, px: 2.5 }}
+        >
+          Manage Guests
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => navigate(`/admin/events/${id}/check-in`)}
+          sx={{ borderRadius: 9999, px: 2.5 }}
+        >
+          Check-In Guests
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => navigate(`/admin/events/${id}/analytics`)}
+          sx={{ borderRadius: 9999, px: 2.5, boxShadow: 'none' }}
+        >
+          View Analytics
         </Button>
       </Stack>
 

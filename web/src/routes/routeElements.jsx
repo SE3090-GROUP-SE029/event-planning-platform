@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import ProtectedRoute from '../shared/components/ProtectedRoute';
 
@@ -8,6 +8,9 @@ const DashboardPage = lazy(() => import('../features/dashboard/pages/DashboardPa
 const AdminEventManagementPage = lazy(() => import('../features/adminEvents/pages/AdminEventManagementPage'));
 const AdminEventDetailsPage = lazy(() => import('../features/adminEvents/pages/AdminEventDetailsPage'));
 const GuestListUploadPage = lazy(() => import('../features/adminEvents/pages/GuestListUploadPage'));
+const GuestManagementPage = lazy(() => import('../features/adminEvents/pages/GuestManagementPage'));
+const GuestCheckInPage = lazy(() => import('../features/adminEvents/pages/GuestCheckInPage'));
+const EventAnalyticsPage = lazy(() => import('../features/adminEvents/pages/EventAnalyticsPage'));
 const AdminPlanDashboardPage = lazy(() => import('../features/adminPlans/pages/AdminPlanDashboardPage'));
 const AdminPlanDetailsPage = lazy(() => import('../features/adminPlans/pages/AdminPlanDetailsPage'));
 const AdminAnalyticsPage = lazy(() => import('../features/dashboard/pages/AdminAnalyticsPage'));
@@ -69,6 +72,18 @@ export function AdminEventDetailsRoute() {
 
 export function GuestListUploadRoute() {
   return <AdminPage page={GuestListUploadPage} />;
+}
+
+export function GuestManagementRoute() {
+  return <AdminPage page={GuestManagementPage} />;
+}
+
+export function EventAnalyticsRoute() {
+  return <AdminPage page={EventAnalyticsPage} />;
+}
+
+export function GuestCheckInRoute() {
+  return <AdminPage page={GuestCheckInPage} />;
 }
 
 export function AdminVendorsRoute() {

@@ -22,7 +22,7 @@ import SurfaceCard from "../../../shared/components/ui/SurfaceCard";
 import { useUploadGuestList } from "../api/guestListApi";
 import { tokens } from "../../../shared/theme/tokens";
 
-const ACCEPTED_TYPES = ".csv,text/csv,text/plain,application/octet-stream";
+const ACCEPTED_TYPES = ".csv,text/csv,text/plain,application/octet-stream,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function StatBox({ label, value, variant }) {
   return (
@@ -89,7 +89,7 @@ export default function GuestListUploadPage() {
           Upload Guest List
         </Typography>
         <Typography color="text.secondary">
-          Upload a CSV file to register multiple guests at once. Each valid guest enters
+          Upload a CSV, PDF, or DOCX file to register multiple guests at once. Each valid guest enters
           the same AI review → capacity → invitation pipeline as public registrations.
         </Typography>
       </Box>
@@ -97,10 +97,10 @@ export default function GuestListUploadPage() {
       {/* Instructions card */}
       <SurfaceCard variant="analytics" sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
-          CSV Format Requirements
+          File Format Requirements
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          The first row must be a header row. Required columns:
+          For CSV, the first row must be a header row. For PDF/DOCX, list names and emails. Required columns/fields:
         </Typography>
         <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }}>
           {["fullName", "emailAddress"].map((col) => (
@@ -148,12 +148,12 @@ export default function GuestListUploadPage() {
         />
         <FileUploadOutlinedIcon sx={{ fontSize: 48, color: tokens.colors.textMuted, mb: 1 }} />
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
-          {selectedFile ? selectedFile.name : "Drop your CSV here, or click to browse"}
+          {selectedFile ? selectedFile.name : "Drop your CSV, PDF, or DOCX here, or click to browse"}
         </Typography>
         <Typography variant="caption" color="text.secondary">
           {selectedFile
             ? `${(selectedFile.size / 1024).toFixed(1)} KB selected`
-            : "Accepted: .csv — max 5 MB, up to 1,000 rows"}
+            : "Accepted: .csv, .pdf, .docx — max 5 MB, up to 1,000 rows"}
         </Typography>
       </SurfaceCard>
 

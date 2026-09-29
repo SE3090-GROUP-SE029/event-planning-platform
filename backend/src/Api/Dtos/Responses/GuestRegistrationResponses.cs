@@ -37,13 +37,13 @@ public record PublicRegistrationResponse(string PublicReference, string Status, 
 public record PlannerRegistrationResponse(long Id, string FullName, string EmailAddress, string? Organisation,
     string? PhoneNumber, string Status, string? RsvpStatus, string? EmailDeliveryStatus,
     DateTimeOffset RegisteredAt, DateTimeOffset? ConfirmedAt, DateTimeOffset? CancelledAt,
-    int DeliveryAttempts, DateTimeOffset? SentAt, RegistrationAnswerResponse[] Answers)
+    int DeliveryAttempts, DateTimeOffset? SentAt, DateTimeOffset? CheckedInAt, string? CheckedInMethod, RegistrationAnswerResponse[] Answers)
 {
     public static PlannerRegistrationResponse From(RegistrationSubmission registration) => new(registration.Id,
         registration.Guest.FullName, registration.Guest.EmailAddress, registration.Guest.Organisation,
         registration.Guest.PhoneNumber, registration.Status.ToString(), registration.Invitation?.RsvpStatus.ToString(),
         registration.RejectionDeliveryStatus?.ToString() ?? registration.Invitation?.DeliveryStatus.ToString(), registration.RegisteredAt, registration.ConfirmedAt,
         registration.CancelledAt, registration.RejectionDeliveryStatus is not null ? registration.RejectionDeliveryAttempts : registration.Invitation?.DeliveryAttempts ?? 0,
-        registration.RejectionSentAt ?? registration.Invitation?.SentAt,
+        registration.RejectionSentAt ?? registration.Invitation?.SentAt, registration.CheckedInAt, registration.CheckedInMethod?.ToString(),
         registration.Answers.Select(a => new RegistrationAnswerResponse(a.RegistrationQuestionId, a.Answer)).ToArray());
 }

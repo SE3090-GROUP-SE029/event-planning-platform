@@ -39,4 +39,18 @@ public sealed class AdminEventsController : ControllerBase
             return NotFound(new { message = ex.Message });
         }
     }
+
+    [HttpGet("/api/events/{eventId:guid}/analytics")]
+    public async Task<ActionResult<EventAnalyticsDto>> GetAnalytics(Guid eventId, [FromServices] Application.GuestManagement.IGuestRegistrationRepository repo, CancellationToken ct)
+    {
+        try
+        {
+            var result = await repo.GetEventAnalyticsAsync(eventId, ct);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
 }

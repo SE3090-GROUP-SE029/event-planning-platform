@@ -29,10 +29,16 @@ public class BulkGuestUploadService(
     public async Task<BulkGuestUploadResult> ProcessAsync(
         Guid eventId,
         string plannerId,
-        string csvContent,
+        Stream fileStream,
+        string extension,
         CancellationToken ct)
     {
-        var (parsedRows, parseErrors) = GuestCsvParser.Parse(csvContent);
+        var (parsedRows, parseErrors) = extension switch
+        {
+            ".pdf" => GuestDocumentParser.ParsePdf(fileStream),
+            ".docx" => GuestDocumentParser.ParseDocx(fileStream),
+            _ => GuestCsvParser.Parse(new StreamReader(fileStream).ReadToEnd())
+        };
 
         var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var duplicateRows = new List<GuestUploadRowError>();

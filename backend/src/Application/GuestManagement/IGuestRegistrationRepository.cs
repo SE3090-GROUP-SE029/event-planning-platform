@@ -1,4 +1,5 @@
 using Domain.Entities;
+using Domain.Enums;
 
 namespace Application.GuestManagement;
 
@@ -13,7 +14,7 @@ public interface IGuestRegistrationRepository
     Task<bool> EmailExistsAsync(Guid eventId, string normalizedEmail, CancellationToken cancellationToken);
     Task<int> ConfirmedCountAsync(Guid eventId, CancellationToken cancellationToken);
     Task<IReadOnlyList<RegistrationSubmission>> WaitingAsync(Guid eventId, CancellationToken cancellationToken);
-    Task<RegistrationPage> ListAsync(Guid eventId, int page, int pageSize, CancellationToken cancellationToken);
+    Task<RegistrationPage> ListAsync(Guid eventId, int page, int pageSize, CancellationToken cancellationToken, RegistrationStatus? status = null, RsvpStatus? rsvpStatus = null, bool? isWaitlisted = null, bool? checkedIn = null);
     Task<bool> TokenExistsAsync(string value, CancellationToken cancellationToken);
     Task<Invitation?> FindInvitationByTokenAsync(string token, CancellationToken cancellationToken);
     Task<(Guid EventId, long Id)?> PendingDeliveryAsync(DateTimeOffset retryBefore, CancellationToken ct);
@@ -21,5 +22,6 @@ public interface IGuestRegistrationRepository
     void AddQuestion(RegistrationQuestion question);
     void AddRegistration(RegistrationSubmission registration);
     void AddInvitation(Invitation invitation);
+    Task<Application.Dtos.Events.EventAnalyticsDto> GetEventAnalyticsAsync(Guid eventId, CancellationToken cancellationToken);
     Task SaveAsync(CancellationToken cancellationToken);
 }

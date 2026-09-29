@@ -62,9 +62,31 @@ public class GuestRegistrationRepository(AppDbContext db) : IGuestRegistrationRe
             db.GuestAiReviews.Any(r => r.RegistrationSubmissionId == e.Id && r.Status == AiAnalysisStatus.COMPLETED && r.Decision == AiDecision.ACCEPTED))
             .OrderBy(e => e.RegisteredAt).ThenBy(e => e.Id).ToListAsync(ct);
 
-    public async Task<RegistrationPage> ListAsync(Guid eventId, int page, int pageSize, CancellationToken ct)
+    public async Task<RegistrationPage> ListAsync(Guid eventId, int page, int pageSize, CancellationToken ct, RegistrationStatus? status = null, RsvpStatus? rsvpStatus = null, bool? isWaitlisted = null, bool? checkedIn = null)
     {
         var query = Registrations.Where(e => e.EventId == eventId);
+        
+        if (status.HasValue)
+        {
+            query = query.Where(e => e.Status == status.Value);
+        }
+        
+        if (rsvpStatus.HasValue)
+        {
+            query = query.Where(e => e.Invitation != null && e.Invitation.RsvpStatus == rsvpStatus.Value);
+        }
+
+        if (isWaitlisted.HasValue && isWaitlisted.Value)
+        {
+            query = query.Where(e => e.Status == RegistrationStatus.WAITING_LIST);
+        }
+        
+        if (checkedIn.HasValue)
+        {
+            if (checkedIn.Value) query = query.Where(e => e.CheckedInAt != null);
+            else query = query.Where(e => e.CheckedInAt == null);
+        }
+
         var total = await query.CountAsync(ct);
         var rows = await query.OrderBy(e => e.RegisteredAt).ThenBy(e => e.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         return new RegistrationPage(rows, total, page, pageSize);
@@ -101,5 +123,49 @@ public class GuestRegistrationRepository(AppDbContext db) : IGuestRegistrationRe
         });
     }
     public void AddInvitation(Invitation invitation) => db.Invitations.Add(invitation);
+    
+    public async Task<Application.Dtos.Events.EventAnalyticsDto> GetEventAnalyticsAsync(Guid eventId, CancellationToken ct)
+    {
+        var ev = await db.Events.AsNoTracking().FirstOrDefaultAsync(e => e.Id == eventId, ct)
+                 ?? throw new KeyNotFoundException("Event not found");
+
+        var registrations = await db.RegistrationSubmissions
+            .AsNoTracking()
+            .Include(r => r.Invitation)
+            .Where(r => r.EventId == eventId)
+            .ToListAsync(ct);
+
+        int total = registrations.Count;
+        int pendingAi = registrations.Count(r => r.Status == RegistrationStatus.PENDING_AI);
+        int accepted = registrations.Count(r => r.Status == RegistrationStatus.CONFIRMED);
+        int rejected = registrations.Count(r => r.Status == RegistrationStatus.REJECTED);
+        int waitlisted = registrations.Count(r => r.Status == RegistrationStatus.WAITING_LIST);
+
+        int rsvpAccepted = registrations.Count(r => r.Invitation?.RsvpStatus == RsvpStatus.ACCEPTED);
+        int rsvpDeclined = registrations.Count(r => r.Invitation?.RsvpStatus == RsvpStatus.DECLINED);
+        int rsvpMaybe = registrations.Count(r => r.Invitation?.RsvpStatus == RsvpStatus.MAYBE);
+
+        int checkedIn = registrations.Count(r => r.CheckedInAt.HasValue);
+        int notCheckedIn = total - checkedIn;
+
+        int capacity = ev.GuestCount;
+        int availableSeats = Math.Max(0, capacity - accepted);
+
+        return new Application.Dtos.Events.EventAnalyticsDto(
+            TotalRegistrations: total,
+            PendingAi: pendingAi,
+            Accepted: accepted,
+            Rejected: rejected,
+            Waitlisted: waitlisted,
+            RsvpAccepted: rsvpAccepted,
+            RsvpDeclined: rsvpDeclined,
+            RsvpMaybe: rsvpMaybe,
+            CheckedIn: checkedIn,
+            NotCheckedIn: notCheckedIn,
+            AvailableSeats: availableSeats,
+            Capacity: capacity
+        );
+    }
+
     public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 }

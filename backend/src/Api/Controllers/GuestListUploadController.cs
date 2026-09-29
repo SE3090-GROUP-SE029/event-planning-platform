@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Api.GuestManagement;
 using Application.GuestManagement;
 using Microsoft.AspNetCore.Mvc;
@@ -31,31 +31,20 @@ public class GuestListUploadController(BulkGuestUploadService uploadService) : C
     public async Task<IActionResult> Upload(Guid eventId, IFormFile? file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
-            return BadRequest(new { code = "file_required", error = "A CSV file is required." });
+            return BadRequest(new { code = "file_required", error = "A file is required." });
 
         if (file.Length > MaxFileSizeBytes)
             return BadRequest(new { code = "file_too_large", error = $"File must not exceed {MaxFileSizeBytes / 1024 / 1024} MB." });
 
-        var contentType = file.ContentType?.ToLowerInvariant() ?? string.Empty;
         var extension = Path.GetExtension(file.FileName)?.ToLowerInvariant() ?? string.Empty;
-        if (!contentType.Contains("csv") && !contentType.Contains("text/plain") &&
-            !contentType.Contains("octet-stream") && extension != ".csv")
+        var validExtensions = new[] { ".csv", ".pdf", ".docx" };
+        if (!validExtensions.Contains(extension))
         {
-            return BadRequest(new { code = "invalid_file_type", error = "Only CSV files are supported. Expected a .csv file." });
+            return BadRequest(new { code = "invalid_file_type", error = "Only CSV, PDF, and DOCX files are supported." });
         }
 
-        string csvContent;
-        try
-        {
-            using var reader = new StreamReader(file.OpenReadStream());
-            csvContent = await reader.ReadToEndAsync(ct);
-        }
-        catch (Exception)
-        {
-            return BadRequest(new { code = "file_read_error", error = "Could not read the uploaded file." });
-        }
-
-        var result = await uploadService.ProcessAsync(eventId, PlannerId, csvContent, ct);
+        using var stream = file.OpenReadStream();
+        var result = await uploadService.ProcessAsync(eventId, PlannerId, stream, extension, ct);
         return Ok(result);
     }
 }
