@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+﻿import { createBrowserRouter, Navigate } from 'react-router-dom';
 import {
   AdminAnalyticsRoute,
   AdminDashboardRoute,
@@ -9,6 +9,7 @@ import {
   AdminSystemRoute,
   AdminUsersRoute,
   AdminVendorsRoute,
+  GuestListUploadRoute,
   LandingRoute,
   LoginRoute,
 } from './routeElements';
@@ -47,6 +48,10 @@ export const router = createBrowserRouter([
     element: <AdminEventDetailsRoute />,
   },
   {
+    path: '/admin/events/:id/guest-upload',
+    element: <GuestListUploadRoute />,
+  },
+  {
     path: '/admin/vendors',
     element: <AdminVendorsRoute />,
   },
@@ -66,5 +71,5 @@ export const router = createBrowserRouter([
     path: '*',
     element: <Navigate to="/" replace />,
   },
-  
+
 ]);

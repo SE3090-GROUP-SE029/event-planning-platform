@@ -13,6 +13,7 @@ public static class GuestManagementServices
         services.AddScoped<IRegistrationEligibilityPolicy, ValidatedRegistrationEligibilityPolicy>();
         services.AddScoped<IGuestRegistrationRepository, GuestRegistrationRepository>();
         services.AddScoped<RegistrationService>();
+        services.AddScoped<BulkGuestUploadService>(); // C4 planner guest list upload
         services.Configure<GuestAiOptions>(configuration.GetSection("GuestAi"));
         services.AddSingleton<AiClientOptions>(provider =>
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<GuestAiOptions>>().Value);
