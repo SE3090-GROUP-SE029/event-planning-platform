@@ -23,4 +23,5 @@ public class BookingResponse
     public DateTime? UpdatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public DateTime? CancelledAt { get; set; }
+    public bool HasReview { get; set; }
 }

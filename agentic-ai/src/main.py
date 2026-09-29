@@ -19,6 +19,7 @@ from src.models.message_models import (
 )
 from src.services.backend_client import BackendClient
 from src.api.routes import router as coordinator_router
+from src.vendor_analysis.routes import router as vendor_analysis_router
 from src.coordinator_agent.config import configure_logging, get_settings
 from src.gemini_client.client import configure_gemini
 from src.gemini_client.exceptions import GeminiConfigurationError
@@ -112,6 +113,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(coordinator_router)
+app.include_router(vendor_analysis_router)
 
 # ============================================================================
 # HEALTH CHECK & PING ENDPOINTS

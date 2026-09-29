@@ -10,6 +10,7 @@ const STATUS_STYLES = {
   CANCELLED: { bg: tokens.colors.pastelPinkLight, color: tokens.colors.pastelPinkText },
   APPROVED: { bg: tokens.colors.pastelGreenLight, color: tokens.colors.pastelGreenText },
   PENDING: { bg: tokens.colors.pastelPeachLight, color: tokens.colors.pastelPeachText },
+  SUSPEND: { bg: tokens.colors.pastelPinkLight, color: tokens.colors.pastelPinkText },
   REJECTED: { bg: tokens.colors.pastelPinkLight, color: tokens.colors.pastelPinkText },
 };
 

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/api/dio_client.dart';
 import '../models/booking_model.dart';
+import '../models/vendor_rating_model.dart';
 
 class BookingRemoteDataSource {
   final Dio dio;
@@ -90,6 +91,39 @@ class BookingRemoteDataSource {
         options: _auth(accessToken),
       );
       return BookingModel.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<VendorRatingModel> createReview(
+    String accessToken,
+    String bookingId, {
+    required int rating,
+    String? comment,
+  }) async {
+    try {
+      final response = await dio.post(
+        '/api/bookings/$bookingId/review',
+        data: {
+          'rating': rating,
+          'comment': comment,
+        },
+        options: _auth(accessToken),
+      );
+      return VendorRatingModel.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<VendorRatingModel> getReview(String accessToken, String bookingId) async {
+    try {
+      final response = await dio.get(
+        '/api/bookings/$bookingId/review',
+        options: _auth(accessToken),
+      );
+      return VendorRatingModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
     }

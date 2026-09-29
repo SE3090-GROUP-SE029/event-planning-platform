@@ -1,0 +1,18 @@
+namespace Application.Dtos.Vendors;
+
+public class AdminVendorResponse
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string BusinessName { get; set; } = default!;
+    public string Category { get; set; } = default!;
+    public string ContactEmail { get; set; } = default!;
+    public string ContactPhone { get; set; } = default!;
+    public string Address { get; set; } = default!;
+    public string? Description { get; set; }
+    public string? ProfileImageUrl { get; set; }
+    public string? WebsiteUrl { get; set; }
+    public string Status { get; set; } = default!;
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}

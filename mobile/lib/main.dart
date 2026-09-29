@@ -26,6 +26,8 @@ import 'features/quotations/pages/my_quotations_page.dart';
 import 'features/quotations/pages/request_quotation_page.dart';
 import 'features/quotations/pages/vendor_quotation_detail_page.dart';
 import 'features/quotations/pages/vendor_quotations_page.dart';
+import 'features/recommendations/pages/vendor_recommendations_page.dart';
+import 'features/vendors/pages/vendor_analytics_page.dart';
 import 'features/vendors/pages/vendor_availability_page.dart';
 import 'features/vendors/pages/vendor_marketplace_detail_page.dart';
 import 'features/vendors/pages/vendor_marketplace_page.dart';
@@ -46,6 +48,7 @@ const _plannerRoutes = {
   '/bookings/mine',
   '/bookings/details',
   '/plans/review',
+  '/recommendations',
 };
 
 const _vendorRoutes = {
@@ -55,6 +58,7 @@ const _vendorRoutes = {
   '/vendors/quotations',
   '/vendors/quotations/details',
   '/vendors/bookings',
+  '/vendors/analytics',
 };
 
 const _authenticatedRoutes = {
@@ -251,6 +255,7 @@ final Map<String, WidgetBuilder> _pageBuilders = {
   '/vendors/quotations': (_) => const VendorQuotationsPage(),
   '/vendors/quotations/details': (_) => const VendorQuotationDetailPage(),
   '/vendors/bookings': (_) => const VendorBookingsPage(),
+  '/vendors/analytics': (_) => const VendorAnalyticsPage(),
   '/marketplace': (_) => const VendorMarketplacePage(),
   '/marketplace/details': (_) => const VendorMarketplaceDetailPage(),
   '/marketplace/request-quotation': (_) => const RequestQuotationPage(),
@@ -260,6 +265,13 @@ final Map<String, WidgetBuilder> _pageBuilders = {
   '/plans/review': (context) => PlanReviewPage(
         planId: ModalRoute.of(context)!.settings.arguments as String,
       ),
+  '/recommendations': (context) {
+    final args = ModalRoute.of(context)!.settings.arguments as Map;
+    return VendorRecommendationsPage(
+      eventId: args['eventId'] as String,
+      planId: args['planId'] as String?,
+    );
+  },
 };
 
 bool isRouteAllowedForSession(
@@ -287,6 +299,7 @@ bool isRouteArgumentsValid(String routeName, Object? arguments) {
     case '/vendors/availability':
     case '/vendors/quotations':
     case '/vendors/bookings':
+    case '/vendors/analytics':
       return arguments == null || arguments is AuthResponseModel;
     case '/events/create':
       return arguments == null ||
@@ -319,6 +332,8 @@ bool isRouteArgumentsValid(String routeName, Object? arguments) {
           (arguments['auth'] == null || arguments['auth'] is AuthResponseModel);
     case '/plans/review':
       return _nonEmptyString(arguments);
+    case '/recommendations':
+      return arguments is Map && _nonEmptyString(arguments['eventId']);
     default:
       return true;
   }
