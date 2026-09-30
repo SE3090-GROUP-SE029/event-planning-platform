@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Application.DTOs.Scheduling;
 using Application.Services.Scheduling;
 using Domain.Enums;
@@ -8,7 +10,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "EventPlannerOnly")]
+[Authorize]
 public class SchedulesController : ControllerBase
 {
     private readonly ScheduleService _scheduleService;
@@ -19,13 +21,41 @@ public class SchedulesController : ControllerBase
     }
 
     [HttpGet("event/{eventId:guid}")]
+    [Authorize(Policy = "EventPlannerOnly")]
     public async Task<IActionResult> GetSchedule(Guid eventId, CancellationToken ct)
     {
-        var schedule = await _scheduleService.GetOrCreateScheduleAsync(eventId, ct);
-        return Ok(schedule);
+        try
+        {
+            var schedule = await _scheduleService.GetOrCreateScheduleForPlannerAsync(eventId, GetCurrentUserId(), ct);
+            return Ok(schedule);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    [HttpGet("vendor/me")]
+    [Authorize(Policy = "VendorOnly")]
+    public async Task<IActionResult> GetMyVendorActivities(CancellationToken ct)
+    {
+        try
+        {
+            var activities = await _scheduleService.GetAssignedActivitiesForVendorAsync(GetCurrentUserId(), ct);
+            return Ok(activities);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     [HttpPost("{scheduleId:guid}/activities")]
+    [Authorize(Policy = "EventPlannerOnly")]
     public async Task<IActionResult> AddActivity(
         Guid scheduleId, 
         [FromBody] CreateActivityRequest request, 
@@ -36,46 +66,98 @@ public class SchedulesController : ControllerBase
             return BadRequest(new { message = "EndTime must be strictly after StartTime." });
         }
 
-        var activity = await _scheduleService.AddActivityAsync(
-            scheduleId,
-            request.Title,
-            request.Description,
-            request.StartTime,
-            request.EndTime,
-            request.AssignedVendorId,
-            ct);
+        try
+        {
+            var activity = await _scheduleService.AddActivityForPlannerAsync(
+                scheduleId,
+                GetCurrentUserId(),
+                request.Title,
+                request.Description,
+                request.StartTime,
+                request.EndTime,
+                request.AssignedVendorId,
+                ct);
 
-        return CreatedAtAction(nameof(GetSchedule), new { eventId = activity.ScheduleId }, activity);
+            return Created($"/api/Schedules/{scheduleId}/activities/{activity.Id}", activity);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
     }
 
     [HttpPatch("activities/{activityId:guid}/status")]
+    [Authorize(Roles = "EVENT_PLANNER,VENDOR")]
     public async Task<IActionResult> UpdateActivityStatus(
         Guid activityId, 
         [FromBody] UpdateActivityStatusRequest request, 
         CancellationToken ct)
     {
-        var updatedActivity = await _scheduleService.UpdateActivityStatusAsync(activityId, request.Status, ct);
-        if (updatedActivity == null)
+        try
         {
-            return NotFound(new { message = "Activity not found." });
-        }
+            var userId = GetCurrentUserId();
+            var updatedActivity = User.IsInRole("VENDOR")
+                ? await _scheduleService.UpdateActivityStatusForVendorAsync(activityId, userId, request.Status, ct)
+                : await _scheduleService.UpdateActivityStatusForPlannerAsync(activityId, userId, request.Status, ct);
 
-        return Ok(updatedActivity);
+            if (updatedActivity == null)
+            {
+                return NotFound(new { message = "Activity not found." });
+            }
+
+            return Ok(updatedActivity);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
     }
 
     [HttpPost("{scheduleId:guid}/generate-ai")]
-    [Authorize]
+    [Authorize(Policy = "EventPlannerOnly")]
     public async Task<IActionResult> GenerateAiSchedule(Guid scheduleId, CancellationToken ct)
     {
         try
         {
-            var updatedSchedule = await _scheduleService.GenerateScheduleWithAiAsync(scheduleId, ct);
+            var updatedSchedule = await _scheduleService.GenerateScheduleWithAiForPlannerAsync(
+                scheduleId,
+                GetCurrentUserId(),
+                ct);
             return Ok(updatedSchedule);
         }
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { message = ex.Message });
         }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var raw = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+        if (!Guid.TryParse(raw, out var userId))
+        {
+            throw new UnauthorizedAccessException("The access token does not contain a user id.");
+        }
+
+        return userId;
     }
 }
 

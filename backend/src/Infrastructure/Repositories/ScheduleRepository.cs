@@ -45,10 +45,26 @@ public class ScheduleRepository : IScheduleRepository
         return activity;
     }
 
+    public async Task<TimelineActivity?> GetActivityByIdAsync(Guid activityId, CancellationToken cancellationToken = default)
+    {
+        return await _context.TimelineActivities
+            .Include(a => a.Schedule)
+            .FirstOrDefaultAsync(a => a.Id == activityId, cancellationToken);
+    }
+
     public async Task<List<TimelineActivity>> GetActivitiesByScheduleIdAsync(Guid scheduleId, CancellationToken cancellationToken = default)
     {
         return await _context.TimelineActivities
             .Where(a => a.ScheduleId == scheduleId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<TimelineActivity>> GetActivitiesByVendorIdAsync(Guid vendorId, CancellationToken cancellationToken = default)
+    {
+        return await _context.TimelineActivities
+            .Include(a => a.Schedule)
+            .Where(a => a.AssignedVendorId == vendorId)
+            .OrderBy(a => a.StartTime)
             .ToListAsync(cancellationToken);
     }
 

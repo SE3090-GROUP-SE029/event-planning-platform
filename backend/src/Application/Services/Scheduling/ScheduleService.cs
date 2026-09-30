@@ -1,4 +1,5 @@
 using System.Globalization;
+using Application.DTOs.Scheduling;
 using Application.Common.Interfaces;
 using Domain.Entities;
 using Domain.Enums;
@@ -11,21 +12,29 @@ public class ScheduleService
     private readonly ConflictDetectionService _conflictDetector;
     private readonly IEventRepository _eventRepository;
     private readonly IScheduleAiClient _scheduleAiClient;
+    private readonly IVendorRepository _vendorRepository;
 
     public ScheduleService(
         IScheduleRepository scheduleRepository,
         ConflictDetectionService conflictDetector,
         IEventRepository eventRepository,
-        IScheduleAiClient scheduleAiClient)
+        IScheduleAiClient scheduleAiClient,
+        IVendorRepository vendorRepository)
     {
         _scheduleRepository = scheduleRepository;
         _conflictDetector = conflictDetector;
         _eventRepository = eventRepository;
         _scheduleAiClient = scheduleAiClient;
+        _vendorRepository = vendorRepository;
     }
 
-    public async Task<EventSchedule> GetOrCreateScheduleAsync(Guid eventId, CancellationToken cancellationToken = default)
+    public async Task<EventSchedule> GetOrCreateScheduleForPlannerAsync(
+        Guid eventId,
+        Guid plannerUserId,
+        CancellationToken cancellationToken = default)
     {
+        await RequirePlannerEventAsync(eventId, plannerUserId);
+
         var schedule = await _scheduleRepository.GetByEventIdAsync(eventId, cancellationToken);
 
         if (schedule == null)
@@ -37,8 +46,9 @@ public class ScheduleService
         return schedule;
     }
 
-    public async Task<TimelineActivity> AddActivityAsync(
+    public async Task<TimelineActivity> AddActivityForPlannerAsync(
         Guid scheduleId, 
+        Guid plannerUserId,
         string title, 
         string? description, 
         DateTime startTime, 
@@ -46,6 +56,8 @@ public class ScheduleService
         Guid? vendorId,
         CancellationToken cancellationToken = default)
     {
+        await RequirePlannerScheduleAsync(scheduleId, plannerUserId, cancellationToken);
+
         var activity = new TimelineActivity
         {
             ScheduleId = scheduleId,
@@ -70,18 +82,74 @@ public class ScheduleService
         return activity;
     }
 
-    public async Task<TimelineActivity?> UpdateActivityStatusAsync(
+    public async Task<TimelineActivity?> UpdateActivityStatusForPlannerAsync(
         Guid activityId, 
+        Guid plannerUserId,
         ActivityStatus status, 
         CancellationToken cancellationToken = default)
     {
+        var activity = await _scheduleRepository.GetActivityByIdAsync(activityId, cancellationToken);
+        if (activity == null)
+        {
+            return null;
+        }
+
+        await RequirePlannerScheduleAsync(activity.ScheduleId, plannerUserId, cancellationToken);
         return await _scheduleRepository.UpdateActivityStatusAsync(activityId, status, cancellationToken);
     }
 
-    public async Task<EventSchedule> GenerateScheduleWithAiAsync(Guid scheduleId, CancellationToken cancellationToken = default)
+    public async Task<TimelineActivity?> UpdateActivityStatusForVendorAsync(
+        Guid activityId,
+        Guid vendorUserId,
+        ActivityStatus status,
+        CancellationToken cancellationToken = default)
     {
-        var schedule = await _scheduleRepository.GetByIdAsync(scheduleId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Schedule {scheduleId} was not found.");
+        if (!IsVendorOperationalStatus(status))
+        {
+            throw new ArgumentException("Vendors can only set Scheduled, In Progress, Completed, or Skipped statuses.");
+        }
+
+        var vendor = await RequireVendorAsync(vendorUserId);
+        var activity = await _scheduleRepository.GetActivityByIdAsync(activityId, cancellationToken);
+        if (activity == null)
+        {
+            return null;
+        }
+
+        if (activity.AssignedVendorId != vendor.Id)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to update this activity.");
+        }
+
+        return await _scheduleRepository.UpdateActivityStatusAsync(activityId, status, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<VendorScheduleActivityResponse>> GetAssignedActivitiesForVendorAsync(
+        Guid vendorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var vendor = await RequireVendorAsync(vendorUserId);
+        var activities = await _scheduleRepository.GetActivitiesByVendorIdAsync(vendor.Id, cancellationToken);
+
+        return activities
+            .Select(activity => new VendorScheduleActivityResponse(
+                activity.Id,
+                activity.ScheduleId,
+                activity.Schedule.EventId,
+                activity.Title,
+                activity.Description,
+                activity.StartTime,
+                activity.EndTime,
+                activity.Status))
+            .ToList();
+    }
+
+    public async Task<EventSchedule> GenerateScheduleWithAiForPlannerAsync(
+        Guid scheduleId,
+        Guid plannerUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var schedule = await RequirePlannerScheduleAsync(scheduleId, plannerUserId, cancellationToken);
 
         var eventEntity = await _eventRepository.GetByIdAsync(schedule.EventId)
             ?? throw new KeyNotFoundException($"Event {schedule.EventId} associated with schedule {scheduleId} was not found.");
@@ -132,6 +200,43 @@ public class ScheduleService
         schedule.UpdatedAt = DateTime.UtcNow;
         return schedule;
     }
+
+    private async Task<Event> RequirePlannerEventAsync(Guid eventId, Guid plannerUserId)
+    {
+        var eventEntity = await _eventRepository.GetByIdAsync(eventId)
+            ?? throw new KeyNotFoundException("Event not found.");
+
+        if (eventEntity.OwnerId != plannerUserId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to access this event schedule.");
+        }
+
+        return eventEntity;
+    }
+
+    private async Task<EventSchedule> RequirePlannerScheduleAsync(
+        Guid scheduleId,
+        Guid plannerUserId,
+        CancellationToken cancellationToken)
+    {
+        var schedule = await _scheduleRepository.GetByIdAsync(scheduleId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Schedule {scheduleId} was not found.");
+
+        await RequirePlannerEventAsync(schedule.EventId, plannerUserId);
+        return schedule;
+    }
+
+    private async Task<Vendor> RequireVendorAsync(Guid vendorUserId)
+    {
+        return await _vendorRepository.GetByUserIdAsync(vendorUserId)
+            ?? throw new KeyNotFoundException("Vendor profile not found.");
+    }
+
+    private static bool IsVendorOperationalStatus(ActivityStatus status) =>
+        status is ActivityStatus.SCHEDULED
+            or ActivityStatus.IN_PROGRESS
+            or ActivityStatus.COMPLETED
+            or ActivityStatus.SKIPPED;
 
     private static DateTime ParseTimestamp(string value, string fieldName)
     {
