@@ -25,6 +25,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Infrastructure.Services.Planning;
+using Infrastructure.Services.Scheduling;
 using Infrastructure.Services.Vendors;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -78,10 +79,23 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured."),
         npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
-// JWT configuration (required by dev authentication)
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
     ?? throw new InvalidOperationException("The Jwt configuration section is missing.");
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? builder.Configuration["Jwt:Secret"]
+    ?? builder.Configuration["JwtSettings:Secret"]
+    ?? jwtSettings.Secret
+    ?? throw new InvalidOperationException("The Jwt secret is missing.");
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+    ?? builder.Configuration["JwtSettings:Issuer"]
+    ?? jwtSettings.Issuer
+    ?? "EventPlanningPlatform";
+var jwtAudience = builder.Configuration["Jwt:Audience"]
+    ?? builder.Configuration["JwtSettings:Audience"]
+    ?? jwtSettings.Audience
+    ?? "EventPlanningPlatform";
+
 builder.Services.Configure<AdminSeedOptions>(builder.Configuration.GetSection("AdminSeed"));
 builder.Services.Configure<AgenticAiOptions>(builder.Configuration.GetSection("AgenticAI"));
 var agenticAiOptions = builder.Configuration.GetSection("AgenticAI").Get<AgenticAiOptions>()
@@ -133,6 +147,7 @@ builder.Services.AddScoped<ICoordinatorPlanValidationService, CoordinatorPlanVal
 builder.Services.AddScoped<IPlanGenerationService, PlanGenerationService>();
 builder.Services.AddScoped<IPlanDecisionService, PlanDecisionService>();
 builder.Services.AddScoped<IAgenticAiClient, AgenticAiClient>();
+builder.Services.AddScoped<IScheduleAiClient, ScheduleAiClient>();
 builder.Services.AddHttpClient("AgenticAI", client =>
 {
     client.BaseAddress = new Uri(agenticAiOptions.BaseUrl);
@@ -145,12 +160,6 @@ builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 builder.Services.AddScoped<ConflictDetectionService>();
 builder.Services.AddScoped<ScheduleService>();
 
-// Component 3: Scheduling Registrations
-builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
-builder.Services.AddScoped<ConflictDetectionService>();
-builder.Services.AddScoped<ScheduleService>();
-
-
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -160,14 +169,14 @@ builder.Services.AddAuthentication(options =>
         {
             options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = true,
-                ValidIssuer = jwtSettings.Issuer,
-                ValidateAudience = true,
-                ValidAudience = jwtSettings.Audience,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+                IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtKey)),
+                ValidateIssuer = !string.IsNullOrEmpty(jwtIssuer),
+                ValidIssuer = jwtIssuer,
+                ValidateAudience = !string.IsNullOrEmpty(jwtAudience),
+                ValidAudience = jwtAudience,
                 ValidateLifetime = true,
-                ClockSkew = TimeSpan.FromSeconds(30)
+                ClockSkew = TimeSpan.Zero
             };
         });
 

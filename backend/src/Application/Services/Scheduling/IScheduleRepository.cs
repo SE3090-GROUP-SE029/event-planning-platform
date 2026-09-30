@@ -5,6 +5,7 @@ namespace Application.Services.Scheduling;
 
 public interface IScheduleRepository
 {
+    Task<EventSchedule?> GetByIdAsync(Guid scheduleId, CancellationToken cancellationToken = default);
     Task<EventSchedule?> GetByEventIdAsync(Guid eventId, CancellationToken cancellationToken = default);
     Task<EventSchedule> CreateScheduleAsync(EventSchedule schedule, CancellationToken cancellationToken = default);
     Task<TimelineActivity> AddActivityAsync(TimelineActivity activity, CancellationToken cancellationToken = default);

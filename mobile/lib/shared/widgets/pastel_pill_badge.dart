@@ -171,6 +171,7 @@ class PastelRibbonBanner extends StatelessWidget {
           Expanded(
             child: Text(
               title,
+              maxLines: 1,
               style: TextStyle(
                 color: textColor,
                 fontSize: 13,
@@ -181,16 +182,25 @@ class PastelRibbonBanner extends StatelessWidget {
             ),
           ),
           if (subtitle != null) ...[
-            Text(
-              subtitle!,
-              style: TextStyle(
-                color: textColor.withValues(alpha: 0.9),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: textColor.withValues(alpha: 0.9),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
-          if (trailing != null) trailing!,
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
         ],
       ),
     );
