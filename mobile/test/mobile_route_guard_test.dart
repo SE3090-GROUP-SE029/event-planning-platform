@@ -22,6 +22,8 @@ void main() {
     final admin = _session('ADMIN');
 
     expect(isRouteAllowedForSession('/plans/review', planner), isTrue);
+    expect(isRouteAllowedForSession('/recommendations', planner), isTrue);
+    expect(isRouteAllowedForSession('/recommendations', vendor), isFalse);
     expect(isRouteAllowedForSession('/dashboard', planner), isTrue);
     expect(isRouteAllowedForSession('/vendors/quotations', planner), isFalse);
     expect(isRouteAllowedForSession('/dashboard', vendor), isTrue);
@@ -34,6 +36,10 @@ void main() {
     expect(isRouteArgumentsValid('/plans/review', 'plan-1'), isTrue);
     expect(isRouteArgumentsValid('/plans/review', null), isFalse);
     expect(isRouteArgumentsValid('/plans/review', '   '), isFalse);
+    expect(
+        isRouteArgumentsValid('/recommendations', {'eventId': 'event-1'}),
+        isTrue);
+    expect(isRouteArgumentsValid('/recommendations', {}), isFalse);
     expect(isRouteArgumentsValid('/marketplace/details', {}), isFalse);
   });
 }

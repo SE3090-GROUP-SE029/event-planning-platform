@@ -19,6 +19,7 @@ class BookingModel {
   final DateTime createdAt;
   final DateTime? completedAt;
   final DateTime? cancelledAt;
+  final bool hasReview;
 
   const BookingModel({
     required this.id,
@@ -41,6 +42,7 @@ class BookingModel {
     required this.createdAt,
     required this.completedAt,
     required this.cancelledAt,
+    required this.hasReview,
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
@@ -74,6 +76,7 @@ class BookingModel {
         cancelledAt: json['cancelledAt'] != null
             ? DateTime.tryParse(json['cancelledAt'].toString())
             : null,
+        hasReview: json['hasReview'] == true,
       );
 
   String get displayAgreedPrice {

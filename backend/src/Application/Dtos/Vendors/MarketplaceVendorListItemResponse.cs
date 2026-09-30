@@ -10,4 +10,6 @@ public class MarketplaceVendorListItemResponse
     public string? ProfileImageUrl { get; set; }
     public decimal? StartingPrice { get; set; }
     public string? StartingPricingType { get; set; }
+    public decimal? AverageRating { get; set; }
+    public int ReviewCount { get; set; }
 }

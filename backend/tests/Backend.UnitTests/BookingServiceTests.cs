@@ -30,6 +30,7 @@ public class BookingServiceTests
             new VendorRepository(db),
             new VendorOfferingRepository(db),
             new VendorAvailabilityRepository(db),
+            new VendorRatingRepository(db),
             new EventRepository(db),
             new EfUnitOfWork(db));
 
