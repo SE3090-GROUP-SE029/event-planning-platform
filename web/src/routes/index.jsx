@@ -9,6 +9,10 @@ import {
   AdminSystemRoute,
   AdminUsersRoute,
   AdminVendorsRoute,
+  GuestListUploadRoute,
+  GuestManagementRoute,
+  GuestCheckInRoute,
+  EventAnalyticsRoute,
   LandingRoute,
   LoginRoute,
 } from './routeElements';
@@ -47,6 +51,22 @@ export const router = createBrowserRouter([
     element: <AdminEventDetailsRoute />,
   },
   {
+    path: '/admin/events/:id/guest-upload',
+    element: <GuestListUploadRoute />,
+  },
+  {
+    path: '/admin/events/:id/guests',
+    element: <GuestManagementRoute />,
+  },
+  {
+    path: '/admin/events/:id/check-in',
+    element: <GuestCheckInRoute />,
+  },
+  {
+    path: '/admin/events/:id/analytics',
+    element: <EventAnalyticsRoute />,
+  },
+  {
     path: '/admin/vendors',
     element: <AdminVendorsRoute />,
   },
@@ -66,5 +86,5 @@ export const router = createBrowserRouter([
     path: '*',
     element: <Navigate to="/" replace />,
   },
-  
+
 ]);

@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { Alert, Box, Button, CircularProgress, Grid, Stack, Typography } from '@mui/material';
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
+import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
 import { EVENT_TYPES, useAdminEvent, enumLabel } from '../api/adminEventApi';
 import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
@@ -48,7 +49,9 @@ export default function AdminEventDetailsPage() {
   }
 
   const event = query.data;
-  const ownerName = event.owner ? `${event.owner.firstName || ''} ${event.owner.lastName || ''}`.trim() : event.ownerId;
+  const ownerName = event.owner
+    ? `${event.owner.firstName || ''} ${event.owner.lastName || ''}`.trim()
+    : event.ownerId;
 
   return (
     <AppLayout
@@ -56,13 +59,44 @@ export default function AdminEventDetailsPage() {
       title="Event Inspection"
       subtitle={event.eventName || `Event #${event.id}`}
     >
-      <Button
-        startIcon={<ArrowBackOutlinedIcon />}
-        onClick={() => navigate('/admin/events')}
-        sx={{ mb: 2, borderRadius: 9999, px: 2.5 }}
-      >
-        Back to events
-      </Button>
+      <Stack direction="row" gap={2} sx={{ mb: 2, flexWrap: 'wrap' }}>
+        <Button
+          startIcon={<ArrowBackOutlinedIcon />}
+          onClick={() => navigate('/admin/events')}
+          sx={{ borderRadius: 9999, px: 2.5 }}
+        >
+          Back to events
+        </Button>
+        <Button
+          startIcon={<FileUploadOutlinedIcon />}
+          variant="outlined"
+          onClick={() => navigate(`/admin/events/${id}/guest-upload`)}
+          sx={{ borderRadius: 9999, px: 2.5 }}
+        >
+          Upload Guest List
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => navigate(`/admin/events/${id}/guests`)}
+          sx={{ borderRadius: 9999, px: 2.5 }}
+        >
+          Manage Guests
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => navigate(`/admin/events/${id}/check-in`)}
+          sx={{ borderRadius: 9999, px: 2.5 }}
+        >
+          Check-In Guests
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => navigate(`/admin/events/${id}/analytics`)}
+          sx={{ borderRadius: 9999, px: 2.5, boxShadow: 'none' }}
+        >
+          View Analytics
+        </Button>
+      </Stack>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3 }}>
         <Box>

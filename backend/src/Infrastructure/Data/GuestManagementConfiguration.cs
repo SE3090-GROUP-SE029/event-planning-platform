@@ -74,6 +74,7 @@ public static class GuestManagementConfiguration
             entity.Property(e => e.PublicReference).IsRequired().HasMaxLength(43);
             entity.Property(e => e.StatusSecretHash).IsRequired().HasMaxLength(64);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.CheckedInMethod).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.RegistrationForm).WithMany().HasForeignKey(e => new { e.RegistrationFormId, e.EventId })
                 .HasPrincipalKey(e => new { e.Id, e.EventId }).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Guest).WithMany().HasForeignKey(e => new { e.GuestId, e.EventId })

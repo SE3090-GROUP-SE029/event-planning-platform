@@ -23,4 +23,6 @@ public class RegistrationSubmission
     public int RejectionDeliveryAttempts { get; set; }
     public DateTimeOffset? RejectionLastAttemptAt { get; set; }
     public DateTimeOffset? RejectionSentAt { get; set; }
+    public DateTimeOffset? CheckedInAt { get; set; }
+    public CheckedInMethod? CheckedInMethod { get; set; }
 }
