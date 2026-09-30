@@ -57,12 +57,13 @@ public class ScheduleService
         CancellationToken cancellationToken = default)
     {
         await RequirePlannerScheduleAsync(scheduleId, plannerUserId, cancellationToken);
+        await ValidateActivityFieldsAsync(title, startTime, endTime, vendorId);
 
         var activity = new TimelineActivity
         {
             ScheduleId = scheduleId,
-            Title = title,
-            Description = description,
+            Title = title.Trim(),
+            Description = NormalizeDescription(description),
             StartTime = startTime,
             EndTime = endTime,
             AssignedVendorId = vendorId,
@@ -71,15 +72,63 @@ public class ScheduleService
 
         activity = await _scheduleRepository.AddActivityAsync(activity, cancellationToken);
 
-        var activities = await _scheduleRepository.GetActivitiesByScheduleIdAsync(scheduleId, cancellationToken);
-        var detectedConflicts = _conflictDetector.DetectConflicts(scheduleId, activities);
-
-        if (detectedConflicts.Count != 0)
-        {
-            await _scheduleRepository.AddConflictsAsync(detectedConflicts, cancellationToken);
-        }
+        await RecalculateDeterministicConflictsAsync(scheduleId, cancellationToken);
 
         return activity;
+    }
+
+    public async Task<TimelineActivity?> UpdateActivityForPlannerAsync(
+        Guid activityId,
+        Guid plannerUserId,
+        string title,
+        string? description,
+        DateTime startTime,
+        DateTime endTime,
+        Guid? vendorId,
+        CancellationToken cancellationToken = default)
+    {
+        var activity = await _scheduleRepository.GetActivityByIdAsync(activityId, cancellationToken);
+        if (activity == null)
+        {
+            return null;
+        }
+
+        await RequirePlannerScheduleAsync(activity.ScheduleId, plannerUserId, cancellationToken);
+        await ValidateActivityFieldsAsync(title, startTime, endTime, vendorId);
+
+        var updated = await _scheduleRepository.UpdateActivityAsync(
+            activityId,
+            title.Trim(),
+            NormalizeDescription(description),
+            startTime,
+            endTime,
+            vendorId,
+            cancellationToken);
+
+        await RecalculateDeterministicConflictsAsync(activity.ScheduleId, cancellationToken);
+        return updated;
+    }
+
+    public async Task<bool?> DeleteActivityForPlannerAsync(
+        Guid activityId,
+        Guid plannerUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var activity = await _scheduleRepository.GetActivityByIdAsync(activityId, cancellationToken);
+        if (activity == null)
+        {
+            return null;
+        }
+
+        await RequirePlannerScheduleAsync(activity.ScheduleId, plannerUserId, cancellationToken);
+
+        var deleted = await _scheduleRepository.DeleteActivityAsync(activityId, cancellationToken);
+        if (deleted)
+        {
+            await RecalculateDeterministicConflictsAsync(activity.ScheduleId, cancellationToken);
+        }
+
+        return deleted;
     }
 
     public async Task<TimelineActivity?> UpdateActivityStatusForPlannerAsync(
@@ -144,6 +193,15 @@ public class ScheduleService
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ScheduleConflict>> GetConflictsForPlannerAsync(
+        Guid scheduleId,
+        Guid plannerUserId,
+        CancellationToken cancellationToken = default)
+    {
+        await RequirePlannerScheduleAsync(scheduleId, plannerUserId, cancellationToken);
+        return await _scheduleRepository.GetConflictsByScheduleIdAsync(scheduleId, cancellationToken);
+    }
+
     public async Task<EventSchedule> GenerateScheduleWithAiForPlannerAsync(
         Guid scheduleId,
         Guid plannerUserId,
@@ -195,6 +253,8 @@ public class ScheduleService
             await _scheduleRepository.AddConflictsAsync(allConflicts, cancellationToken);
         }
 
+        await RecalculateDeterministicConflictsAsync(scheduleId, cancellationToken);
+
         schedule.Activities = generatedActivities;
         schedule.Conflicts = allConflicts;
         schedule.UpdatedAt = DateTime.UtcNow;
@@ -230,6 +290,47 @@ public class ScheduleService
     {
         return await _vendorRepository.GetByUserIdAsync(vendorUserId)
             ?? throw new KeyNotFoundException("Vendor profile not found.");
+    }
+
+    private async Task ValidateActivityFieldsAsync(
+        string title,
+        DateTime startTime,
+        DateTime endTime,
+        Guid? vendorId)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            throw new ArgumentException("Activity title is required.");
+        }
+
+        if (title.Trim().Length > 150)
+        {
+            throw new ArgumentException("Activity title must be 150 characters or fewer.");
+        }
+
+        if (endTime <= startTime)
+        {
+            throw new ArgumentException("EndTime must be strictly after StartTime.");
+        }
+
+        if (vendorId.HasValue && await _vendorRepository.GetByIdAsync(vendorId.Value) == null)
+        {
+            throw new ArgumentException("AssignedVendorId must reference an existing vendor.");
+        }
+    }
+
+    private async Task RecalculateDeterministicConflictsAsync(
+        Guid scheduleId,
+        CancellationToken cancellationToken)
+    {
+        var activities = await _scheduleRepository.GetActivitiesByScheduleIdAsync(scheduleId, cancellationToken);
+        var detectedConflicts = _conflictDetector.DetectConflicts(scheduleId, activities);
+        await _scheduleRepository.ReplaceUnresolvedConflictsAsync(scheduleId, detectedConflicts, cancellationToken);
+    }
+
+    private static string? NormalizeDescription(string? description)
+    {
+        return string.IsNullOrWhiteSpace(description) ? null : description.Trim();
     }
 
     private static bool IsVendorOperationalStatus(ActivityStatus status) =>

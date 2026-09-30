@@ -68,10 +68,57 @@ public class ScheduleRepository : IScheduleRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<ScheduleConflict>> GetConflictsByScheduleIdAsync(Guid scheduleId, CancellationToken cancellationToken = default)
+    {
+        return await _context.ScheduleConflicts
+            .Where(c => c.ScheduleId == scheduleId)
+            .OrderByDescending(c => c.DetectedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddConflictsAsync(IEnumerable<ScheduleConflict> conflicts, CancellationToken cancellationToken = default)
     {
         _context.ScheduleConflicts.AddRange(conflicts);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ReplaceUnresolvedConflictsAsync(Guid scheduleId, IEnumerable<ScheduleConflict> conflicts, CancellationToken cancellationToken = default)
+    {
+        var deterministicTypes = new[] { "VendorDoubleBooked" };
+        var staleConflicts = await _context.ScheduleConflicts
+            .Where(c => c.ScheduleId == scheduleId
+                && !c.IsResolved
+                && deterministicTypes.Contains(c.ConflictType))
+            .ToListAsync(cancellationToken);
+
+        _context.ScheduleConflicts.RemoveRange(staleConflicts);
+        _context.ScheduleConflicts.AddRange(conflicts);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<TimelineActivity?> UpdateActivityAsync(
+        Guid activityId,
+        string title,
+        string? description,
+        DateTime startTime,
+        DateTime endTime,
+        Guid? assignedVendorId,
+        CancellationToken cancellationToken = default)
+    {
+        var activity = await _context.TimelineActivities.FirstOrDefaultAsync(a => a.Id == activityId, cancellationToken);
+        if (activity == null)
+        {
+            return null;
+        }
+
+        activity.Title = title;
+        activity.Description = description;
+        activity.StartTime = startTime;
+        activity.EndTime = endTime;
+        activity.AssignedVendorId = assignedVendorId;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return activity;
     }
 
     public async Task<TimelineActivity?> UpdateActivityStatusAsync(Guid activityId, ActivityStatus status, CancellationToken cancellationToken = default)
@@ -86,5 +133,18 @@ public class ScheduleRepository : IScheduleRepository
 
         await _context.SaveChangesAsync(cancellationToken);
         return activity;
+    }
+
+    public async Task<bool> DeleteActivityAsync(Guid activityId, CancellationToken cancellationToken = default)
+    {
+        var activity = await _context.TimelineActivities.FirstOrDefaultAsync(a => a.Id == activityId, cancellationToken);
+        if (activity == null)
+        {
+            return false;
+        }
+
+        _context.TimelineActivities.Remove(activity);
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

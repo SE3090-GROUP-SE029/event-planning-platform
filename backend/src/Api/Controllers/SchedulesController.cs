@@ -84,6 +84,78 @@ public class SchedulesController : ControllerBase
         {
             return NotFound(new { message = ex.Message });
         }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    [HttpPut("activities/{activityId:guid}")]
+    [Authorize(Policy = "EventPlannerOnly")]
+    public async Task<IActionResult> UpdateActivity(
+        Guid activityId,
+        [FromBody] UpdateActivityRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            var activity = await _scheduleService.UpdateActivityForPlannerAsync(
+                activityId,
+                GetCurrentUserId(),
+                request.Title,
+                request.Description,
+                request.StartTime,
+                request.EndTime,
+                request.AssignedVendorId,
+                ct);
+
+            if (activity == null)
+            {
+                return NotFound(new { message = "Activity not found." });
+            }
+
+            return Ok(activity);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    [HttpDelete("activities/{activityId:guid}")]
+    [Authorize(Policy = "EventPlannerOnly")]
+    public async Task<IActionResult> DeleteActivity(Guid activityId, CancellationToken ct)
+    {
+        try
+        {
+            var deleted = await _scheduleService.DeleteActivityForPlannerAsync(
+                activityId,
+                GetCurrentUserId(),
+                ct);
+
+            if (deleted == null)
+            {
+                return NotFound(new { message = "Activity not found." });
+            }
+
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
         catch (UnauthorizedAccessException)
         {
             return Forbid();
@@ -114,6 +186,28 @@ public class SchedulesController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    [HttpGet("{scheduleId:guid}/conflicts")]
+    [Authorize(Policy = "EventPlannerOnly")]
+    public async Task<IActionResult> GetConflicts(Guid scheduleId, CancellationToken ct)
+    {
+        try
+        {
+            var conflicts = await _scheduleService.GetConflictsForPlannerAsync(
+                scheduleId,
+                GetCurrentUserId(),
+                ct);
+            return Ok(conflicts);
         }
         catch (KeyNotFoundException ex)
         {

@@ -135,10 +135,196 @@ public class ScheduleAuthorizationTests
     }
 
     [Fact]
+    public async Task PlannerSuccessfullyEditsOwnedActivity()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        var vendor = SeedVendor(db);
+        var activity = SeedActivity(db, schedule.Id, assignedVendorId: null);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+        var start = new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc);
+        var end = start.AddHours(1);
+
+        var result = await service.UpdateActivityForPlannerAsync(
+            activity.Id,
+            plannerId,
+            "Updated activity",
+            "Updated notes",
+            start,
+            end,
+            vendor.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal("Updated activity", result!.Title);
+        Assert.Equal("Updated notes", result.Description);
+        Assert.Equal(start, result.StartTime);
+        Assert.Equal(end, result.EndTime);
+        Assert.Equal(vendor.Id, result.AssignedVendorId);
+    }
+
+    [Fact]
+    public async Task PlannerSuccessfullyDeletesOwnedActivity()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        var activity = SeedActivity(db, schedule.Id, assignedVendorId: null);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var result = await service.DeleteActivityForPlannerAsync(activity.Id, plannerId);
+
+        Assert.True(result);
+        Assert.Empty(db.TimelineActivities);
+    }
+
+    [Fact]
+    public async Task AnotherPlannerCannotEditOrDeleteActivity()
+    {
+        using var db = CreateDb();
+        var eventEntity = SeedEvent(db, Guid.NewGuid());
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        var activity = SeedActivity(db, schedule.Id, assignedVendorId: null);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.UpdateActivityForPlannerAsync(
+                activity.Id,
+                Guid.NewGuid(),
+                "Blocked edit",
+                null,
+                activity.StartTime,
+                activity.EndTime,
+                null));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.DeleteActivityForPlannerAsync(activity.Id, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task InvalidActivityTimesAreRejected()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        var activity = SeedActivity(db, schedule.Id, assignedVendorId: null);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.UpdateActivityForPlannerAsync(
+                activity.Id,
+                plannerId,
+                "Invalid time",
+                null,
+                activity.StartTime,
+                activity.StartTime,
+                null));
+    }
+
+    [Fact]
+    public async Task NonexistentActivityIdsReturnNull()
+    {
+        using var db = CreateDb();
+        var service = CreateService(db);
+
+        var update = await service.UpdateActivityForPlannerAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Missing",
+            null,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddHours(1),
+            null);
+        var delete = await service.DeleteActivityForPlannerAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Null(update);
+        Assert.Null(delete);
+    }
+
+    [Fact]
+    public async Task SameVendorOverlappingActivitiesProduceConflicts()
+    {
+        using var db = CreateDb();
+        var (service, plannerId, schedule, vendor) = await SeedScheduleWithVendorAsync(db);
+        var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
+
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), vendor.Id);
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), vendor.Id);
+
+        Assert.Equal(1, CountUnresolvedVendorConflicts(db, schedule.Id));
+    }
+
+    [Fact]
+    public async Task EditingActivityToNonOverlappingTimeRemovesStaleUnresolvedConflict()
+    {
+        using var db = CreateDb();
+        var (service, plannerId, schedule, vendor) = await SeedScheduleWithVendorAsync(db);
+        var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), vendor.Id);
+        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), vendor.Id);
+        Assert.Equal(1, CountUnresolvedVendorConflicts(db, schedule.Id));
+
+        await service.UpdateActivityForPlannerAsync(
+            second.Id,
+            plannerId,
+            second.Title,
+            second.Description,
+            start.AddHours(1),
+            start.AddHours(2),
+            vendor.Id);
+
+        Assert.Equal(0, CountUnresolvedVendorConflicts(db, schedule.Id));
+    }
+
+    [Fact]
+    public async Task DeletingOverlappingActivityRecalculatesConflicts()
+    {
+        using var db = CreateDb();
+        var (service, plannerId, schedule, vendor) = await SeedScheduleWithVendorAsync(db);
+        var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), vendor.Id);
+        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), vendor.Id);
+        Assert.Equal(1, CountUnresolvedVendorConflicts(db, schedule.Id));
+
+        await service.DeleteActivityForPlannerAsync(second.Id, plannerId);
+
+        Assert.Equal(0, CountUnresolvedVendorConflicts(db, schedule.Id));
+    }
+
+    [Fact]
+    public async Task ConflictRecalculationDoesNotProduceDuplicateUnresolvedConflicts()
+    {
+        using var db = CreateDb();
+        var (service, plannerId, schedule, vendor) = await SeedScheduleWithVendorAsync(db);
+        var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), vendor.Id);
+        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), vendor.Id);
+
+        await service.UpdateActivityForPlannerAsync(
+            second.Id,
+            plannerId,
+            second.Title,
+            second.Description,
+            start.AddMinutes(30),
+            start.AddMinutes(90),
+            vendor.Id);
+
+        Assert.Equal(1, CountUnresolvedVendorConflicts(db, schedule.Id));
+    }
+
+    [Fact]
     public void VendorCannotPerformPlannerOnlyOperationsByEndpointPolicy()
     {
         AssertPolicy(nameof(SchedulesController.GetSchedule), "EventPlannerOnly");
         AssertPolicy(nameof(SchedulesController.AddActivity), "EventPlannerOnly");
+        AssertPolicy(nameof(SchedulesController.UpdateActivity), "EventPlannerOnly");
+        AssertPolicy(nameof(SchedulesController.DeleteActivity), "EventPlannerOnly");
         AssertPolicy(nameof(SchedulesController.GenerateAiSchedule), "EventPlannerOnly");
         AssertPolicy(nameof(SchedulesController.GetMyVendorActivities), "VendorOnly");
     }
@@ -247,6 +433,23 @@ public class ScheduleAuthorizationTests
         db.TimelineActivities.Add(activity);
         return activity;
     }
+
+    private static async Task<(ScheduleService Service, Guid PlannerId, EventSchedule Schedule, Vendor Vendor)>
+        SeedScheduleWithVendorAsync(AppDbContext db)
+    {
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        var vendor = SeedVendor(db);
+        await db.SaveChangesAsync();
+        return (CreateService(db), plannerId, schedule, vendor);
+    }
+
+    private static int CountUnresolvedVendorConflicts(AppDbContext db, Guid scheduleId) =>
+        db.ScheduleConflicts.Count(conflict =>
+            conflict.ScheduleId == scheduleId
+            && !conflict.IsResolved
+            && conflict.ConflictType == "VendorDoubleBooked");
 
     private static void AssertPolicy(string methodName, string expectedPolicy)
     {
