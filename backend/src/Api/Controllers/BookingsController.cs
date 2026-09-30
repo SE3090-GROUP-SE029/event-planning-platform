@@ -13,10 +13,12 @@ namespace Api.Controllers;
 public class BookingsController : ControllerBase
 {
     private readonly IBookingService _bookings;
+    private readonly IVendorRatingService _ratings;
 
-    public BookingsController(IBookingService bookings)
+    public BookingsController(IBookingService bookings, IVendorRatingService ratings)
     {
         _bookings = bookings;
+        _ratings = ratings;
     }
 
     [HttpGet("mine")]
@@ -109,6 +111,52 @@ public class BookingsController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{id:guid}/review")]
+    [Authorize(Policy = "EventPlannerOnly")]
+    public async Task<ActionResult<VendorRatingResponse>> CreateReview(Guid id, CreateVendorRatingRequest request)
+    {
+        try
+        {
+            return Ok(await _ratings.CreateAsync(GetCurrentUserId(), id, request));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("{id:guid}/review")]
+    public async Task<ActionResult<VendorRatingResponse>> GetReview(Guid id)
+    {
+        try
+        {
+            return Ok(await _ratings.GetByBookingIdAsync(
+                id,
+                GetCurrentUserId(),
+                User.IsInRole("VENDOR")));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
         }
     }
 

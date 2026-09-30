@@ -31,7 +31,10 @@ public class AppDbContext : DbContext
     public DbSet<VendorAvailability> VendorAvailabilities => Set<VendorAvailability>();
     public DbSet<Quotation> Quotations => Set<Quotation>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<VendorRating> VendorRatings => Set<VendorRating>();
     public DbSet<EventPlanDraft> EventPlanDrafts => Set<EventPlanDraft>();
+    public DbSet<VendorRecommendationRun> VendorRecommendationRuns => Set<VendorRecommendationRun>();
+    public DbSet<VendorRecommendationItem> VendorRecommendationItems => Set<VendorRecommendationItem>();
 
     // Dev Scheduling DbSets
     public DbSet<EventSchedule> EventSchedules => Set<EventSchedule>();

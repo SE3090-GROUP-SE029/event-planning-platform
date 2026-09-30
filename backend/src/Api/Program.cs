@@ -26,6 +26,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Infrastructure.Services.Planning;
 using Infrastructure.Services.Scheduling;
+using Infrastructure.Services.Vendors;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -110,6 +111,8 @@ builder.Services.AddScoped<IVendorAvailabilityRepository, VendorAvailabilityRepo
 builder.Services.AddScoped<IVendorMarketplaceRepository, VendorMarketplaceRepository>();
 builder.Services.AddScoped<IQuotationRepository, QuotationRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+builder.Services.AddScoped<IVendorRatingRepository, VendorRatingRepository>();
+builder.Services.AddScoped<IVendorRecommendationRepository, VendorRecommendationRepository>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IVendorImageStorage>(_ =>
 {
@@ -125,10 +128,15 @@ builder.Services.AddScoped<IVendorOfferingService, VendorOfferingService>();
 builder.Services.AddScoped<IVendorGalleryService, VendorGalleryService>();
 builder.Services.AddScoped<IVendorAvailabilityService, VendorAvailabilityService>();
 builder.Services.AddScoped<IVendorMarketplaceService, VendorMarketplaceService>();
+builder.Services.AddScoped<IVendorAnalyticsService, VendorAnalyticsService>();
 builder.Services.AddScoped<IQuotationService, QuotationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<IVendorRatingService, VendorRatingService>();
+builder.Services.AddScoped<IVendorRecommendationService, VendorRecommendationService>();
+builder.Services.AddScoped<IVendorAnalysisAiClient, VendorAnalysisAiClient>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
+builder.Services.AddScoped<IAdminVendorService, AdminVendorService>();
 builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
 builder.Services.AddScoped<IAdminReadService, AdminReadService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();

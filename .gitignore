@@ -17,6 +17,10 @@ appsettings.*.local.json
 *.local
 backend/src/Api/appsettings.json.local
 
+# Local temp / verify build output (never commit)
+.tmp-merge/
+backend/artifacts/
+
 # Runtime vendor uploads (keep folder via .gitkeep)
 backend/src/Api/wwwroot/uploads/vendors/*
 !backend/src/Api/wwwroot/uploads/vendors/.gitkeep

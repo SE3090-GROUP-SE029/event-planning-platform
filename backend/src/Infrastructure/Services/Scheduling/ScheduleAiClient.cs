@@ -34,7 +34,11 @@ public sealed class ScheduleAiClient(
             requirements = string.IsNullOrWhiteSpace(eventEntity.Requirements) ? string.Empty : eventEntity.Requirements
         };
 
-        using var response = await client.PostAsJsonAsync(options.Value.GeneratePath, request, cancellationToken);
+        var path = string.IsNullOrWhiteSpace(options.Value.ScheduleGeneratePath)
+            ? "/api/schedules/generate"
+            : options.Value.ScheduleGeneratePath;
+
+        using var response = await client.PostAsJsonAsync(path, request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             var payload = await response.Content.ReadAsStringAsync(cancellationToken);

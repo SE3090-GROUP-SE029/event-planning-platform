@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -479,6 +479,27 @@ class _PlanReviewPageState extends ConsumerState<PlanReviewPage> {
                 label: const Text('Regenerate Plan'),
               ),
             ),
+
+          if (!isAdmin && plan.status == PlanStatus.approved) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: AppButtonStyles.ai(),
+                onPressed: () {
+                  Navigator.of(context).pushNamed(
+                    '/recommendations',
+                    arguments: {
+                      'eventId': plan.eventId,
+                      'planId': plan.id,
+                    },
+                  );
+                },
+                icon: const Icon(Icons.storefront_outlined),
+                label: const Text('Recommend vendors'),
+              ),
+            ),
+          ],
         ],
       ),
     );

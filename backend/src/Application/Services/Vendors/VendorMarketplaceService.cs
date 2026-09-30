@@ -12,17 +12,20 @@ public class VendorMarketplaceService : IVendorMarketplaceService
     private readonly IVendorOfferingRepository _offerings;
     private readonly IVendorGalleryImageRepository _images;
     private readonly IVendorAvailabilityRepository _availability;
+    private readonly IVendorRatingRepository _ratings;
 
     public VendorMarketplaceService(
         IVendorMarketplaceRepository marketplace,
         IVendorOfferingRepository offerings,
         IVendorGalleryImageRepository images,
-        IVendorAvailabilityRepository availability)
+        IVendorAvailabilityRepository availability,
+        IVendorRatingRepository ratings)
     {
         _marketplace = marketplace;
         _offerings = offerings;
         _images = images;
         _availability = availability;
+        _ratings = ratings;
     }
 
     public async Task<MarketplaceVendorListResponse> ListAsync(VendorMarketplaceQuery query)
@@ -50,6 +53,7 @@ public class VendorMarketplaceService : IVendorMarketplaceService
         var services = await _offerings.ListByVendorIdAsync(vendor.Id);
         var images = await _images.ListByVendorIdAsync(vendor.Id);
         var availability = await _availability.ListByVendorIdAsync(vendor.Id);
+        var (averageRating, reviewCount) = await _ratings.GetAggregateForVendorAsync(vendor.Id);
         var now = DateTime.UtcNow;
 
         return new MarketplaceVendorDetailResponse
@@ -61,6 +65,8 @@ public class VendorMarketplaceService : IVendorMarketplaceService
             Address = vendor.Address,
             ProfileImageUrl = vendor.ProfileImageUrl,
             WebsiteUrl = vendor.WebsiteUrl,
+            AverageRating = averageRating,
+            ReviewCount = reviewCount,
             Images = images.Select(i => new MarketplaceGalleryImageResponse
             {
                 Id = i.Id,

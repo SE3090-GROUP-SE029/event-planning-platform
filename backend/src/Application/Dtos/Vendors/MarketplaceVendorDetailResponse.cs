@@ -9,6 +9,8 @@ public class MarketplaceVendorDetailResponse
     public string Address { get; set; } = default!;
     public string? ProfileImageUrl { get; set; }
     public string? WebsiteUrl { get; set; }
+    public decimal? AverageRating { get; set; }
+    public int ReviewCount { get; set; }
     public IReadOnlyList<MarketplaceGalleryImageResponse> Images { get; set; } = [];
     public IReadOnlyList<MarketplaceServiceItemResponse> Services { get; set; } = [];
     public IReadOnlyList<MarketplaceAvailabilityItemResponse> Availability { get; set; } = [];
