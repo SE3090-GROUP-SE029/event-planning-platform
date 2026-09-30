@@ -1,7 +1,15 @@
-from langgraph.graph import StateGraph, START, END
-from src.gemini_client.client import GeminiClient
-from src.models.scheduling_models import ScheduleState, ActivityItem, GenerateScheduleResponse
 from datetime import datetime
+from typing import List
+
+from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel
+
+from src.gemini_client.client import GeminiClient
+from src.models.scheduling_models import (
+    ActivityItem,
+    GenerateScheduleResponse,
+    ScheduleState,
+)
 
 SYSTEM_PROMPT = """
 You are an expert AI Event Scheduling Agent.
@@ -12,6 +20,11 @@ Rules:
 3. Teardown/cleanup must conclude the event.
 4. Assign appropriate vendor categories (AudioVisual, Catering, Photography, Hospitality).
 """
+
+
+class GeneratedList(BaseModel):
+    activities: List[ActivityItem]
+
 
 class SchedulingAgent:
     def __init__(self, gemini_client: GeminiClient):
@@ -31,13 +44,11 @@ class SchedulingAgent:
             Guests: {state.guest_count}
             Notes: {state.requirements or 'Standard setup'}
             """
-            class GeneratedList(BaseModel):
-                activities: List[ActivityItem]
 
             result = await self.client.generate_structured_output(
                 system_prompt=SYSTEM_PROMPT,
                 user_prompt=user_prompt,
-                response_schema=GeneratedList
+                response_schema=GeneratedList,
             )
             return {"raw_activities": result.activities}
 
@@ -85,5 +96,5 @@ class SchedulingAgent:
         final_state = await self.workflow.ainvoke(state)
         return GenerateScheduleResponse(
             activities=final_state["validated_activities"],
-            conflicts=final_state["conflicts"]
+            conflicts=final_state["conflicts"],
         )
