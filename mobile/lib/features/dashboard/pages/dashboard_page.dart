@@ -329,17 +329,6 @@ class DashboardPage extends ConsumerWidget {
                   ],
                   if (isVendor) ...[
                     PastelListItem(
-                      icon: Icons.add_circle_outline_rounded,
-                      iconVariant: PastelIconVariant.yellow,
-                      title: 'Plan new event',
-                      subtitle: 'Start a new event planning journey',
-                      showDivider: false,
-                      onTap: () => Navigator.of(context)
-                          .pushNamed('/events/create', arguments: session),
-                    ),
-                  ],
-                  if (isVendor) ...[
-                    PastelListItem(
                       icon: Icons.handyman_outlined,
                       iconVariant: PastelIconVariant.blue,
                       title: 'Vendor services',
@@ -407,15 +396,16 @@ class DashboardPage extends ConsumerWidget {
                       ),
                     ),
                   ],
-                  PastelListItem(
-                    icon: Icons.add_circle_outline_rounded,
-                    iconVariant: PastelIconVariant.yellow,
-                    title: 'Plan new event',
-                    subtitle: 'Start a new event planning journey',
-                    showDivider: false,
-                    onTap: () => Navigator.of(context)
-                        .pushNamed('/events/create', arguments: session),
-                  ),
+                  if (isEventPlanner)
+                    PastelListItem(
+                      icon: Icons.add_circle_outline_rounded,
+                      iconVariant: PastelIconVariant.yellow,
+                      title: 'Plan new event',
+                      subtitle: 'Start a new event planning journey',
+                      showDivider: false,
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/events/create', arguments: session),
+                    ),
                   if (isVendor)
                     PastelListItem(
                       icon: Icons.storefront_rounded,

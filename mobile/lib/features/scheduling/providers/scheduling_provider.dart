@@ -16,60 +16,88 @@ class ScheduleNotifier extends AsyncNotifier<EventSchedule> {
 
   @override
   Future<EventSchedule> build() async {
-    return _api.getSchedule(eventId);
+    return _loadScheduleWithConflicts();
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _api.getSchedule(eventId));
+    state = await AsyncValue.guard(_loadScheduleWithConflicts);
   }
 
-  Future<void> updateActivityStatus(String activityId, String newStatus) async {
+  Future<EventSchedule> _loadScheduleWithConflicts() async {
+    final schedule = await _api.getSchedule(eventId);
+    final conflicts = await _api.getConflicts(schedule.id);
+    return schedule.copyWith(conflicts: conflicts);
+  }
+
+  Future<void> addActivity({
+    required String title,
+    String? description,
+    required DateTime startTime,
+    required DateTime endTime,
+    String? assignedVendorId,
+  }) async {
     final current = state.value;
     if (current == null) return;
 
-    final optimisticActivities = current.activities.map((activity) {
-      if (activity.id == activityId) {
-        return activity.copyWith(status: newStatus);
-      }
-      return activity;
-    }).toList();
-
-    final optimisticSchedule = EventSchedule(
-      id: current.id,
-      eventId: current.eventId,
-      isLocked: current.isLocked,
-      activities: optimisticActivities,
-      conflicts: current.conflicts,
+    await _api.addActivity(
+      current.id,
+      title: title,
+      description: description,
+      startTime: startTime,
+      endTime: endTime,
+      assignedVendorId: assignedVendorId,
     );
+    await _reloadAfterMutation();
+  }
 
-    state = AsyncData(optimisticSchedule);
+  Future<void> updateActivity({
+    required String activityId,
+    required String title,
+    String? description,
+    required DateTime startTime,
+    required DateTime endTime,
+    String? assignedVendorId,
+  }) async {
+    await _api.updateActivity(
+      activityId,
+      title: title,
+      description: description,
+      startTime: startTime,
+      endTime: endTime,
+      assignedVendorId: assignedVendorId,
+    );
+    await _reloadAfterMutation();
+  }
 
-    try {
-      final updatedActivity = await _api.updateActivityStatus(activityId, newStatus);
-      final refreshedActivities = optimisticActivities.map((activity) {
-        if (activity.id == updatedActivity.id) {
-          return updatedActivity;
-        }
-        return activity;
-      }).toList();
+  Future<void> deleteActivity(String activityId) async {
+    await _api.deleteActivity(activityId);
+    await _reloadAfterMutation();
+  }
 
-      state = AsyncData(
-        EventSchedule(
-          id: current.id,
-          eventId: current.eventId,
-          isLocked: current.isLocked,
-          activities: refreshedActivities,
-          conflicts: current.conflicts,
-        ),
-      );
-    } catch (error) {
-      state = AsyncValue.data(current);
-    }
+  Future<void> updateActivityStatus(String activityId, String newStatus) async {
+    await _api.updateActivityStatus(activityId, newStatus);
+    await _reloadAfterMutation();
   }
 
   Future<void> generateWithAi(String scheduleId) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _api.generateAiSchedule(scheduleId));
+    try {
+      final schedule = await _api.generateAiSchedule(scheduleId);
+      final conflicts = await _api.getConflicts(schedule.id);
+      state = AsyncData(schedule.copyWith(conflicts: conflicts));
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<void> _reloadAfterMutation() async {
+    try {
+      state = AsyncData(await _loadScheduleWithConflicts());
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 }

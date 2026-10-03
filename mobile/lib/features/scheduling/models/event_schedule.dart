@@ -40,4 +40,20 @@ class EventSchedule {
       conflicts: conflicts,
     );
   }
+
+  EventSchedule copyWith({
+    String? id,
+    String? eventId,
+    bool? isLocked,
+    List<TimelineActivity>? activities,
+    List<ScheduleConflict>? conflicts,
+  }) {
+    return EventSchedule(
+      id: id ?? this.id,
+      eventId: eventId ?? this.eventId,
+      isLocked: isLocked ?? this.isLocked,
+      activities: activities ?? this.activities,
+      conflicts: conflicts ?? this.conflicts,
+    );
+  }
 }
