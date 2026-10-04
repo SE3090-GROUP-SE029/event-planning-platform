@@ -185,11 +185,14 @@ class _VendorRecommendationsPageState
           if (run.fromCache || (run.sourceNote?.isNotEmpty ?? false))
             Card(
               color: AppColors.warning.withValues(alpha: 0.15),
-              child: ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: Text(
-                  run.sourceNote ??
-                      'Showing previously saved recommendations.',
+              child: Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text(
+                    run.sourceNote ??
+                        'Showing previously saved recommendations.',
+                  ),
                 ),
               ),
             ),

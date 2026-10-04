@@ -1,3 +1,4 @@
+using Application.Common;
 using Domain.Entities;
 using Domain.Enums;
 
@@ -36,6 +37,13 @@ public class ScheduleService
         Guid? vendorId,
         CancellationToken cancellationToken = default)
     {
+        startTime = UtcDateTime.Normalize(startTime);
+        endTime = UtcDateTime.Normalize(endTime);
+        if (endTime <= startTime)
+        {
+            throw new ArgumentException("EndTime must be strictly after StartTime.");
+        }
+
         var activity = new TimelineActivity
         {
             ScheduleId = scheduleId,

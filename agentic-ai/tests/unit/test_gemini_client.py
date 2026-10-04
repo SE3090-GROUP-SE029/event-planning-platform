@@ -104,6 +104,25 @@ class _DeadlineModel(_Model):
         raise DeadlineExceeded("request timed out")
 
 
+class _HangingModel(_Model):
+    async def generate_content_async(self, *_args: Any, **_kwargs: Any) -> _Response:
+        await asyncio.Event().wait()
+        return _Response()
+
+
+class _HangingStreamResponse:
+    def __aiter__(self) -> "_HangingStreamResponse":
+        return self
+
+    async def __anext__(self) -> Any:
+        await asyncio.Event().wait()
+
+
+class _HangingStreamModel(_Model):
+    async def generate_content_async(self, *_args: Any, **_kwargs: Any) -> Any:
+        return _HangingStreamResponse()
+
+
 class _QuotaModel(_Model):
     async def generate_content_async(self, *_args: Any, **_kwargs: Any) -> _Response:
         raise ResourceExhausted("project quota exhausted")
@@ -264,6 +283,75 @@ def test_gemini_deadline_is_reported_as_timeout() -> None:
                 "Report a timeout for this unique request.", AnalysisOutput
             )
         )
+
+
+def test_gemini_operation_deadline_cancels_a_hanging_request() -> None:
+    client = GeminiClient(
+        model=_HangingModel(),
+        timeout=10,
+        operation_timeout=0.01,
+        max_retries=0,
+    )
+
+    with pytest.raises(GeminiTimeoutError):
+        asyncio.run(
+            client.generate_with_prompt(
+                "Cancel a hanging request at the operation deadline.",
+                AnalysisOutput,
+            )
+        )
+
+
+def test_coordinator_node_uses_a_share_of_the_workflow_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        gemini_timeout_seconds=2,
+        gemini_max_retries=0,
+        coordinator_timeout_seconds=1,
+        max_iterations=1,
+    )
+    monkeypatch.setattr(gemini_client_module, "get_settings", lambda: settings)
+    original_wait_for = asyncio.wait_for
+    observed_timeouts: list[float] = []
+
+    async def observe_wait_for(awaitable: Any, timeout: float) -> Any:
+        observed_timeouts.append(timeout)
+        return await original_wait_for(awaitable, timeout)
+
+    monkeypatch.setattr(gemini_client_module.asyncio, "wait_for", observe_wait_for)
+    client = GeminiClient(model=_HangingModel())
+
+    with pytest.raises(GeminiTimeoutError):
+        asyncio.run(
+            client.generate_with_prompt(
+                "Use the coordinator's bounded per-node timeout.",
+                AnalysisOutput,
+                node_name="assess_risks",
+            )
+        )
+
+    assert observed_timeouts[0] == pytest.approx(1 / 8, abs=1e-3)
+
+
+def test_gemini_operation_deadline_cancels_a_hanging_stream() -> None:
+    client = GeminiClient(
+        model=_HangingStreamModel(),
+        timeout=10,
+        operation_timeout=0.01,
+        max_retries=0,
+    )
+
+    async def consume_stream() -> None:
+        async for _ in client.generate_plan_with_streaming(
+            {"name": "Gala"},
+            CoordinatorPlanOutput,
+        ):
+            pass
+
+    with pytest.raises(GeminiTimeoutError):
+        asyncio.run(consume_stream())
 
 
 def test_invalid_model_identifier_fails_settings_validation() -> None:

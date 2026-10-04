@@ -13,6 +13,8 @@ import '../api/event_remote_datasource.dart';
 import '../models/event_model.dart';
 import '../../plans/api/plan_remote_datasource.dart';
 import '../../plans/models/plan_model.dart';
+import '../../guest_management/pages/guest_management_page.dart';
+import '../../guest_management/pages/guest_analytics_page.dart';
 
 class EventDetailsPage extends StatefulWidget {
   final EventRemoteDataSource? eventApi;
@@ -468,6 +470,118 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                         PastelCard(
                           padding: const EdgeInsets.all(AppDimens.space20),
                           child: _buildPlanAction(),
+                        ),
+                      ],
+
+                      // C4 — Guest Management quick access (planner only)
+                      if (_canManagePlan && _event != null) ...[
+                        const PastelSectionHeader(title: 'Guest Management'),
+                        PastelCard(
+                          padding: const EdgeInsets.all(AppDimens.space4),
+                          child: Column(
+                            children: [
+                              Material(
+                                color: Colors.transparent,
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.pastelBlueLight,
+                                      borderRadius: BorderRadius.circular(
+                                          AppDimens.radiusMedium),
+                                    ),
+                                    child: const Icon(
+                                      Icons.people_outline_rounded,
+                                      size: 20,
+                                      color: AppColors.pastelBlueText,
+                                    ),
+                                  ),
+                                  title: const Text(
+                                    'Manage Guests',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  subtitle: const Text(
+                                    'View, upload, and manage registrations',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12),
+                                  ),
+                                  trailing: const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.textMuted),
+                                  onTap: () => Navigator.push<void>(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      settings: RouteSettings(
+                                        name: '/guests',
+                                        arguments: {
+                                          'auth': _auth,
+                                          'event': _event,
+                                        },
+                                      ),
+                                      builder: (_) => GuestManagementPage(
+                                        auth: _auth,
+                                        event: _event,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const Divider(
+                                  height: 1,
+                                  thickness: 0.8,
+                                  color: Color(0x0C000000),
+                                  indent: 56),
+                              Material(
+                                color: Colors.transparent,
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.pastelGreenLight,
+                                      borderRadius: BorderRadius.circular(
+                                          AppDimens.radiusMedium),
+                                    ),
+                                    child: const Icon(
+                                      Icons.bar_chart_rounded,
+                                      size: 20,
+                                      color: AppColors.pastelGreenText,
+                                    ),
+                                  ),
+                                  title: const Text(
+                                    'Guest Analytics',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  subtitle: const Text(
+                                    'Check-in rates, RSVP breakdown',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12),
+                                  ),
+                                  trailing: const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.textMuted),
+                                  onTap: () => Navigator.push<void>(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => GuestAnalyticsPage(
+                                        auth: _auth!,
+                                        event: _event!,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ],

@@ -28,7 +28,7 @@ public record FormQuestionResponse(Guid Id, string Question, bool Required)
     public static FormQuestionResponse[] From(RegistrationForm form) => form.Questions.Where(q => q.IsSelected)
         .OrderBy(q => q.DisplayOrder).Select(q => new FormQuestionResponse(q.Id, q.Question, q.Required)).ToArray();
 }
-public record RegistrationAnswerResponse(Guid QuestionId, string Answer);
+public record RegistrationAnswerResponse(Guid QuestionId, string? Answer);
 
 public record PublicRegistrationResponse(string PublicReference, string Status, string? StatusSecret,
     string? InvitationToken, string? QrPngBase64, string? RsvpStatus, string? EmailDeliveryStatus,
@@ -37,13 +37,13 @@ public record PublicRegistrationResponse(string PublicReference, string Status, 
 public record PlannerRegistrationResponse(long Id, string FullName, string EmailAddress, string? Organisation,
     string? PhoneNumber, string Status, string? RsvpStatus, string? EmailDeliveryStatus,
     DateTimeOffset RegisteredAt, DateTimeOffset? ConfirmedAt, DateTimeOffset? CancelledAt,
-    int DeliveryAttempts, DateTimeOffset? SentAt, RegistrationAnswerResponse[] Answers)
+    int DeliveryAttempts, DateTimeOffset? SentAt, DateTimeOffset? CheckedInAt, string? CheckedInMethod, RegistrationAnswerResponse[] Answers)
 {
     public static PlannerRegistrationResponse From(RegistrationSubmission registration) => new(registration.Id,
         registration.Guest.FullName, registration.Guest.EmailAddress, registration.Guest.Organisation,
         registration.Guest.PhoneNumber, registration.Status.ToString(), registration.Invitation?.RsvpStatus.ToString(),
         registration.RejectionDeliveryStatus?.ToString() ?? registration.Invitation?.DeliveryStatus.ToString(), registration.RegisteredAt, registration.ConfirmedAt,
         registration.CancelledAt, registration.RejectionDeliveryStatus is not null ? registration.RejectionDeliveryAttempts : registration.Invitation?.DeliveryAttempts ?? 0,
-        registration.RejectionSentAt ?? registration.Invitation?.SentAt,
+        registration.RejectionSentAt ?? registration.Invitation?.SentAt, registration.CheckedInAt, registration.CheckedInMethod?.ToString(),
         registration.Answers.Select(a => new RegistrationAnswerResponse(a.RegistrationQuestionId, a.Answer)).ToArray());
 }

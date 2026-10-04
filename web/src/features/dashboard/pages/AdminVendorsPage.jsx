@@ -66,7 +66,11 @@ export default function AdminVendorsPage() {
       activeTab="admin-vendors"
       title="Vendor Oversight"
       subtitle="Review vendor registrations and marketplace approval status"
-      onSearch={setSearch}
+      searchValue={search}
+      onSearch={(value) => {
+        setPage(0);
+        setSearch(value);
+      }}
     >
       <Box sx={{ mb: 3 }}>
         <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.04em', mb: 0.5 }}>

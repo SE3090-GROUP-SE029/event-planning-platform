@@ -49,10 +49,45 @@ public class AdminReadServiceTests
         Assert.Equal(3, result.Vendors.Total);
     }
 
+    [Fact]
+    public async Task ListPlansAsync_normalizes_date_filters_before_repository_query()
+    {
+        var repository = new FakeAdminReadRepository();
+        var service = new AdminReadService(repository);
+        var dateFrom = new DateTime(2026, 10, 4);
+        var dateTo = new DateTime(2026, 10, 5);
+
+        await service.ListPlansAsync(new AdminPlanQuery
+        {
+            DateFrom = dateFrom,
+            DateTo = dateTo
+        }, CancellationToken.None);
+
+        Assert.Equal(DateTimeKind.Utc, repository.LastPlanQuery!.DateFrom!.Value.Kind);
+        Assert.Equal(DateTimeKind.Utc, repository.LastPlanQuery.DateTo!.Value.Kind);
+        Assert.Equal(dateFrom.Ticks, repository.LastPlanQuery.DateFrom.Value.Ticks);
+        Assert.Equal(dateTo.Ticks, repository.LastPlanQuery.DateTo.Value.Ticks);
+    }
+
+    [Fact]
+    public async Task ListPlansAsync_rejects_reversed_date_range()
+    {
+        var service = new AdminReadService(new FakeAdminReadRepository());
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.ListPlansAsync(
+            new AdminPlanQuery
+            {
+                DateFrom = new DateTime(2026, 10, 5),
+                DateTo = new DateTime(2026, 10, 4)
+            },
+            CancellationToken.None));
+    }
+
     private sealed class FakeAdminReadRepository : IAdminReadRepository
     {
         public IReadOnlyList<User> Users { get; init; } = [];
         public AdminAnalyticsResponse Analytics { get; init; } = new();
+        public AdminPlanQuery? LastPlanQuery { get; private set; }
 
         public Task<AdminAnalyticsResponse> GetAnalyticsAsync(DateTime monthStart, CancellationToken cancellationToken) =>
             Task.FromResult(Analytics);
@@ -63,8 +98,11 @@ public class AdminReadServiceTests
         public Task<(IReadOnlyList<Vendor> Items, int TotalCount)> ListVendorsAsync(AdminVendorQuery query, CancellationToken cancellationToken) =>
             Task.FromResult(((IReadOnlyList<Vendor>)[], 0));
 
-        public Task<(IReadOnlyList<EventPlanDraft> Items, int TotalCount)> ListPlansAsync(AdminPlanQuery query, CancellationToken cancellationToken) =>
-            Task.FromResult(((IReadOnlyList<EventPlanDraft>)[], 0));
+        public Task<(IReadOnlyList<EventPlanDraft> Items, int TotalCount)> ListPlansAsync(AdminPlanQuery query, CancellationToken cancellationToken)
+        {
+            LastPlanQuery = query;
+            return Task.FromResult(((IReadOnlyList<EventPlanDraft>)[], 0));
+        }
 
         public Task<EventPlanDraft?> GetPlanAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult<EventPlanDraft?>(null);

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import {
   Alert,
@@ -35,11 +35,17 @@ import {
 
 export default function VendorProfilePage() {
   const isVendor = useAuthStore((state) => state.hasRole('VENDOR'));
+  const [failedImageUrl, setFailedImageUrl] = useState(null);
   const logoInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const { data: profile, isLoading, isError, error } = useMyVendorProfile();
   const isEditing = Boolean(profile);
-  const { data: gallery = [], isLoading: galleryLoading } = useMyVendorGallery(isEditing);
+  const {
+    data: gallery = [],
+    isLoading: galleryLoading,
+    isError: galleryIsError,
+    error: galleryError,
+  } = useMyVendorGallery(isEditing);
   const createProfile = useCreateVendorProfile();
   const updateProfile = useUpdateVendorProfile();
   const uploadImage = useUploadVendorProfileImage();
@@ -69,6 +75,7 @@ export default function VendorProfilePage() {
     name: 'category',
   });
   const imageUrl = resolveVendorImageUrl(profile?.profileImageUrl);
+  const imageLoadFailed = imageUrl !== null && failedImageUrl === imageUrl;
 
   useEffect(() => {
     if (!profile) {
@@ -158,10 +165,11 @@ export default function VendorProfilePage() {
           </Typography>
           <Stack spacing={1.5} sx={{ mb: 3, alignItems: 'center' }}>
             <Avatar
-              src={imageUrl || undefined}
+              src={imageUrl && !imageLoadFailed ? imageUrl : undefined}
+              imgProps={{ onError: () => setFailedImageUrl(imageUrl) }}
               sx={{ width: 112, height: 112, bgcolor: '#E8E4DA', color: '#19191C', fontSize: 42 }}
             >
-              {!imageUrl && <StorefrontOutlinedIcon fontSize="inherit" />}
+              {(!imageUrl || imageLoadFailed) && <StorefrontOutlinedIcon fontSize="inherit" />}
             </Avatar>
             <input
               ref={logoInputRef}
@@ -272,6 +280,12 @@ export default function VendorProfilePage() {
             </Alert>
           )}
 
+          {isEditing && galleryIsError && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 3 }}>
+              {galleryError?.message || 'Unable to load vendor images. Please try again.'}
+            </Alert>
+          )}
+
           {isEditing && galleryLoading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
               <CircularProgress size={28} />
@@ -308,6 +322,7 @@ export default function VendorProfilePage() {
                       component="img"
                       src={src || undefined}
                       alt="Vendor gallery"
+                      onError={(event) => { event.currentTarget.style.display = 'none'; }}
                       sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                     <IconButton

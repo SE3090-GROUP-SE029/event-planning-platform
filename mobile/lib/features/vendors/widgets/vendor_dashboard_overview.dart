@@ -257,15 +257,26 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
                   CircleAvatar(
                     radius: 28,
                     backgroundColor: AppColors.pastelGreenLight,
-                    backgroundImage:
-                        imageUrl != null ? NetworkImage(imageUrl) : null,
                     child: imageUrl == null
                         ? const Icon(
                             Icons.storefront_rounded,
                             color: AppColors.pastelGreenText,
                             size: 26,
                           )
-                        : null,
+                        : ClipOval(
+                            child: Image.network(
+                              imageUrl,
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
+                                Icons.storefront_rounded,
+                                color: AppColors.pastelGreenText,
+                                size: 26,
+                              ),
+                            ),
+                          ),
                   ),
                   const SizedBox(width: AppDimens.space14),
                   Expanded(
@@ -498,6 +509,16 @@ class _VendorDashboardOverviewState extends State<VendorDashboardOverview> {
                           width: 100,
                           height: 80,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            width: 100,
+                            height: 80,
+                            color: AppColors.pastelGreenLight,
+                            child: const Icon(
+                              Icons.image_outlined,
+                              color: AppColors.pastelGreenText,
+                            ),
+                          ),
                         ),
                 );
               }).toList(),

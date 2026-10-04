@@ -119,7 +119,11 @@ public sealed class AdminReadRepository(AppDbContext db) : IAdminReadRepository
         if (query.PlannerId.HasValue) plans = plans.Where(plan => plan.CreatedById == query.PlannerId.Value);
         if (query.EventType.HasValue) plans = plans.Where(plan => plan.Event.EventType == query.EventType.Value);
         if (query.DateFrom.HasValue) plans = plans.Where(plan => plan.GeneratedAt >= query.DateFrom.Value);
-        if (query.DateTo.HasValue) plans = plans.Where(plan => plan.GeneratedAt < query.DateTo.Value.AddDays(1));
+        if (query.DateTo.HasValue)
+        {
+            var dateTo = Application.Common.UtcDateTime.ToExclusiveUpperBound(query.DateTo.Value);
+            plans = plans.Where(plan => plan.GeneratedAt < dateTo);
+        }
         if (query.ScoreMin.HasValue) plans = plans.Where(plan => plan.PlanCompletenessScore >= query.ScoreMin.Value);
         if (query.ScoreMax.HasValue) plans = plans.Where(plan => plan.PlanCompletenessScore <= query.ScoreMax.Value);
         if (!string.IsNullOrWhiteSpace(query.Search))

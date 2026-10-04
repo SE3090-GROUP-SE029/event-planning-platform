@@ -1,7 +1,8 @@
 from google.adk.agents import LlmAgent
 from google.adk.models.base_llm import BaseLlm
 from google.genai import types
-from src.models.registration_question_models import QuestionSuggestions
+from src.agents.adk_schema import validate_and_log_adk_request
+from src.models.registration_question_models import QuestionSuggestionsOutput
 
 SYSTEM_PROMPT = """
 Suggest clear registration questions using ONLY the supplied event name and
@@ -23,6 +24,7 @@ Use no extra keys, markdown, tools, reasoning traces or control characters.
 
 def create_agent(model: BaseLlm) -> LlmAgent:
     return LlmAgent(name="registration_question_agent", model=model,
-                    instruction=SYSTEM_PROMPT, output_schema=QuestionSuggestions,
+                    instruction=SYSTEM_PROMPT, output_schema=QuestionSuggestionsOutput,
                     generate_content_config=types.GenerateContentConfig(temperature=0, max_output_tokens=2048),
+                    before_model_callback=validate_and_log_adk_request,
                     tools=[])

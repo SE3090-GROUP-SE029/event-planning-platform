@@ -3,6 +3,7 @@ using Application.Dtos.Events;
 using Application.Services.Events;
 using Domain.Entities;
 using Domain.Enums;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Backend.UnitTests;
 
@@ -32,7 +33,10 @@ public class AdminEventServiceTests
             CreatedAt = DateTime.UtcNow
         };
         var events = new TestEventRepository(eventEntity);
-        var service = new AdminEventService(events, new TestUserRepository(owner));
+        var service = new AdminEventService(
+            events,
+            new TestUserRepository(owner),
+            NullLogger<AdminEventService>.Instance);
 
         var result = await service.ListAsync(new AdminEventQuery());
 
@@ -44,20 +48,51 @@ public class AdminEventServiceTests
     [Fact]
     public async Task ListAsync_rejects_invalid_sort_field()
     {
-        var service = new AdminEventService(new TestEventRepository(), new TestUserRepository());
+        var service = new AdminEventService(
+            new TestEventRepository(),
+            new TestUserRepository(),
+            NullLogger<AdminEventService>.Instance);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.ListAsync(new AdminEventQuery { SortBy = "owner" }));
     }
 
+    [Fact]
+    public async Task ListAsync_normalizes_date_filters_to_utc_before_repository_query()
+    {
+        var repository = new TestEventRepository();
+        var service = new AdminEventService(
+            repository,
+            new TestUserRepository(),
+            NullLogger<AdminEventService>.Instance);
+        var dateFrom = new DateTime(2026, 10, 4);
+        var dateTo = new DateTime(2026, 10, 5);
+
+        await service.ListAsync(new AdminEventQuery
+        {
+            DateFrom = dateFrom,
+            DateTo = dateTo
+        });
+
+        Assert.Equal(DateTimeKind.Utc, repository.LastAdminQuery!.DateFrom!.Value.Kind);
+        Assert.Equal(DateTimeKind.Utc, repository.LastAdminQuery.DateTo!.Value.Kind);
+        Assert.Equal(dateFrom.Ticks, repository.LastAdminQuery.DateFrom.Value.Ticks);
+        Assert.Equal(dateTo.Ticks, repository.LastAdminQuery.DateTo.Value.Ticks);
+    }
+
     private sealed class TestEventRepository(params Event[] events) : IEventRepository
     {
         private readonly List<Event> _events = events.ToList();
+        public AdminEventQuery? LastAdminQuery { get; private set; }
+
         public Task<Event?> GetByIdAsync(Guid id) => Task.FromResult(_events.SingleOrDefault(e => e.Id == id));
         public Task<(IReadOnlyList<Event> Items, int TotalCount)> ListAsync(Guid? ownerId, EventQuery query) =>
             Task.FromResult(((IReadOnlyList<Event>)_events, _events.Count));
-        public Task<(IReadOnlyList<Event> Items, int TotalCount)> ListAdminAsync(AdminEventQuery query) =>
-            Task.FromResult(((IReadOnlyList<Event>)_events, _events.Count));
+        public Task<(IReadOnlyList<Event> Items, int TotalCount)> ListAdminAsync(AdminEventQuery query)
+        {
+            LastAdminQuery = query;
+            return Task.FromResult(((IReadOnlyList<Event>)_events, _events.Count));
+        }
         public Task AddAsync(Event eventEntity) => Task.CompletedTask;
         public Task SaveChangesAsync() => Task.CompletedTask;
         public void Remove(Event eventEntity) { }

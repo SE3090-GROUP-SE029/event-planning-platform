@@ -1,20 +1,31 @@
+using Application.Common;
 using Application.Common.Interfaces;
 using Application.Dtos.Admin;
 using Domain.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Services.Admin;
 
-public sealed class AdminReadService(IAdminReadRepository repository) : IAdminReadService
+public sealed class AdminReadService(
+    IAdminReadRepository repository,
+    ILogger<AdminReadService>? logger = null) : IAdminReadService
 {
     public Task<AdminAnalyticsResponse> GetAnalyticsAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        return repository.GetAnalyticsAsync(new DateTime(now.Year, now.Month, 1), cancellationToken);
+        var monthStart = UtcDateTime.Normalize(new DateTime(now.Year, now.Month, 1));
+        return repository.GetAnalyticsAsync(monthStart, cancellationToken);
     }
 
     public async Task<AdminUserListResponse> ListUsersAsync(AdminUserQuery query, CancellationToken cancellationToken)
     {
         ValidatePaging(query.Page, query.PageSize);
+        logger?.LogInformation(
+            "Listing admin users. Page={Page}, PageSize={PageSize}, Role={Role}, HasSearch={HasSearch}",
+            query.Page,
+            query.PageSize,
+            query.Role,
+            !string.IsNullOrWhiteSpace(query.Search));
         var (items, total) = await repository.ListUsersAsync(query, cancellationToken);
         return new AdminUserListResponse
         {
@@ -26,6 +37,13 @@ public sealed class AdminReadService(IAdminReadRepository repository) : IAdminRe
     public async Task<AdminVendorListResponse> ListVendorsAsync(AdminVendorQuery query, CancellationToken cancellationToken)
     {
         ValidatePaging(query.Page, query.PageSize);
+        logger?.LogInformation(
+            "Listing admin vendors. Page={Page}, PageSize={PageSize}, Status={Status}, Category={Category}, HasSearch={HasSearch}",
+            query.Page,
+            query.PageSize,
+            query.Status,
+            query.Category,
+            !string.IsNullOrWhiteSpace(query.Search));
         var (items, total) = await repository.ListVendorsAsync(query, cancellationToken);
         return new AdminVendorListResponse
         {
@@ -36,7 +54,25 @@ public sealed class AdminReadService(IAdminReadRepository repository) : IAdminRe
 
     public async Task<AdminPlanListResponse> ListPlansAsync(AdminPlanQuery query, CancellationToken cancellationToken)
     {
+        if (query.DateFrom.HasValue)
+            query.DateFrom = UtcDateTime.Normalize(query.DateFrom.Value);
+        if (query.DateTo.HasValue)
+            query.DateTo = UtcDateTime.Normalize(query.DateTo.Value);
+        if (query.DateFrom.HasValue &&
+            query.DateTo.HasValue &&
+            query.DateFrom.Value > query.DateTo.Value)
+            throw new ArgumentException("DateFrom must be earlier than or equal to DateTo.");
+
         ValidatePaging(query.Page, query.PageSize);
+        logger?.LogInformation(
+            "Listing admin plans. Page={Page}, PageSize={PageSize}, Status={Status}, EventType={EventType}, HasSearch={HasSearch}, DateFrom={DateFrom}, DateTo={DateTo}",
+            query.Page,
+            query.PageSize,
+            query.Status,
+            query.EventType,
+            !string.IsNullOrWhiteSpace(query.Search),
+            query.DateFrom,
+            query.DateTo);
         var (items, total) = await repository.ListPlansAsync(query, cancellationToken);
         return new AdminPlanListResponse
         {

@@ -17,19 +17,22 @@ public class VendorsController : ControllerBase
     private readonly IVendorGalleryService _galleryService;
     private readonly IVendorAvailabilityService _availabilityService;
     private readonly IVendorAnalyticsService _analyticsService;
+    private readonly ILogger<VendorsController> _logger;
 
     public VendorsController(
         IVendorService vendorService,
         IVendorOfferingService offeringService,
         IVendorGalleryService galleryService,
         IVendorAvailabilityService availabilityService,
-        IVendorAnalyticsService analyticsService)
+        IVendorAnalyticsService analyticsService,
+        ILogger<VendorsController> logger)
     {
         _vendorService = vendorService;
         _offeringService = offeringService;
         _galleryService = galleryService;
         _availabilityService = availabilityService;
         _analyticsService = analyticsService;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -96,12 +99,19 @@ public class VendorsController : ControllerBase
     }
 
     [HttpPost("me/profile-image")]
+    [Consumes("multipart/form-data")]
     [RequestSizeLimit(3 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 3 * 1024 * 1024)]
-    public async Task<ActionResult<VendorProfileResponse>> UploadProfileImage(IFormFile? file)
+    public async Task<ActionResult<VendorProfileResponse>> UploadProfileImage(
+        [FromForm(Name = "file")] IFormFile? file)
     {
         try
         {
+            _logger.LogInformation(
+                "Vendor profile image upload received. UserId={UserId}, FileBytes={FileBytes}, ContentType={ContentType}",
+                GetCurrentUserId(),
+                file?.Length ?? 0,
+                file?.ContentType ?? "missing");
             if (file is null || file.Length == 0)
             {
                 return BadRequest(new { message = "An image file is required." });
@@ -113,10 +123,14 @@ public class VendorsController : ControllerBase
                 stream,
                 file.ContentType ?? "application/octet-stream",
                 file.Length);
+            _logger.LogInformation(
+                "Vendor profile image upload succeeded. UserId={UserId}",
+                GetCurrentUserId());
             return Ok(result);
         }
         catch (ArgumentException ex)
         {
+            _logger.LogWarning(ex, "Vendor profile image upload rejected. UserId={UserId}", GetCurrentUserId());
             return BadRequest(new { message = ex.Message });
         }
         catch (KeyNotFoundException ex)
@@ -140,12 +154,19 @@ public class VendorsController : ControllerBase
     }
 
     [HttpPost("me/images")]
+    [Consumes("multipart/form-data")]
     [RequestSizeLimit(3 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 3 * 1024 * 1024)]
-    public async Task<ActionResult<VendorGalleryImageResponse>> UploadGalleryImage(IFormFile? file)
+    public async Task<ActionResult<VendorGalleryImageResponse>> UploadGalleryImage(
+        [FromForm(Name = "file")] IFormFile? file)
     {
         try
         {
+            _logger.LogInformation(
+                "Vendor gallery image upload received. UserId={UserId}, FileBytes={FileBytes}, ContentType={ContentType}",
+                GetCurrentUserId(),
+                file?.Length ?? 0,
+                file?.ContentType ?? "missing");
             if (file is null || file.Length == 0)
             {
                 return BadRequest(new { message = "An image file is required." });
@@ -157,10 +178,15 @@ public class VendorsController : ControllerBase
                 stream,
                 file.ContentType ?? "application/octet-stream",
                 file.Length);
+            _logger.LogInformation(
+                "Vendor gallery image upload succeeded. UserId={UserId}, ImageId={ImageId}",
+                GetCurrentUserId(),
+                result.Id);
             return CreatedAtAction(nameof(ListMyImages), value: result);
         }
         catch (ArgumentException ex)
         {
+            _logger.LogWarning(ex, "Vendor gallery image upload rejected. UserId={UserId}", GetCurrentUserId());
             return BadRequest(new { message = ex.Message });
         }
         catch (InvalidOperationException ex)

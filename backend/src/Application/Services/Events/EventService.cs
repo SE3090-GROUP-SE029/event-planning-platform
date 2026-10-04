@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Common;
 using Application.Dtos.Events;
 using Domain.Entities;
 using Domain.Enums;
@@ -20,6 +21,7 @@ public class EventService : IEventService
 
     public async Task<EventResponse> CreateAsync(Guid ownerId, CreateEventRequest request)
     {
+        request.PreferredDate = UtcDateTime.Normalize(request.PreferredDate);
         await _validator.ValidateAndThrowAsync(request);
 
         var now = DateTime.UtcNow;
@@ -78,6 +80,7 @@ public class EventService : IEventService
 
     public async Task<EventResponse> UpdateAsync(Guid eventId, Guid userId, UpdateEventRequest request)
     {
+        request.PreferredDate = UtcDateTime.Normalize(request.PreferredDate);
         var eventEntity = await _events.GetByIdAsync(eventId)
             ?? throw new KeyNotFoundException("Event not found.");
 
@@ -136,6 +139,11 @@ public class EventService : IEventService
 
     private static void ValidateQuery(EventQuery query)
     {
+        if (query.Search?.Length > 200)
+        {
+            throw new ArgumentException("Search must be 200 characters or fewer.");
+        }
+
         if (query.Page < 1)
         {
             throw new ArgumentException("Page must be greater than zero.");

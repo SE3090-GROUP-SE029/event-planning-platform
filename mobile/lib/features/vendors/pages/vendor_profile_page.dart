@@ -48,6 +48,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
   bool _saving = false;
   bool _uploadingImage = false;
   bool _uploadingGallery = false;
+  double? _imageUploadProgress;
+  double? _galleryUploadProgress;
   bool _hasProfile = false;
   String? _status;
   String? _error;
@@ -100,11 +102,7 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
             : 'CATERING';
         _status = profile.status;
         _hasProfile = true;
-        try {
-          _gallery = await _vendorApi.listGalleryImages(token);
-        } catch (_) {
-          _gallery = [];
-        }
+        _gallery = await _vendorApi.listGalleryImages(token);
       }
       setState(() {
         _loading = false;
@@ -177,27 +175,42 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     final token = _auth?.accessToken;
     if (token == null || !_hasProfile) return;
 
-    final picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1200,
-      imageQuality: 85,
-    );
-    if (picked == null || !mounted) return;
-
-    setState(() {
-      _uploadingImage = true;
-      _error = null;
-    });
-
     try {
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+      if (await picked.length() > VendorRemoteDataSource.maxImageBytes) {
+        setState(() => _error = 'Image must be 2 MB or smaller.');
+        return;
+      }
+      final bytes = await picked.readAsBytes();
+      if (bytes.length > VendorRemoteDataSource.maxImageBytes) {
+        setState(() => _error = 'Image must be 2 MB or smaller.');
+        return;
+      }
+
+      setState(() {
+        _uploadingImage = true;
+        _imageUploadProgress = 0;
+        _error = null;
+      });
+
       final saved = await _vendorApi.uploadProfileImage(
         token,
-        picked.path,
+        bytes,
         picked.name,
+        onSendProgress: (sent, total) {
+          if (!mounted || total <= 0) return;
+          setState(() => _imageUploadProgress = sent / total);
+        },
       );
       if (!mounted) return;
       setState(() {
         _uploadingImage = false;
+        _imageUploadProgress = null;
         _profileImageUrl = saved.profileImageUrl;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -210,7 +223,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
       if (!mounted) return;
       setState(() {
         _uploadingImage = false;
-        _error = e.toString();
+        _imageUploadProgress = null;
+        _error = 'Unable to upload profile image: $e';
       });
     }
   }
@@ -219,32 +233,52 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
     final token = _auth?.accessToken;
     if (token == null || !_hasProfile) return;
 
-    final picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      imageQuality: 85,
-    );
-    if (picked == null || !mounted) return;
-
-    setState(() {
-      _uploadingGallery = true;
-      _error = null;
-    });
-
     try {
-      await _vendorApi.uploadGalleryImage(token, picked.path, picked.name);
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+      if (await picked.length() > VendorRemoteDataSource.maxImageBytes) {
+        setState(() => _error = 'Image must be 2 MB or smaller.');
+        return;
+      }
+      final bytes = await picked.readAsBytes();
+      if (bytes.length > VendorRemoteDataSource.maxImageBytes) {
+        setState(() => _error = 'Image must be 2 MB or smaller.');
+        return;
+      }
+
+      setState(() {
+        _uploadingGallery = true;
+        _galleryUploadProgress = 0;
+        _error = null;
+      });
+
+      await _vendorApi.uploadGalleryImage(
+        token,
+        bytes,
+        picked.name,
+        onSendProgress: (sent, total) {
+          if (!mounted || total <= 0) return;
+          setState(() => _galleryUploadProgress = sent / total);
+        },
+      );
       if (!mounted) return;
       final gallery = await _vendorApi.listGalleryImages(token);
       if (!mounted) return;
       setState(() {
         _gallery = gallery;
         _uploadingGallery = false;
+        _galleryUploadProgress = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _uploadingGallery = false;
-        _error = e.toString();
+        _galleryUploadProgress = null;
+        _error = 'Unable to upload gallery image: $e';
       });
     }
   }
@@ -266,6 +300,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final profileImageUrl =
+        VendorRemoteDataSource.resolveImageUrl(_profileImageUrl);
     return Scaffold(
       backgroundColor: AppColors.canvas,
       appBar: AppBar(
@@ -310,33 +346,37 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                                 child: CircleAvatar(
                                   radius: 34,
                                   backgroundColor: AppColors.pastelGreenLight,
-                                  backgroundImage: VendorRemoteDataSource
-                                              .resolveImageUrl(
-                                                  _profileImageUrl) !=
-                                          null
-                                      ? NetworkImage(
-                                          VendorRemoteDataSource
-                                              .resolveImageUrl(
-                                                  _profileImageUrl)!,
-                                        )
-                                      : null,
                                   child: _uploadingImage
-                                      ? const SizedBox(
+                                      ? SizedBox(
                                           width: 22,
                                           height: 22,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
+                                            value: _imageUploadProgress,
                                           ),
                                         )
-                                      : (VendorRemoteDataSource.resolveImageUrl(
-                                                  _profileImageUrl) ==
-                                              null
+                                      : profileImageUrl == null
                                           ? const Icon(
                                               Icons.storefront_rounded,
                                               color: AppColors.pastelGreenText,
                                               size: 34,
                                             )
-                                          : null),
+                                          : ClipOval(
+                                              child: Image.network(
+                                                profileImageUrl,
+                                                width: 68,
+                                                height: 68,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error,
+                                                        stackTrace) =>
+                                                    const Icon(
+                                                  Icons.storefront_rounded,
+                                                  color:
+                                                      AppColors.pastelGreenText,
+                                                  size: 34,
+                                                ),
+                                              ),
+                                            ),
                                 ),
                               ),
                               const SizedBox(width: AppDimens.space16),
@@ -446,10 +486,12 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                           const SizedBox(height: AppDimens.space16),
                           Text(
                             'Category',
-                            style:
-                                Theme.of(context).textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
@@ -580,9 +622,8 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                                     : Icons.add_business_rounded,
                                 size: 18,
                               ),
-                        label: Text(_hasProfile
-                            ? 'Save changes'
-                            : 'Create profile'),
+                        label: Text(
+                            _hasProfile ? 'Save changes' : 'Create profile'),
                       ),
                     ),
 
@@ -596,10 +637,10 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                             SizedBox(
                               width: double.infinity,
                               child: OutlinedButton.icon(
-                                onPressed: _uploadingGallery ||
-                                        _gallery.length >= 8
-                                    ? null
-                                    : _pickAndUploadGalleryImage,
+                                onPressed:
+                                    _uploadingGallery || _gallery.length >= 8
+                                        ? null
+                                        : _pickAndUploadGalleryImage,
                                 icon: _uploadingGallery
                                     ? const SizedBox(
                                         width: 16,
@@ -608,17 +649,27 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Icon(Icons.add_photo_alternate_outlined),
+                                    : const Icon(
+                                        Icons.add_photo_alternate_outlined),
                                 label: Text(_uploadingGallery
                                     ? 'Uploading…'
                                     : 'Add image'),
                               ),
                             ),
+                            if (_uploadingGallery) ...[
+                              const SizedBox(height: AppDimens.space8),
+                              LinearProgressIndicator(
+                                value: _galleryUploadProgress,
+                                color: AppColors.pastelGreenText,
+                                backgroundColor: AppColors.pastelGreenLight,
+                              ),
+                            ],
                             const SizedBox(height: AppDimens.space12),
                             if (_gallery.isEmpty)
                               const Text(
                                 'No business images yet.',
-                                style: TextStyle(color: AppColors.textSecondary),
+                                style:
+                                    TextStyle(color: AppColors.textSecondary),
                               )
                             else
                               Wrap(
@@ -636,13 +687,27 @@ class _VendorProfilePageState extends State<VendorProfilePage> {
                                             ? Container(
                                                 width: 100,
                                                 height: 80,
-                                                color: AppColors.pastelGreenLight,
+                                                color:
+                                                    AppColors.pastelGreenLight,
                                               )
                                             : Image.network(
                                                 url,
                                                 width: 100,
                                                 height: 80,
                                                 fit: BoxFit.cover,
+                                                errorBuilder: (context, error,
+                                                        stackTrace) =>
+                                                    Container(
+                                                  width: 100,
+                                                  height: 80,
+                                                  color: AppColors
+                                                      .pastelGreenLight,
+                                                  child: const Icon(
+                                                    Icons.image_outlined,
+                                                    color: AppColors
+                                                        .pastelGreenText,
+                                                  ),
+                                                ),
                                               ),
                                       ),
                                       Positioned(
