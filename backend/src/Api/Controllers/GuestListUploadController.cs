@@ -16,7 +16,9 @@ namespace Api.Controllers;
 [ServiceFilter(typeof(PlannerAccessFilter))]
 [ServiceFilter(typeof(RegistrationExceptionFilter))]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class GuestListUploadController(BulkGuestUploadService uploadService) : ControllerBase
+public class GuestListUploadController(
+    BulkGuestUploadService uploadService,
+    ILogger<GuestListUploadController> logger) : ControllerBase
 {
     private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
@@ -28,8 +30,18 @@ public class GuestListUploadController(BulkGuestUploadService uploadService) : C
     /// </summary>
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> Upload(Guid eventId, IFormFile? file, CancellationToken ct)
+    [RequestSizeLimit(MaxFileSizeBytes + 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxFileSizeBytes)]
+    public async Task<IActionResult> Upload(
+        Guid eventId,
+        [FromForm(Name = "file")] IFormFile? file,
+        CancellationToken ct)
     {
+        logger.LogInformation(
+            "Guest list upload received. EventId={EventId}, FileBytes={FileBytes}, ContentType={ContentType}",
+            eventId,
+            file?.Length ?? 0,
+            file?.ContentType ?? "missing");
         if (file is null || file.Length == 0)
             return BadRequest(new { code = "file_required", error = "A file is required." });
 
@@ -45,6 +57,12 @@ public class GuestListUploadController(BulkGuestUploadService uploadService) : C
 
         using var stream = file.OpenReadStream();
         var result = await uploadService.ProcessAsync(eventId, PlannerId, stream, extension, ct);
+        logger.LogInformation(
+            "Guest list upload processed. EventId={EventId}, TotalRows={TotalRows}, SuccessfulRows={SuccessfulRows}, FailedRows={FailedRows}",
+            eventId,
+            result.TotalRows,
+            result.SuccessfulRows,
+            result.FailedRows);
         return Ok(result);
     }
 }

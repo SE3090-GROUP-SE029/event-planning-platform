@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -106,8 +107,9 @@ final plannerFormProvider = FutureProvider.autoDispose
     .family<PlannerFormModel?, String>((ref, eventId) async {
   try {
     return await ref.read(guestManagementApiProvider).getForm(eventId);
-  } catch (_) {
-    return null;
+  } on DioException catch (error) {
+    if (error.response?.statusCode == 404) return null;
+    rethrow;
   }
 });
 

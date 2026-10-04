@@ -61,6 +61,10 @@ class GuestDecision(BaseModel):
     flags: list[Flag] = Field(max_length=10)
 
 
+class GuestDecisionOutput(GuestDecision):
+    model_config = ConfigDict(extra="ignore", strict=True, allow_inf_nan=False)
+
+
 class GuestReviewResponse(GuestDecision):
     model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False,
                               alias_generator=to_camel, populate_by_name=True)

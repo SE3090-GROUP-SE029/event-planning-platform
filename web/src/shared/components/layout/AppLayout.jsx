@@ -9,6 +9,7 @@ export default function AppLayout({
   title,
   subtitle,
   onSearch,
+  searchValue,
   children,
 }) {
   const user = useAuthStore((state) => state.user);
@@ -23,6 +24,7 @@ export default function AppLayout({
             title={title}
             subtitle={subtitle}
             onSearch={onSearch}
+            searchValue={searchValue}
           />
           <Box sx={{ flex: 1 }}>{children}</Box>
         </Box>

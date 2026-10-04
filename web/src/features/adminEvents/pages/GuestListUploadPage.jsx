@@ -42,25 +42,47 @@ export default function GuestListUploadPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [fileError, setFileError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const mutation = useUploadGuestList(eventId);
 
+  const validateAndSelectFile = (file) => {
+    if (!file) return;
+    const extension = file.name.split(".").pop().toLowerCase();
+    if (!["csv", "pdf", "docx"].includes(extension)) {
+      setSelectedFile(null);
+      setFileError("Only CSV, PDF, and DOCX files are supported.");
+      mutation.reset();
+      return;
+    }
+    if (file.size <= 0) {
+      setSelectedFile(null);
+      setFileError("The selected file is empty.");
+      mutation.reset();
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSelectedFile(null);
+      setFileError("File must not exceed 5 MB.");
+      mutation.reset();
+      return;
+    }
+    setFileError(null);
+    setSelectedFile(file);
+    mutation.reset();
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      mutation.reset();
-    }
+    validateAndSelectFile(file);
+    e.target.value = "";
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      mutation.reset();
-    }
+    validateAndSelectFile(file);
   };
 
   const handleUpload = () => {
@@ -156,6 +178,11 @@ export default function GuestListUploadPage() {
             : "Accepted: .csv, .pdf, .docx — max 5 MB, up to 1,000 rows"}
         </Typography>
       </SurfaceCard>
+      {fileError && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 3 }}>
+          {fileError}
+        </Alert>
+      )}
 
       {mutation.isError && (
         <Alert severity="error" sx={{ mb: 2, borderRadius: 3 }}>
@@ -177,7 +204,7 @@ export default function GuestListUploadPage() {
         {selectedFile && (
           <Button
             variant="text"
-            onClick={() => { setSelectedFile(null); mutation.reset(); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+            onClick={() => { setSelectedFile(null); setFileError(null); mutation.reset(); if (fileInputRef.current) fileInputRef.current.value = ""; }}
             sx={{ borderRadius: 9999 }}
           >
             Clear

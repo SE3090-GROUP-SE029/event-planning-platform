@@ -47,7 +47,11 @@ export default function AdminUsersPage() {
       activeTab="users"
       title="User Management"
       subtitle="Inspect and manage all platform accounts"
-      onSearch={setSearch}
+      searchValue={search}
+      onSearch={(value) => {
+        setPage(0);
+        setSearch(value);
+      }}
     >
       <Box sx={{ mb: 3 }}>
         <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.04em', mb: 0.5 }}>

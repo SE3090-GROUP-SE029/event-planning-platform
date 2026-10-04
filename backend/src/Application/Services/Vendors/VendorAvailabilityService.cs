@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Common.Interfaces;
 using Application.Dtos.Vendors;
 using Domain.Entities;
@@ -111,8 +112,8 @@ public class VendorAvailabilityService : IVendorAvailabilityService
 
     private static (DateTime Start, DateTime End) NormalizeRange(DateTime start, DateTime end)
     {
-        var normalizedStart = ToUtc(start);
-        var normalizedEnd = ToUtc(end);
+        var normalizedStart = UtcDateTime.Normalize(start);
+        var normalizedEnd = UtcDateTime.Normalize(end);
 
         if (normalizedStart >= normalizedEnd)
         {
@@ -120,16 +121,6 @@ public class VendorAvailabilityService : IVendorAvailabilityService
         }
 
         return (normalizedStart, normalizedEnd);
-    }
-
-    private static DateTime ToUtc(DateTime value)
-    {
-        return value.Kind switch
-        {
-            DateTimeKind.Utc => value,
-            DateTimeKind.Local => value.ToUniversalTime(),
-            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
-        };
     }
 
     private static VendorAvailabilityResponse ToResponse(VendorAvailability item) => new()

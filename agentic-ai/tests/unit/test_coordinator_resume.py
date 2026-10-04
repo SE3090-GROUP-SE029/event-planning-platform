@@ -129,3 +129,31 @@ def test_coordinator_resumes_after_quota_failure_without_repeating_completed_nod
             assert calls["rationale"] == 1
 
     asyncio.run(execute_with_checkpoint())
+
+
+def test_coordinator_timeout_includes_waiting_for_same_event_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.coordinator_agent.execution as execution
+
+    async def execute_while_lock_is_held() -> None:
+        lock = asyncio.Lock()
+        await lock.acquire()
+        monkeypatch.setattr(execution, "_execution_lock", lambda _thread_id: lock)
+
+        with pytest.raises(TimeoutError, match="0.01 second timeout"):
+            await execute_coordinator_agent(
+                str(uuid4()),
+                {
+                    "name": "Gala",
+                    "type": "CORPORATE",
+                    "date": "2027-06-15T18:00:00",
+                    "budget": 1000,
+                    "guest_count": 100,
+                },
+                timeout_seconds=0.01,
+            )
+
+        assert lock.locked()
+
+    asyncio.run(execute_while_lock_is_held())

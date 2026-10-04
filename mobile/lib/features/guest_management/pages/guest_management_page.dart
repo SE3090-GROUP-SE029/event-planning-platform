@@ -15,9 +15,17 @@ import '../providers/guest_management_providers.dart';
 import 'guest_upload_page.dart';
 import 'guest_registration_detail_page.dart';
 import 'qr_check_in_page.dart';
+import 'registration_form_setup_page.dart';
 
 class GuestManagementPage extends ConsumerStatefulWidget {
-  const GuestManagementPage({super.key});
+  final AuthResponseModel? auth;
+  final EventModel? event;
+
+  const GuestManagementPage({
+    super.key,
+    this.auth,
+    this.event,
+  });
 
   @override
   ConsumerState<GuestManagementPage> createState() =>
@@ -38,14 +46,23 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_auth == null) {
-      final args = ModalRoute.of(context)?.settings.arguments as Map?;
-      _auth = args?['auth'] as AuthResponseModel?;
-      _event = args?['event'] as EventModel?;
+    final routeArgs = ModalRoute.of(context)?.settings.arguments as Map?;
+    final routeAuth = routeArgs?['auth'] as AuthResponseModel? ?? widget.auth;
+    final routeEvent = routeArgs?['event'] as EventModel? ?? widget.event;
+
+    if (_auth == null || _event == null) {
+      _auth = routeAuth;
+      _event = routeEvent;
+    } else if (_auth != routeAuth || _event != routeEvent) {
+      _auth = routeAuth;
+      _event = routeEvent;
+    }
+
+    final event = _event;
+    if (event != null && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _event != null) {
-          ref.read(guestListControllerProvider(_event!.id)).load();
-        }
+        if (!mounted) return;
+        ref.read(guestListControllerProvider(event.id)).load();
       });
     }
   }
@@ -80,6 +97,41 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
     ctrl.checkedInFilter = _checkedInFilter;
     ctrl.searchQuery = _searchController.text;
     ctrl.load(refresh: true);
+  }
+
+  Future<void> _openRegistrationForm(EventModel event) async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (_) => RegistrationFormSetupPage(
+          eventId: event.id,
+          eventName: event.eventName,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    ref.invalidate(plannerFormProvider(event.id));
+    ref.read(guestListControllerProvider(event.id)).load(refresh: true);
+  }
+
+  Future<void> _openGuestUpload(
+    EventModel event,
+    AuthResponseModel auth,
+    bool formIsPublished,
+  ) async {
+    if (!formIsPublished) {
+      await _openRegistrationForm(event);
+      return;
+    }
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => GuestUploadPage(auth: auth, event: event),
+      ),
+    );
+    if (mounted) {
+      ref.read(guestListControllerProvider(event.id)).load(refresh: true);
+    }
   }
 
   void _showFilterSheet() {
@@ -133,6 +185,9 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
     }
 
     final controller = ref.watch(guestListControllerProvider(event.id));
+    final formAsync = ref.watch(plannerFormProvider(event.id));
+    final registrationForm = formAsync.asData?.value;
+    final formIsPublished = registrationForm?.status == 'PUBLISHED';
     final displayed = controller.filtered;
 
     return Scaffold(
@@ -140,6 +195,11 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
       appBar: AppBar(
         title: const Text('Guests'),
         actions: [
+          IconButton(
+            tooltip: 'Registration form settings',
+            onPressed: () => _openRegistrationForm(event),
+            icon: const Icon(Icons.assignment_outlined),
+          ),
           // Filter button
           IconButton(
             tooltip: 'Filter guests',
@@ -169,21 +229,10 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
           ),
           // Upload button
           IconButton(
-            tooltip: 'Upload guest list',
-            onPressed: () async {
-              await Navigator.push<void>(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => GuestUploadPage(
-                    auth: auth,
-                    event: event,
-                  ),
-                ),
-              );
-              if (mounted) {
-                ref.read(guestListControllerProvider(event.id)).load(refresh: true);
-              }
-            },
+            tooltip: formIsPublished
+                ? 'Upload guest list'
+                : 'Set up registration form before uploading',
+            onPressed: () => _openGuestUpload(event, auth, formIsPublished),
             icon: Container(
               width: 38,
               height: 38,
@@ -213,7 +262,9 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
                 ),
               );
               if (mounted) {
-                ref.read(guestListControllerProvider(event.id)).load(refresh: true);
+                ref
+                    .read(guestListControllerProvider(event.id))
+                    .load(refresh: true);
               }
             },
             icon: Container(
@@ -236,6 +287,31 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
       ),
       body: Column(
         children: [
+          if (formAsync.hasValue && registrationForm?.status != 'PUBLISHED')
+            MaterialBanner(
+              content: const Text(
+                'Publish a registration form before uploading or managing guests.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => _openRegistrationForm(event),
+                  child: const Text('Set up form'),
+                ),
+              ],
+            ),
+          if (formAsync.hasError)
+            MaterialBanner(
+              content: Text(
+                'Could not load the registration form: ${formAsync.error}',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      ref.invalidate(plannerFormProvider(event.id)),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           // Summary bar
           _buildSummaryBar(controller),
           // Search field
@@ -257,17 +333,22 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
                 hintText: 'Search by name or email…',
                 prefixIcon: Icon(Icons.search_rounded,
                     size: 20, color: AppColors.textMuted),
-                contentPadding: EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 12),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
             ),
           ),
           // Active filter chips
-          if (_hasActiveFilter)
-            _buildActiveFilterChips(),
+          if (_hasActiveFilter) _buildActiveFilterChips(),
           // Guest list
           Expanded(
-            child: _buildBody(controller, displayed, event, auth),
+            child: _buildBody(
+              controller,
+              displayed,
+              event,
+              auth,
+              formIsPublished,
+            ),
           ),
         ],
       ),
@@ -348,8 +429,8 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
                 color: AppColors.pastelBlueText,
                 fontWeight: FontWeight.w600)),
         backgroundColor: AppColors.pastelBlueLight,
-        deleteIcon:
-            const Icon(Icons.close_rounded, size: 14, color: AppColors.pastelBlueText),
+        deleteIcon: const Icon(Icons.close_rounded,
+            size: 14, color: AppColors.pastelBlueText),
         onDeleted: onRemove,
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -362,6 +443,7 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
     List<PlannerRegistrationModel> displayed,
     EventModel event,
     AuthResponseModel auth,
+    bool formIsPublished,
   ) {
     if (controller.loading && controller.guests.isEmpty) {
       return const Center(
@@ -379,11 +461,10 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
             icon: Icons.error_outline_rounded,
             iconVariant: PastelIconVariant.pink,
             title: 'Unable to load guests',
-            description: controller.error ??
-                'Something went wrong. Please try again.',
+            description:
+                controller.error ?? 'Something went wrong. Please try again.',
             actionLabel: 'Retry',
-            onActionTap: () =>
-                controller.load(refresh: true),
+            onActionTap: () => controller.load(refresh: true),
           ),
         ],
       );
@@ -397,15 +478,13 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
             icon: Icons.people_outline_rounded,
             iconVariant: PastelIconVariant.yellow,
             title: 'No guests yet',
-            description:
-                'Upload a guest list or share your registration form link to get started.',
-            actionLabel: 'Upload guest list',
-            onActionTap: () => Navigator.push<void>(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => GuestUploadPage(auth: auth, event: event),
-              ),
-            ),
+            description: formIsPublished
+                ? 'Upload a guest list or share your registration form link to get started.'
+                : 'Set up and publish a registration form before uploading guests.',
+            actionLabel: formIsPublished
+                ? 'Upload guest list'
+                : 'Set up registration form',
+            onActionTap: () => _openGuestUpload(event, auth, formIsPublished),
           ),
         ],
       );
@@ -508,9 +587,7 @@ class _GuestCard extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              guest.fullName.isNotEmpty
-                  ? guest.fullName[0].toUpperCase()
-                  : '?',
+              guest.fullName.isNotEmpty ? guest.fullName[0].toUpperCase() : '?',
               style: TextStyle(
                 color: _avatarTextColor(guest.status),
                 fontSize: 18,
@@ -571,8 +648,8 @@ class _GuestCard extends StatelessWidget {
                         text: '✓ Checked In',
                         style: PastelBadgeStyle.green,
                         fontSize: 10,
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                       ),
                   ],
                 ),
@@ -742,9 +819,8 @@ class _FilterSheetState extends State<_FilterSheet> {
       ),
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-              AppDimens.space20, AppDimens.space24,
-              AppDimens.space20, AppDimens.space32),
+          padding: const EdgeInsets.fromLTRB(AppDimens.space20,
+              AppDimens.space24, AppDimens.space20, AppDimens.space32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -833,16 +909,16 @@ class _FilterSheetState extends State<_FilterSheet> {
                   FilterChip(
                     label: const Text('Checked In'),
                     selected: _checkedIn == true,
-                    onSelected: (_) => setState(() =>
-                        _checkedIn = _checkedIn == true ? null : true),
+                    onSelected: (_) => setState(
+                        () => _checkedIn = _checkedIn == true ? null : true),
                     selectedColor: AppColors.pastelGreenLight,
                     checkmarkColor: AppColors.pastelGreenText,
                   ),
                   FilterChip(
                     label: const Text('Not Checked In'),
                     selected: _checkedIn == false,
-                    onSelected: (_) => setState(() =>
-                        _checkedIn = _checkedIn == false ? null : false),
+                    onSelected: (_) => setState(
+                        () => _checkedIn = _checkedIn == false ? null : false),
                     selectedColor: AppColors.pastelYellowLight,
                     checkmarkColor: AppColors.pastelYellowText,
                   ),
@@ -852,8 +928,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () =>
-                      widget.onApply(_status, _rsvp, _checkedIn),
+                  onPressed: () => widget.onApply(_status, _rsvp, _checkedIn),
                   child: const Text('Apply Filters'),
                 ),
               ),

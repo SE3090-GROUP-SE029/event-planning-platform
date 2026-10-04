@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
@@ -11,8 +12,10 @@ from google.genai import types
 from pydantic import ValidationError
 
 from src.coordinator_agent.config import Settings
+from src.agents.adk_schema import AdkSchemaError, validate_gemini_schema
 from src.main import app
-from src.models.guest_review_models import GuestReviewRequest
+from src.models.guest_review_models import GuestDecisionOutput, GuestReviewRequest
+from src.models.registration_question_models import QuestionSuggestionsOutput
 from src.services import guest_review_service as guest_review_service_module
 from src.services.guest_review_service import (
     AnalysisError, GuestReviewService, ReviewSettings, get_guest_review_service,
@@ -138,6 +141,51 @@ def test_input_rejects_extra_fields_and_oversized_context():
         GuestReviewRequest.model_validate(payload)
 
 
+def test_adk_output_schemas_omit_additional_properties_at_every_depth():
+    schemas = (
+        GuestDecisionOutput.model_json_schema(),
+        QuestionSuggestionsOutput.model_json_schema(),
+    )
+
+    def schema_nodes(value):
+        if isinstance(value, dict):
+            yield value
+            for child in value.values():
+                yield from schema_nodes(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from schema_nodes(child)
+
+    for schema in schemas:
+        assert all(
+            "additionalProperties" not in node
+            and "additional_properties" not in node
+            for node in schema_nodes(schema)
+        )
+        validate_gemini_schema(schema)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "additionalProperties": False},
+        {
+            "type": "object",
+            "properties": {
+                "nested": {
+                    "type": "object",
+                    "additional_properties": False,
+                }
+            },
+        },
+        {"type": "object", "unevaluatedProperties": False},
+    ],
+)
+def test_adk_schema_validation_rejects_unsupported_keywords(schema):
+    with pytest.raises(AdkSchemaError):
+        validate_gemini_schema(schema)
+
+
 @pytest.mark.parametrize("raw,status,code", [
     (json.dumps(decision()), 200, None), ("invalid", 502, "invalid_ai_response"),
 ])
@@ -173,8 +221,12 @@ def test_python_analysis_endpoint_rejects_nonlocal_clients():
         app.dependency_overrides.clear()
 
 
-def test_real_adk_gemini_bridge_uses_gemini_schema_and_isolated_contexts(monkeypatch):
+def test_real_adk_gemini_bridge_uses_gemini_schema_and_isolated_contexts(
+    monkeypatch,
+    caplog,
+):
     # A local Gemini API fake exercises the actual ADK runner without external calls.
+    caplog.set_level(logging.INFO, logger="src.agents.adk_schema")
     calls = []
     successful_calls = []
 
@@ -188,7 +240,16 @@ def test_real_adk_gemini_bridge_uses_gemini_schema_and_isolated_contexts(monkeyp
                 ":", 1
             )[0]
             calls.append((key, model_name, body))
-            if model_name == "gemini-primary" and key == "first-test-key":
+            if model_name == "gemini-invalid":
+                response = {
+                    "error": {
+                        "code": 400,
+                        "message": "Invalid schema request",
+                        "status": "INVALID_ARGUMENT",
+                    }
+                }
+                status = 400
+            elif model_name == "gemini-primary" and key == "first-test-key":
                 response = {
                     "error": {
                         "code": 429,
@@ -307,29 +368,88 @@ def test_real_adk_gemini_bridge_uses_gemini_schema_and_isolated_contexts(monkeyp
         )
         assert len(suggestions.questions) == 1
 
+        app.dependency_overrides[get_guest_review_service] = (
+            lambda: GuestReviewService(review_settings)
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(
+                app=app,
+                client=("127.0.0.1", 123),
+            ),
+            base_url="http://local",
+        ) as client:
+            response = await client.post("/api/guest-reviews/analyze", json=payload)
+        assert response.status_code == 200
+        assert response.json()["decision"] == "ACCEPTED"
+        assert set(response.json()) == {
+            "decision",
+            "confidence",
+            "reasons",
+            "flags",
+            "model",
+            "promptVersion",
+        }
+
+        app.dependency_overrides[get_guest_review_service] = (
+            lambda: GuestReviewService(
+                ReviewSettings(
+                    model="gemini-invalid",
+                    api_keys=("schema-test-key",),
+                    timeout_seconds=30,
+                )
+            )
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(
+                app=app,
+                client=("127.0.0.1", 123),
+            ),
+            base_url="http://local",
+        ) as client:
+            invalid_response = await client.post(
+                "/api/guest-reviews/analyze",
+                json=payload,
+            )
+        assert invalid_response.status_code == 502
+        assert invalid_response.json() == {"code": "ai_request_invalid"}
+
     try:
         asyncio.run(run())
     finally:
+        app.dependency_overrides.clear()
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
 
-    assert len(calls) == 9
-    assert [(model, key) for key, model, _ in calls] == [
+    assert len(calls) == 13
+    assert [(model, key) for key, model, _ in calls[:-1]] == [
         ("gemini-primary", "first-test-key"),
         ("gemini-primary", "second-test-key"),
         ("gemini-fallback", "first-test-key"),
-    ] * 3
+    ] * 4
+    assert calls[-1][0:2] == ("schema-test-key", "gemini-invalid")
+    for _, _, body in calls:
+        schema = body["generationConfig"]["responseSchema"]
+        serialized_schema = json.dumps(schema)
+        assert "additionalProperties" not in serialized_schema
+        assert "additional_properties" not in serialized_schema
     gemini_calls = [body for model, body in successful_calls if model == "gemini-fallback"]
-    assert len(gemini_calls) == 3
+    assert len(gemini_calls) == 4
     assert all(model == "gemini-fallback" for model, _ in successful_calls)
     for body in gemini_calls:
         assert not body.get("tools")
         assert len(body.get("contents", [])) == 1
-    for body in gemini_calls[:2]:
+    for body in (gemini_calls[0], gemini_calls[1], gemini_calls[3]):
         assert body["generationConfig"]["responseSchema"]["properties"][
             "decision"
         ]["enum"] == ["ACCEPTED", "REJECTED"]
+    guest_schema = gemini_calls[0]["generationConfig"]["responseSchema"]
+    assert guest_schema["properties"]["reasons"]["type"] == "ARRAY"
+    assert guest_schema["properties"]["reasons"]["items"]["type"] == "STRING"
+    question_schema = gemini_calls[2]["generationConfig"]["responseSchema"]
+    question_item = question_schema["properties"]["questions"]["items"]
+    assert question_item["properties"]["required"]["type"] == "BOOLEAN"
+    assert question_item["required"] == ["question", "required"]
     first_input = json.loads(
         gemini_calls[0]["contents"][0]["parts"][0]["text"]
     )
@@ -351,3 +471,8 @@ def test_real_adk_gemini_bridge_uses_gemini_schema_and_isolated_contexts(monkeyp
     )
     assert set(question_input) == {"event"}
     assert question_input["event"]["eventName"] == "Research Conference"
+    assert "response_schema=" in caplog.text
+    assert "generation_config=" in caplog.text
+    assert "serialized_request_payload=" in caplog.text
+    assert '"text": "<redacted>"' in caplog.text
+    assert "nimal@example.com" not in caplog.text

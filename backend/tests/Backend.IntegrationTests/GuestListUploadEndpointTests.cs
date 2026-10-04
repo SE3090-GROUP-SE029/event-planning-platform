@@ -87,6 +87,38 @@ public class GuestListUploadEndpointTests(RegistrationHostFixture fixture) : ICl
     }
 
     [Fact]
+    public async Task CreatingAndPublishingFormEnablesGuestUpload()
+    {
+        var eventDetails = await fixture.CreateEventAsync();
+        using var createRequest = new HttpRequestMessage(
+            HttpMethod.Post, $"/api/events/{eventDetails.Id}/registration-form")
+        {
+            Content = JsonContent.Create(new
+            {
+                opensAt = RegistrationHostFixture.Now.AddHours(-1),
+                closesAt = RegistrationHostFixture.Now.AddDays(5),
+                seatLimit = 10,
+            }),
+        };
+        createRequest.Headers.Add("X-Test-Identity", RegistrationHostFixture.PlannerId);
+        var createResponse = await fixture.Client.SendAsync(createRequest);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        using var publishRequest = new HttpRequestMessage(
+            HttpMethod.Post, $"/api/events/{eventDetails.Id}/registration-form/publish");
+        publishRequest.Headers.Add("X-Test-Identity", RegistrationHostFixture.PlannerId);
+        var publishResponse = await fixture.Client.SendAsync(publishRequest);
+        Assert.Equal(HttpStatusCode.OK, publishResponse.StatusCode);
+
+        var uploadResponse = await UploadCsvAsync(
+            eventDetails.Id,
+            "fullName,emailAddress\nAlice,alice@lifecycle.com",
+            RegistrationHostFixture.PlannerId);
+        var upload = await JsonAsync(uploadResponse);
+        Assert.Equal(1, upload.GetProperty("successfulRows").GetInt32());
+    }
+
+    [Fact]
     public async Task UnpublishedFormReturns409()
     {
         var eventDetails = await fixture.CreateEventAsync();
@@ -191,6 +223,38 @@ public class GuestListUploadEndpointTests(RegistrationHostFixture fixture) : ICl
         Assert.Equal(0, result.GetProperty("successfulRows").GetInt32());
         Assert.Equal(1, result.GetProperty("alreadyRegisteredRows").GetInt32());
         Assert.Equal(0, result.GetProperty("failedRows").GetInt32());
+    }
+
+    [Fact]
+    public async Task ConcurrentUploadsOfSameGuestCreateOnlyOneRegistration()
+    {
+        var eventDetails = await fixture.CreateEventAsync();
+        await fixture.WithServiceAsync(s => s.CreateFormAsync(
+            eventDetails.Id, RegistrationHostFixture.PlannerId,
+            new Application.GuestManagement.FormSettings(
+                RegistrationHostFixture.Now.AddHours(-1), RegistrationHostFixture.Now.AddDays(5), 10), Ct));
+        await fixture.WithServiceAsync(s => s.PublishAsync(
+            eventDetails.Id, RegistrationHostFixture.PlannerId, Ct));
+
+        const string csv = "fullName,emailAddress\nAlice,concurrent@upload.com\n";
+        var responses = await Task.WhenAll(
+            UploadCsvAsync(eventDetails.Id, csv, RegistrationHostFixture.PlannerId),
+            UploadCsvAsync(eventDetails.Id, csv, RegistrationHostFixture.PlannerId));
+        var results = await Task.WhenAll(
+            responses.Select(response => JsonAsync(response)));
+
+        Assert.Equal(
+            1,
+            results.Sum(result => result.GetProperty("successfulRows").GetInt32()));
+        Assert.Equal(
+            1,
+            results.Sum(result => result.GetProperty("alreadyRegisteredRows").GetInt32()));
+
+        await using var db = fixture.CreateDb();
+        Assert.Equal(1, await db.Guests.CountAsync(g => g.EventId == eventDetails.Id));
+        Assert.Equal(
+            1,
+            await db.RegistrationSubmissions.CountAsync(s => s.EventId == eventDetails.Id));
     }
 
     [Fact]

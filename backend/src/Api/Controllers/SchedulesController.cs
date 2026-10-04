@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.DTOs.Scheduling;
 using Application.Services.Scheduling;
 using Domain.Enums;
@@ -31,7 +32,9 @@ public class SchedulesController : ControllerBase
         [FromBody] CreateActivityRequest request, 
         CancellationToken ct)
     {
-        if (request.EndTime <= request.StartTime)
+        var startTime = UtcDateTime.Normalize(request.StartTime);
+        var endTime = UtcDateTime.Normalize(request.EndTime);
+        if (endTime <= startTime)
         {
             return BadRequest(new { message = "EndTime must be strictly after StartTime." });
         }
@@ -40,8 +43,8 @@ public class SchedulesController : ControllerBase
             scheduleId,
             request.Title,
             request.Description,
-            request.StartTime,
-            request.EndTime,
+            startTime,
+            endTime,
             request.AssignedVendorId,
             ct);
 

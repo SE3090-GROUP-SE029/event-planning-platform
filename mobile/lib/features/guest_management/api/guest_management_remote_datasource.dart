@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/api/dio_client.dart';
 import '../models/guest_registration_model.dart';
 import '../models/registration_form_model.dart';
@@ -33,6 +34,50 @@ class GuestManagementRemoteDataSource {
     return PlannerFormModel.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Create a registration form draft for an event.
+  Future<PlannerFormModel> createForm(
+    String eventId, {
+    required DateTime opensAt,
+    required DateTime closesAt,
+    required int seatLimit,
+  }) async {
+    final response = await _dio.post(
+      '/api/events/$eventId/registration-form',
+      data: {
+        'opensAt': opensAt.toUtc().toIso8601String(),
+        'closesAt': closesAt.toUtc().toIso8601String(),
+        'seatLimit': seatLimit,
+      },
+    );
+    return PlannerFormModel.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Update the registration form settings.
+  Future<PlannerFormModel> updateForm(
+    String eventId, {
+    required DateTime opensAt,
+    required DateTime closesAt,
+    required int seatLimit,
+  }) async {
+    final response = await _dio.put(
+      '/api/events/$eventId/registration-form',
+      data: {
+        'opensAt': opensAt.toUtc().toIso8601String(),
+        'closesAt': closesAt.toUtc().toIso8601String(),
+        'seatLimit': seatLimit,
+      },
+    );
+    return PlannerFormModel.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Publish the event's saved registration form.
+  Future<PlannerFormModel> publishForm(String eventId) async {
+    final response = await _dio.post(
+      '/api/events/$eventId/registration-form/publish',
+    );
+    return PlannerFormModel.fromJson(response.data as Map<String, dynamic>);
+  }
+
   // ──────────────────────────────────────────
   // PLANNER — Guest List Upload
   // ──────────────────────────────────────────
@@ -40,21 +85,52 @@ class GuestManagementRemoteDataSource {
   /// Upload a CSV/PDF/DOCX file for bulk guest import.
   /// Returns structured result with rows processed, duplicates, errors.
   Future<BulkUploadResult> uploadGuestList(
-    String eventId,
-    List<int> fileBytes,
-    String fileName,
-  ) async {
+      String eventId, List<int> fileBytes, String fileName,
+      {ProgressCallback? onSendProgress}) async {
+    final extension = fileName.split('.').last.toLowerCase();
+    final contentType = switch (extension) {
+      'csv' => DioMediaType('text', 'csv'),
+      'pdf' => DioMediaType('application', 'pdf'),
+      'docx' => DioMediaType(
+          'application',
+          'vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ),
+      _ => throw ArgumentError('Only CSV, PDF, and DOCX files are supported.'),
+    };
+    if (fileBytes.isEmpty) {
+      throw ArgumentError('The selected file is empty.');
+    }
+    if (fileBytes.length > 5 * 1024 * 1024) {
+      throw ArgumentError('File must not exceed 5 MB.');
+    }
+
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(
         fileBytes,
         filename: fileName,
+        contentType: contentType,
       ),
     });
+    const endpointSuffix = '/registration-form/upload';
+    final endpoint = '/api/events/$eventId$endpointSuffix';
+    if (kDebugMode) {
+      debugPrint(
+        '[GuestFileUpload] POST ${_dio.options.baseUrl}$endpoint '
+        'multipart/form-data; extension=$extension; bytes=${fileBytes.length}; '
+        'authorization=attached',
+      );
+    }
     final response = await _dio.post(
-      '/api/events/$eventId/registration-form/upload',
+      endpoint,
+      onSendProgress: onSendProgress,
       data: formData,
-      options: Options(contentType: 'multipart/form-data'),
+      options: Options(contentType: Headers.multipartFormDataContentType),
     );
+    if (kDebugMode) {
+      debugPrint(
+        '[GuestFileUpload] response status=${response.statusCode}',
+      );
+    }
     return BulkUploadResult.fromJson(response.data as Map<String, dynamic>);
   }
 

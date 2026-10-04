@@ -1,5 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -29,6 +30,7 @@ class GuestUploadPage extends StatefulWidget {
 }
 
 enum _UploadState { idle, uploading, success, error }
+
 class _GuestUploadPageState extends State<GuestUploadPage> {
   late final GuestManagementRemoteDataSource _api;
 
@@ -39,6 +41,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
 
   // Upload state
   _UploadState _state = _UploadState.idle;
+  double? _uploadProgress;
   BulkUploadResult? _result;
   String? _error;
 
@@ -49,23 +52,6 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
   }
 
   Future<void> _pickFile() async {
-    // Using image_picker's XFile for file picking is not available for docs.
-    // We use the existing image_picker package (already in pubspec) to pick
-    // from gallery/files. For document-type files, we open the file picker.
-    // Since file_picker is NOT in pubspec, we'll guide the user to use
-    // a workaround: on Android/iOS we use image_picker.pickImage as the
-    // project doesn't include file_picker.
-    //
-    // IMPORTANT: The project's pubspec.yaml only has image_picker ^1.1.2.
-    // We must NOT add a new package. Instead, we accept text-based input
-    // or note to the user about the platform limitation.
-    // For now, we use ImagePicker to select from gallery (for image files)
-    // and show a note about CSV uploads needing the file path.
-    //
-    // Real production approach: add file_picker to pubspec. Since AGENTS.md
-    // requires explicit approval for new packages, we implement a manual-entry
-    // fallback that still exercises the full API flow.
-
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -74,33 +60,46 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
         ),
       ),
       builder: (_) => _FileTypeSheet(
-        onSelectFromGallery: () async {
+        onSelectFile: () async {
           Navigator.pop(context);
-          final picker = ImagePicker();
-          final file = await picker.pickImage(source: ImageSource.gallery);
-          if (file != null && mounted) {
-            final bytes = await file.readAsBytes();
-            final name = file.name;
-            if (!_isValidExtension(name)) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                        'Only CSV, PDF, and DOCX files are supported.'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-              }
+          try {
+            final selection = await FilePicker.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: const ['csv', 'pdf', 'docx'],
+              allowMultiple: false,
+              withData: true,
+            );
+            if (selection == null || !mounted) return;
+
+            final file = selection.files.single;
+            if (!_isValidExtension(file.name)) {
+              _showSelectionError(
+                'Only CSV, PDF, and DOCX files are supported.',
+              );
+              return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+              _showSelectionError('File must not exceed 5 MB.');
+              return;
+            }
+            final bytes = file.bytes;
+            if (bytes == null || bytes.isEmpty) {
+              _showSelectionError(
+                'The selected file could not be read. Please try again.',
+              );
               return;
             }
             setState(() {
-              _selectedFileName = name;
+              _selectedFileName = file.name;
               _selectedFileSize = bytes.length;
               _selectedFileBytes = bytes;
               _state = _UploadState.idle;
               _result = null;
               _error = null;
             });
+          } catch (e) {
+            if (!mounted) return;
+            _showSelectionError('Unable to select file: $e');
           }
         },
       ),
@@ -110,6 +109,16 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
   bool _isValidExtension(String name) {
     final ext = name.split('.').last.toLowerCase();
     return ['csv', 'pdf', 'docx'].contains(ext);
+  }
+
+  void _showSelectionError(String message) {
+    setState(() {
+      _selectedFileName = null;
+      _selectedFileSize = null;
+      _selectedFileBytes = null;
+      _error = message;
+      _state = _UploadState.error;
+    });
   }
 
   Future<void> _upload() async {
@@ -127,6 +136,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
 
     setState(() {
       _state = _UploadState.uploading;
+      _uploadProgress = 0;
       _error = null;
       _result = null;
     });
@@ -136,11 +146,16 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
         widget.event.id,
         bytes,
         name,
+        onSendProgress: (sent, total) {
+          if (!mounted || total <= 0) return;
+          setState(() => _uploadProgress = sent / total);
+        },
       );
       if (mounted) {
         setState(() {
           _result = result;
           _state = _UploadState.success;
+          _uploadProgress = null;
         });
       }
     } catch (e) {
@@ -148,6 +163,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
         setState(() {
           _error = _parseError(e);
           _state = _UploadState.error;
+          _uploadProgress = null;
         });
       }
     }
@@ -156,6 +172,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
   void _reset() {
     setState(() {
       _state = _UploadState.idle;
+      _uploadProgress = null;
       _result = null;
       _error = null;
       _selectedFileName = null;
@@ -165,9 +182,28 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
   }
 
   String _parseError(Object e) {
+    if (e is ArgumentError) {
+      return e.message?.toString() ?? 'The selected file is not supported.';
+    }
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map<String, dynamic>) {
+        final message = data['error'] ?? data['message'];
+        if (message != null) return message.toString();
+      }
+      if (e.response?.statusCode == 401) {
+        return 'Your session has expired. Please sign in again.';
+      }
+      if (e.response?.statusCode == 403) {
+        return 'You do not have permission to upload this guest list.';
+      }
+      if (e.response?.statusCode == 413) {
+        return 'File must not exceed 5 MB.';
+      }
+    }
     final msg = e.toString();
-    final jsonMatch = RegExp(r'"(?:message|error)"\s*:\s*"([^"]+)"')
-        .firstMatch(msg);
+    final jsonMatch =
+        RegExp(r'"(?:message|error)"\s*:\s*"([^"]+)"').firstMatch(msg);
     if (jsonMatch != null) return jsonMatch.group(1)!;
     if (msg.contains('invalid_file_type')) {
       return 'Only CSV, PDF, and DOCX files are supported.';
@@ -226,15 +262,16 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
             // Loading indicator
             if (_state == _UploadState.uploading) ...[
               const SizedBox(height: AppDimens.space24),
-              const Center(
+              Center(
                 child: Column(
                   children: [
                     CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
+                      value: _uploadProgress,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
                           AppColors.obsidianBlack),
                     ),
-                    SizedBox(height: 16),
-                    Text(
+                    const SizedBox(height: 16),
+                    const Text(
                       'Uploading and processing guest list…',
                       style: TextStyle(
                         color: AppColors.textSecondary,
@@ -548,8 +585,8 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
             child: Column(
               children: result.errors.map((e) {
                 return Padding(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: AppDimens.space6),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: AppDimens.space6),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -666,15 +703,15 @@ class DottedBorderBox extends StatelessWidget {
 
 /// File type selection bottom sheet.
 class _FileTypeSheet extends StatelessWidget {
-  final VoidCallback onSelectFromGallery;
+  final VoidCallback onSelectFile;
 
-  const _FileTypeSheet({required this.onSelectFromGallery});
+  const _FileTypeSheet({required this.onSelectFile});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          AppDimens.space20, AppDimens.space24, AppDimens.space20, AppDimens.space32),
+      padding: const EdgeInsets.fromLTRB(AppDimens.space20, AppDimens.space24,
+          AppDimens.space20, AppDimens.space32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -705,7 +742,7 @@ class _FileTypeSheet extends StatelessWidget {
               title: const Text('Pick from Files / Gallery',
                   style: TextStyle(fontWeight: FontWeight.w700)),
               subtitle: const Text('Select a CSV, PDF, or DOCX file'),
-              onTap: onSelectFromGallery,
+              onTap: onSelectFile,
               contentPadding: EdgeInsets.zero,
             ),
           ),
@@ -713,8 +750,7 @@ class _FileTypeSheet extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Text(
-              'Note: File selection is provided by the system file picker. '
-              'Navigate to your CSV/PDF/DOCX file in the file manager.',
+              'Choose a CSV, PDF, or DOCX file from your device.',
               style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 12,

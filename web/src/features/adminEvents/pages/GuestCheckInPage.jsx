@@ -21,7 +21,7 @@ export default function GuestCheckInPage() {
 
   const checkInMutation = useMutation({
     mutationFn: async (token) => {
-      const res = await apiClient.post(`/events/${id}/registration-form/check-in`, { token });
+      const res = await apiClient.post(`/api/events/${id}/registration-form/check-in`, { token });
       return res.data;
     },
     onSuccess: (data) => {

@@ -1,7 +1,7 @@
 import { Avatar, Box, InputBase, Typography } from '@mui/material';
 import { tokens } from '../../theme/tokens';
 
-export default function TopSearchNavbar({ user, onSearch, title, subtitle }) {
+export default function TopSearchNavbar({ user, onSearch, searchValue, title, subtitle }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3.5 }}>
       <Box
@@ -22,6 +22,7 @@ export default function TopSearchNavbar({ user, onSearch, title, subtitle }) {
         <InputBase
           fullWidth
           placeholder="Search events"
+          value={searchValue}
           onChange={(event) => onSearch?.(event.target.value)}
           sx={{ fontSize: 14, color: tokens.colors.textPrimary }}
         />

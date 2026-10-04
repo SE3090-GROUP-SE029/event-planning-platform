@@ -79,8 +79,7 @@ public class RegistrationFormsController(RegistrationService service) : Controll
     public async Task<IActionResult> CheckIn(Guid eventId, ValidateInvitationRequest request, CancellationToken ct)
     {
         var registration = await service.CheckInGuestAsync(eventId, PlannerId, request.Token, ct);
-        // The check-in state is not persisted because properties for it are omitted from the domain model 
-        // to prevent EF core migration requirement.
+        // Check-in state is persisted by the event-locked registration operation.
         return Ok(new { message = "Guest checked in successfully.", guest = PlannerRegistrationResponse.From(registration) });
     }
 

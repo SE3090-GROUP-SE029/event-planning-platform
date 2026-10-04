@@ -130,16 +130,20 @@ async def execute_coordinator_agent(
         )
         config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
         logger.info("Starting coordinator agent for event %s", event_id)
-        async with _execution_lock(thread_id):
-            final_state = await asyncio.wait_for(
-                _run_graph_async(
+
+        async def run_with_lock() -> CoordinatorState:
+            async with _execution_lock(thread_id):
+                return await _run_graph_async(
                     build_coordinator_graph(checkpointer),
                     initial_state,
                     config,
                     checkpointer,
-                ),
-                timeout=execution_timeout,
-            )
+                )
+
+        final_state = await asyncio.wait_for(
+            run_with_lock(),
+            timeout=execution_timeout,
+        )
         if not final_state.validation_passed or final_state.final_plan is None:
             logger.error(
                 "Coordinator final validation failed for event %s: %s",

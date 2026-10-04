@@ -4,7 +4,8 @@ from google.adk.agents import LlmAgent
 from google.adk.models.base_llm import BaseLlm
 from google.genai import types
 
-from src.models.guest_review_models import GuestDecision
+from src.agents.adk_schema import validate_and_log_adk_request
+from src.models.guest_review_models import GuestDecisionOutput
 
 PROMPT_VERSION = "guest-filtering-v2"
 SYSTEM_PROMPT = """
@@ -54,7 +55,8 @@ chain-of-thought, extra keys, tool calls, instructions, or control characters.
 def create_agent(model: BaseLlm) -> LlmAgent:
     return LlmAgent(
         name="guest_filtering_agent", model=model, instruction=SYSTEM_PROMPT,
-        output_schema=GuestDecision,
+        output_schema=GuestDecisionOutput,
         generate_content_config=types.GenerateContentConfig(temperature=0, max_output_tokens=2048),
+        before_model_callback=validate_and_log_adk_request,
         tools=[],
     )

@@ -10,6 +10,8 @@ import '../models/vendor_profile_model.dart';
 import '../models/vendor_service_model.dart';
 
 class VendorRemoteDataSource {
+  static const int maxImageBytes = 2 * 1024 * 1024;
+
   final Dio dio;
 
   VendorRemoteDataSource({Dio? dio}) : dio = dio ?? DioClient().dio;
@@ -97,25 +99,35 @@ class VendorRemoteDataSource {
 
   Future<VendorProfileModel> uploadProfileImage(
     String accessToken,
-    String filePath,
+    List<int> fileBytes,
     String fileName,
+    {ProgressCallback? onSendProgress}
   ) async {
     try {
+      _validateImage(fileBytes, fileName);
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(filePath, filename: fileName),
+        'file': MultipartFile.fromBytes(
+          fileBytes,
+          filename: fileName,
+          contentType: _imageContentType(fileName),
+        ),
       });
+      _logUpload('/api/vendors/me/profile-image', fileName, fileBytes.length);
       final response = await dio.post(
         '/api/vendors/me/profile-image',
+        onSendProgress: onSendProgress,
         data: formData,
         options: Options(
+          contentType: Headers.multipartFormDataContentType,
           headers: {
             'Authorization': 'Bearer $accessToken',
-            'Content-Type': 'multipart/form-data',
           },
         ),
       );
+      _logUploadResponse(response.statusCode);
       return VendorProfileModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
+      _logUploadError(e);
       throw _handleError(e);
     }
   }
@@ -140,29 +152,81 @@ class VendorRemoteDataSource {
 
   Future<VendorGalleryImageModel> uploadGalleryImage(
     String accessToken,
-    String filePath,
+    List<int> fileBytes,
     String fileName,
+    {ProgressCallback? onSendProgress}
   ) async {
     try {
+      _validateImage(fileBytes, fileName);
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(filePath, filename: fileName),
+        'file': MultipartFile.fromBytes(
+          fileBytes,
+          filename: fileName,
+          contentType: _imageContentType(fileName),
+        ),
       });
+      _logUpload('/api/vendors/me/images', fileName, fileBytes.length);
       final response = await dio.post(
         '/api/vendors/me/images',
+        onSendProgress: onSendProgress,
         data: formData,
         options: Options(
+          contentType: Headers.multipartFormDataContentType,
           headers: {
             'Authorization': 'Bearer $accessToken',
-            'Content-Type': 'multipart/form-data',
           },
         ),
       );
+      _logUploadResponse(response.statusCode);
       return VendorGalleryImageModel.fromJson(
         response.data as Map<String, dynamic>,
       );
     } on DioException catch (e) {
+      _logUploadError(e);
       throw _handleError(e);
     }
+  }
+
+  void _validateImage(List<int> bytes, String fileName) {
+    if (bytes.isEmpty) {
+      throw ArgumentError('The selected image is empty.');
+    }
+    if (bytes.length > maxImageBytes) {
+      throw ArgumentError('Image must be 2 MB or smaller.');
+    }
+    _imageContentType(fileName);
+  }
+
+  DioMediaType _imageContentType(String fileName) {
+    return switch (fileName.split('.').last.toLowerCase()) {
+      'jpg' || 'jpeg' => DioMediaType('image', 'jpeg'),
+      'png' => DioMediaType('image', 'png'),
+      'webp' => DioMediaType('image', 'webp'),
+      _ => throw ArgumentError('Image must be a JPEG, PNG, or WebP file.'),
+    };
+  }
+
+  void _logUpload(String endpoint, String fileName, int byteCount) {
+    if (!kDebugMode) return;
+    debugPrint(
+      '[VendorImageUpload] POST ${dio.options.baseUrl}$endpoint '
+      'multipart/form-data; extension=${fileName.split('.').last}; bytes=$byteCount; '
+      'authorization=attached',
+    );
+  }
+
+  void _logUploadResponse(int? statusCode) {
+    if (kDebugMode) {
+      debugPrint('[VendorImageUpload] response status=$statusCode');
+    }
+  }
+
+  void _logUploadError(DioException error) {
+    if (!kDebugMode) return;
+    debugPrint(
+      '[VendorImageUpload] failed: status=${error.response?.statusCode ?? 'none'}, '
+      'message=${error.message ?? 'unknown'}',
+    );
   }
 
   Future<void> deleteGalleryImage(String accessToken, String imageId) async {
@@ -389,6 +453,19 @@ class VendorRemoteDataSource {
     if (error.response?.data is Map<String, dynamic>) {
       final data = error.response!.data as Map<String, dynamic>;
       if (data.containsKey('message')) return data['message'].toString();
+      if (data.containsKey('error')) return data['error'].toString();
+    }
+    if (error.response?.statusCode == 401) {
+      return 'Your session has expired. Please sign in again.';
+    }
+    if (error.response?.statusCode == 403) {
+      return 'You do not have permission to upload this image.';
+    }
+    if (error.response?.statusCode == 413) {
+      return 'Image must be 2 MB or smaller.';
+    }
+    if (error.response?.statusCode == 415) {
+      return 'Image must be a JPEG, PNG, or WebP file.';
     }
     return error.message ?? 'Unable to complete vendor request.';
   }

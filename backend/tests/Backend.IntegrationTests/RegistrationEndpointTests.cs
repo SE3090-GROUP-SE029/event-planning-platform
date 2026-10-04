@@ -82,6 +82,45 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task InvalidEventAndRegistrationIdsReturnNotFound()
+    {
+        var invalidEventResponse = await SendAsync(
+            HttpMethod.Get,
+            "/api/events/not-a-guid/registration-form",
+            planner: RegistrationHostFixture.PlannerId);
+        Assert.Equal(HttpStatusCode.NotFound, invalidEventResponse.StatusCode);
+
+        var eventDetails = await fixture.CreateEventAsync();
+        var invalidRegistrationResponse = await SendAsync(
+            HttpMethod.Get,
+            PlannerPath(eventDetails.Id) + "/registrations/not-a-number",
+            planner: RegistrationHostFixture.PlannerId);
+        Assert.Equal(HttpStatusCode.NotFound, invalidRegistrationResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task CheckInPersistsAttendanceState()
+    {
+        var (eventDetails, publicId) = await PublishedAsync();
+        var registration = await SubmitAsync(publicId, 1);
+        var invitationToken = registration.GetProperty("invitationToken").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(invitationToken));
+
+        var response = await SendAsync(
+            HttpMethod.Post,
+            PlannerPath(eventDetails.Id) + "/check-in",
+            new { token = invitationToken },
+            RegistrationHostFixture.PlannerId);
+        await JsonAsync(response);
+
+        await using var db = fixture.CreateDb();
+        var saved = await db.RegistrationSubmissions
+            .SingleAsync(s => s.EventId == eventDetails.Id);
+        Assert.NotNull(saved.CheckedInAt);
+        Assert.Equal(CheckedInMethod.QR_CODE, saved.CheckedInMethod);
+    }
+
+    [Fact]
     public async Task ValidRegistrationsConfirmUntilCapacityThenWaitWithoutQrOrEmail()
     {
         var (eventDetails, publicId) = await PublishedAsync(2);

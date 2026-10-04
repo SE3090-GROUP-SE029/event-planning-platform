@@ -516,9 +516,17 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                   onTap: () => Navigator.push<void>(
                                     context,
                                     MaterialPageRoute<void>(
-                                      settings:
-                                          const RouteSettings(name: '/guests'),
-                                      builder: (_) => const GuestManagementPage(),
+                                      settings: RouteSettings(
+                                        name: '/guests',
+                                        arguments: {
+                                          'auth': _auth,
+                                          'event': _event,
+                                        },
+                                      ),
+                                      builder: (_) => GuestManagementPage(
+                                        auth: _auth,
+                                        event: _event,
+                                      ),
                                     ),
                                   ),
                                 ),

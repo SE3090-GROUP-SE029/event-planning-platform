@@ -87,7 +87,11 @@ export default function AdminPlanDashboardPage() {
       activeTab="plans"
       title="Plan Governance"
       subtitle="Monitor AI generation quality and coordinator review decisions"
-      onSearch={(value) => setFilters((current) => ({ ...current, search: value }))}
+      searchValue={filters.search}
+      onSearch={(value) => {
+        setPage(0);
+        setFilters((current) => ({ ...current, search: value }));
+      }}
     >
       <Stack direction={{ xs: 'column', md: 'row' }} sx={{ mb: 2.5, justifyContent: 'space-between', alignItems: { md: 'center' } }} spacing={2}>
         <Box>

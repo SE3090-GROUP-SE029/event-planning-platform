@@ -70,21 +70,21 @@ export default function AdminEventDetailsPage() {
         <Button
           startIcon={<FileUploadOutlinedIcon />}
           variant="outlined"
-          onClick={() => navigate(`/admin/events/${id}/guest-upload`)}
+          disabled
           sx={{ borderRadius: 9999, px: 2.5 }}
         >
           Upload Guest List
         </Button>
         <Button
           variant="outlined"
-          onClick={() => navigate(`/admin/events/${id}/guests`)}
+          disabled
           sx={{ borderRadius: 9999, px: 2.5 }}
         >
           Manage Guests
         </Button>
         <Button
           variant="outlined"
-          onClick={() => navigate(`/admin/events/${id}/check-in`)}
+          disabled
           sx={{ borderRadius: 9999, px: 2.5 }}
         >
           Check-In Guests
@@ -97,6 +97,10 @@ export default function AdminEventDetailsPage() {
           View Analytics
         </Button>
       </Stack>
+      <Alert severity="info" sx={{ mb: 3 }}>
+        Guest upload, guest management, and check-in are restricted to the
+        event-owning planner. Admin inspection does not grant planner access.
+      </Alert>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 3 }}>
         <Box>
