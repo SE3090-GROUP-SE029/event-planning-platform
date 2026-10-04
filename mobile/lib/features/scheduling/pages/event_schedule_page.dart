@@ -768,6 +768,13 @@ class _ConflictCard extends StatelessWidget {
   }
 
   String _conflictTitle(ScheduleConflict conflict) {
+    switch (conflict.conflictType) {
+      case 'ActivityOverlap':
+        return 'Schedule overlap';
+      case 'VendorDoubleBooked':
+        return 'Vendor conflict';
+    }
+
     final type = conflict.conflictType.replaceAll('_', ' ').toLowerCase();
     if (type.isEmpty) return 'Schedule conflict';
     return '${type[0].toUpperCase()}${type.substring(1)}';

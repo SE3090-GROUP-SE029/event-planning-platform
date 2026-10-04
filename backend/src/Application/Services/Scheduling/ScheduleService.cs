@@ -247,18 +247,16 @@ public class ScheduleService
             })
             .ToList();
 
-        var detectedConflicts = _conflictDetector.DetectConflicts(scheduleId, persistedActivities);
-        var allConflicts = generatedConflicts.Concat(detectedConflicts).ToList();
-
-        if (allConflicts.Count != 0)
+        if (generatedConflicts.Count != 0)
         {
-            await _scheduleRepository.AddConflictsAsync(allConflicts, cancellationToken);
+            await _scheduleRepository.AddConflictsAsync(generatedConflicts, cancellationToken);
         }
 
         await RecalculateDeterministicConflictsAsync(scheduleId, cancellationToken);
+        var conflicts = await _scheduleRepository.GetConflictsByScheduleIdAsync(scheduleId, cancellationToken);
 
         schedule.Activities = persistedActivities;
-        schedule.Conflicts = allConflicts;
+        schedule.Conflicts = conflicts;
         schedule.UpdatedAt = DateTime.UtcNow;
         ApplyEventContext(schedule, eventEntity);
         return schedule;
@@ -348,7 +346,38 @@ public class ScheduleService
     {
         var activities = await _scheduleRepository.GetActivitiesByScheduleIdAsync(scheduleId, cancellationToken);
         var detectedConflicts = _conflictDetector.DetectConflicts(scheduleId, activities);
+        await EnrichVendorConflictDescriptionsAsync(detectedConflicts, activities);
         await _scheduleRepository.ReplaceUnresolvedConflictsAsync(scheduleId, detectedConflicts, cancellationToken);
+    }
+
+    private async Task EnrichVendorConflictDescriptionsAsync(
+        IReadOnlyList<ScheduleConflict> conflicts,
+        IReadOnlyList<TimelineActivity> activities)
+    {
+        var activityById = activities.ToDictionary(activity => activity.Id);
+        var vendorNameById = new Dictionary<Guid, string>();
+
+        foreach (var conflict in conflicts.Where(conflict =>
+                     conflict.ConflictType == ConflictDetectionService.VendorDoubleBooked))
+        {
+            if (!activityById.TryGetValue(conflict.ActivityId1, out var activity)
+                || !activity.AssignedVendorId.HasValue)
+            {
+                continue;
+            }
+
+            var vendorId = activity.AssignedVendorId.Value;
+            if (!vendorNameById.TryGetValue(vendorId, out var vendorName))
+            {
+                var vendor = await _vendorRepository.GetByIdAsync(vendorId);
+                vendorName = string.IsNullOrWhiteSpace(vendor?.BusinessName)
+                    ? $"Vendor {vendorId}"
+                    : vendor.BusinessName;
+                vendorNameById[vendorId] = vendorName;
+            }
+
+            conflict.Description = $"Vendor conflict: {vendorName} is assigned to overlapping activities.";
+        }
     }
 
     private static string? NormalizeDescription(string? description)

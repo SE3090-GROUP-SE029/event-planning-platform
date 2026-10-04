@@ -1,9 +1,13 @@
+using System.Globalization;
 using Domain.Entities;
 
 namespace Application.Services.Scheduling;
 
 public class ConflictDetectionService
 {
+    public const string VendorDoubleBooked = "VendorDoubleBooked";
+    public const string ActivityOverlap = "ActivityOverlap";
+
     public static bool Overlaps(DateTime startA, DateTime endA, DateTime startB, DateTime endB)
     {
         return startA < endB && endA > startB;
@@ -29,8 +33,24 @@ public class ConflictDetectionService
                             ScheduleId = scheduleId,
                             ActivityId1 = act1.Id,
                             ActivityId2 = act2.Id,
-                            ConflictType = "VendorDoubleBooked",
-                            Description = $"Vendor {act1.AssignedVendorId} is assigned to overlapping activities: '{act1.Title}' and '{act2.Title}'.",
+                            ConflictType = VendorDoubleBooked,
+                            Description = $"Vendor conflict: Vendor {act1.AssignedVendorId} is assigned to overlapping activities: '{act1.Title}' and '{act2.Title}'.",
+                            IsResolved = false,
+                            DetectedAt = DateTime.UtcNow
+                        });
+                    }
+                    else
+                    {
+                        var overlapStart = act1.StartTime > act2.StartTime ? act1.StartTime : act2.StartTime;
+                        var overlapEnd = act1.EndTime < act2.EndTime ? act1.EndTime : act2.EndTime;
+
+                        conflicts.Add(new ScheduleConflict
+                        {
+                            ScheduleId = scheduleId,
+                            ActivityId1 = act1.Id,
+                            ActivityId2 = act2.Id,
+                            ConflictType = ActivityOverlap,
+                            Description = $"Schedule overlap: {act1.Title} overlaps with {act2.Title} from {FormatTime(overlapStart)} to {FormatTime(overlapEnd)}.",
                             IsResolved = false,
                             DetectedAt = DateTime.UtcNow
                         });
@@ -41,4 +61,7 @@ public class ConflictDetectionService
 
         return conflicts;
     }
+
+    private static string FormatTime(DateTime value) =>
+        value.ToString("h:mm tt", CultureInfo.InvariantCulture);
 }

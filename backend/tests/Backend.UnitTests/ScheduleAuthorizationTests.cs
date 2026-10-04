@@ -504,17 +504,63 @@ public class ScheduleAuthorizationTests
         await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), vendor.Id);
 
         Assert.Equal(1, CountUnresolvedVendorConflicts(db, schedule.Id));
+        Assert.Equal(0, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
+        Assert.Contains(db.ScheduleConflicts, conflict =>
+            conflict.ScheduleId == schedule.Id
+            && conflict.ConflictType == ConflictDetectionService.VendorDoubleBooked
+            && conflict.Description == "Vendor conflict: Vendor is assigned to overlapping activities.");
+    }
+
+    [Fact]
+    public async Task DifferentVendorOverlappingActivitiesProduceActivityOverlap()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        var firstVendor = SeedVendor(db);
+        var secondVendor = SeedVendor(db);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+        var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
+
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "Ceremony", null, start, start.AddHours(1), firstVendor.Id);
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "Dinner Setup", null, start.AddMinutes(30), start.AddMinutes(90), secondVendor.Id);
+
+        Assert.Equal(1, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
+        Assert.Equal(0, CountUnresolvedVendorConflicts(db, schedule.Id));
+    }
+
+    [Fact]
+    public async Task NoVendorOverlappingActivitiesProduceActivityOverlap()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+        var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
+
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "Ceremony", null, start, start.AddHours(1), null);
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "Dinner Setup", null, start.AddMinutes(30), start.AddMinutes(90), null);
+
+        Assert.Equal(1, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
     }
 
     [Fact]
     public async Task EditingActivityToNonOverlappingTimeRemovesStaleUnresolvedConflict()
     {
         using var db = CreateDb();
-        var (service, plannerId, schedule, vendor) = await SeedScheduleWithVendorAsync(db);
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
         var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
-        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), vendor.Id);
-        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), vendor.Id);
-        Assert.Equal(1, CountUnresolvedVendorConflicts(db, schedule.Id));
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), null);
+        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), null);
+        Assert.Equal(1, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
 
         await service.UpdateActivityForPlannerAsync(
             second.Id,
@@ -523,34 +569,42 @@ public class ScheduleAuthorizationTests
             second.Description,
             start.AddHours(1),
             start.AddHours(2),
-            vendor.Id);
+            null);
 
-        Assert.Equal(0, CountUnresolvedVendorConflicts(db, schedule.Id));
+        Assert.Equal(0, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
     }
 
     [Fact]
     public async Task DeletingOverlappingActivityRecalculatesConflicts()
     {
         using var db = CreateDb();
-        var (service, plannerId, schedule, vendor) = await SeedScheduleWithVendorAsync(db);
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
         var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
-        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), vendor.Id);
-        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), vendor.Id);
-        Assert.Equal(1, CountUnresolvedVendorConflicts(db, schedule.Id));
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), null);
+        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), null);
+        Assert.Equal(1, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
 
         await service.DeleteActivityForPlannerAsync(second.Id, plannerId);
 
-        Assert.Equal(0, CountUnresolvedVendorConflicts(db, schedule.Id));
+        Assert.Equal(0, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
     }
 
     [Fact]
     public async Task ConflictRecalculationDoesNotProduceDuplicateUnresolvedConflicts()
     {
         using var db = CreateDb();
-        var (service, plannerId, schedule, vendor) = await SeedScheduleWithVendorAsync(db);
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
         var start = new DateTime(2026, 10, 15, 18, 0, 0, DateTimeKind.Utc);
-        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), vendor.Id);
-        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), vendor.Id);
+        await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "A", null, start, start.AddHours(1), null);
+        var second = await service.AddActivityForPlannerAsync(schedule.Id, plannerId, "B", null, start.AddMinutes(30), start.AddMinutes(90), null);
 
         await service.UpdateActivityForPlannerAsync(
             second.Id,
@@ -559,9 +613,38 @@ public class ScheduleAuthorizationTests
             second.Description,
             start.AddMinutes(30),
             start.AddMinutes(90),
-            vendor.Id);
+            null);
 
-        Assert.Equal(1, CountUnresolvedVendorConflicts(db, schedule.Id));
+        Assert.Equal(1, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
+    }
+
+    [Fact]
+    public async Task AiGeneratedOverlappingActivitiesAreDetectedAfterPersistence()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeScheduleAiClient(AiResult(
+            new AiScheduleActivity
+            {
+                Title = "Ceremony",
+                StartTime = "2026-10-15T18:00:00",
+                EndTime = "2026-10-15T19:00:00"
+            },
+            new AiScheduleActivity
+            {
+                Title = "Dinner Setup",
+                StartTime = "2026-10-15T18:30:00",
+                EndTime = "2026-10-15T19:30:00"
+            })));
+
+        var result = await service.GenerateScheduleWithAiForPlannerAsync(schedule.Id, plannerId);
+
+        Assert.Equal(2, db.TimelineActivities.Count(activity => activity.ScheduleId == schedule.Id));
+        Assert.Equal(1, CountUnresolvedActivityOverlapConflicts(db, schedule.Id));
+        Assert.Contains(result.Conflicts, conflict => conflict.ConflictType == ConflictDetectionService.ActivityOverlap);
     }
 
     [Fact]
@@ -694,10 +777,16 @@ public class ScheduleAuthorizationTests
     }
 
     private static int CountUnresolvedVendorConflicts(AppDbContext db, Guid scheduleId) =>
+        CountUnresolvedConflicts(db, scheduleId, ConflictDetectionService.VendorDoubleBooked);
+
+    private static int CountUnresolvedActivityOverlapConflicts(AppDbContext db, Guid scheduleId) =>
+        CountUnresolvedConflicts(db, scheduleId, ConflictDetectionService.ActivityOverlap);
+
+    private static int CountUnresolvedConflicts(AppDbContext db, Guid scheduleId, string conflictType) =>
         db.ScheduleConflicts.Count(conflict =>
             conflict.ScheduleId == scheduleId
             && !conflict.IsResolved
-            && conflict.ConflictType == "VendorDoubleBooked");
+            && conflict.ConflictType == conflictType);
 
     private static DateTime EventDateAt(int hour, int minute) =>
         new(2026, 10, 15, hour, minute, 0, DateTimeKind.Utc);

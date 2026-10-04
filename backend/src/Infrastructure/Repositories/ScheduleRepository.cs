@@ -84,7 +84,11 @@ public class ScheduleRepository : IScheduleRepository
 
     public async Task ReplaceUnresolvedConflictsAsync(Guid scheduleId, IEnumerable<ScheduleConflict> conflicts, CancellationToken cancellationToken = default)
     {
-        var deterministicTypes = new[] { "VendorDoubleBooked" };
+        var deterministicTypes = new[]
+        {
+            ConflictDetectionService.VendorDoubleBooked,
+            ConflictDetectionService.ActivityOverlap
+        };
         var staleConflicts = await _context.ScheduleConflicts
             .Where(c => c.ScheduleId == scheduleId
                 && !c.IsResolved
