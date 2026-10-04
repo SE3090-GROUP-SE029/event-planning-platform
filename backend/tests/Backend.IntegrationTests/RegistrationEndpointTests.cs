@@ -111,7 +111,9 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
             PlannerPath(eventDetails.Id) + "/check-in",
             new { token = invitationToken },
             RegistrationHostFixture.PlannerId);
-        await JsonAsync(response);
+        var checkIn = await JsonAsync(response);
+        Assert.Equal("Guest 1", checkIn.GetProperty("guest").GetProperty("fullName").GetString());
+        Assert.Equal(JsonValueKind.Array, checkIn.GetProperty("guest").GetProperty("answers").ValueKind);
 
         await using var db = fixture.CreateDb();
         var saved = await db.RegistrationSubmissions

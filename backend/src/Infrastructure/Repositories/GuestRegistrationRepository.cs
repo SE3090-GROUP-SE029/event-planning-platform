@@ -98,7 +98,10 @@ public class GuestRegistrationRepository(AppDbContext db) : IGuestRegistrationRe
             await db.RegistrationSubmissions.AnyAsync(e => e.PublicReference == value, ct);
 
     public Task<Invitation?> FindInvitationByTokenAsync(string token, CancellationToken ct)
-        => db.Invitations.Include(e => e.RegistrationSubmission).SingleOrDefaultAsync(e => e.Token == token, ct);
+        => db.Invitations
+            .Include(e => e.RegistrationSubmission).ThenInclude(e => e.Guest)
+            .Include(e => e.RegistrationSubmission).ThenInclude(e => e.Answers)
+            .SingleOrDefaultAsync(e => e.Token == token, ct);
 
     public void AddForm(RegistrationForm form) => db.RegistrationForms.Add(form);
     public void AddQuestion(RegistrationQuestion question) => db.RegistrationQuestions.Add(question);
