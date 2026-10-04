@@ -426,7 +426,7 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
   _StatusInfo _statusInfo(RegistrationStatus status) {
     switch (status) {
       case RegistrationStatus.confirmed:
-        return _StatusInfo(
+        return const _StatusInfo(
           icon: Icons.check_circle_rounded,
           iconBg: AppColors.pastelGreenLight,
           iconColor: AppColors.pastelGreenText,
@@ -437,7 +437,7 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
               'Your registration is confirmed. Check your email for the invitation with your QR code.',
         );
       case RegistrationStatus.pendingAi:
-        return _StatusInfo(
+        return const _StatusInfo(
           icon: Icons.hourglass_top_rounded,
           iconBg: AppColors.pastelYellowLight,
           iconColor: AppColors.pastelYellowText,
@@ -448,7 +448,7 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
               'Your registration has been received and is being reviewed. We\'ll notify you by email.',
         );
       case RegistrationStatus.waitingList:
-        return _StatusInfo(
+        return const _StatusInfo(
           icon: Icons.pending_outlined,
           iconBg: AppColors.pastelBlueLight,
           iconColor: AppColors.pastelBlueText,
@@ -459,7 +459,7 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
               'You\'re on the waiting list. We\'ll notify you if a spot opens up.',
         );
       case RegistrationStatus.rejected:
-        return _StatusInfo(
+        return const _StatusInfo(
           icon: Icons.cancel_outlined,
           iconBg: AppColors.errorBg,
           iconColor: AppColors.error,
@@ -470,7 +470,7 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
               'Unfortunately your registration was not accepted for this event.',
         );
       case RegistrationStatus.cancelled:
-        return _StatusInfo(
+        return const _StatusInfo(
           icon: Icons.block_rounded,
           iconBg: AppColors.surfaceMuted,
           iconColor: AppColors.textMuted,
@@ -480,7 +480,7 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
           subtitle: 'This registration has been cancelled.',
         );
       default:
-        return _StatusInfo(
+        return const _StatusInfo(
           icon: Icons.help_outline_rounded,
           iconBg: AppColors.surfaceMuted,
           iconColor: AppColors.textMuted,

@@ -276,6 +276,7 @@ final Map<String, WidgetBuilder> _pageBuilders = {
     final publicId =
         ModalRoute.of(context)!.settings.arguments as String? ?? '';
     return GuestRegistrationPage(publicFormId: publicId);
+  },
   '/recommendations': (context) {
     final args = ModalRoute.of(context)!.settings.arguments as Map;
     return VendorRecommendationsPage(

@@ -63,7 +63,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
             foreach (var (question, index) in selected.Select((q, i) => (q, i)))
             {
                 var saved = new RegistrationQuestion { RegistrationFormId = form.Id,
-                    Question = question.Question, Required = question.Required, DisplayOrder = index };
+                    Question = question.Question, Required = question.Required ?? false, DisplayOrder = index };
                 form.Questions.Add(saved);
                 repository.AddQuestion(saved);
             }

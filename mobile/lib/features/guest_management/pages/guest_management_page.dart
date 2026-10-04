@@ -413,8 +413,8 @@ class _GuestManagementPageState extends ConsumerState<GuestManagementPage> {
     if (displayed.isEmpty && _searchController.text.isNotEmpty) {
       return ListView(
         padding: const EdgeInsets.all(AppDimens.space20),
-        children: [
-          const SizedBox(height: 60),
+        children: const [
+          SizedBox(height: 60),
           PastelEmptyState(
             icon: Icons.search_off_rounded,
             iconVariant: PastelIconVariant.blue,

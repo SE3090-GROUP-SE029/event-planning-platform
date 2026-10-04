@@ -93,7 +93,7 @@ public static class GuestManagementConfiguration
         modelBuilder.Entity<RegistrationAnswer>(entity =>
         {
             entity.HasKey(e => new { e.RegistrationSubmissionId, e.RegistrationQuestionId });
-            entity.Property(e => e.Answer).IsRequired().HasMaxLength(4000);
+            entity.Property(e => e.Answer).HasMaxLength(4000);
             entity.HasOne(e => e.RegistrationSubmission).WithMany(e => e.Answers)
                 .HasForeignKey(e => new { e.RegistrationSubmissionId, e.RegistrationFormId })
                 .HasPrincipalKey(e => new { e.Id, e.RegistrationFormId }).OnDelete(DeleteBehavior.Restrict);

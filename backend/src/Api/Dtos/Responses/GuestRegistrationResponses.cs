@@ -28,7 +28,7 @@ public record FormQuestionResponse(Guid Id, string Question, bool Required)
     public static FormQuestionResponse[] From(RegistrationForm form) => form.Questions.Where(q => q.IsSelected)
         .OrderBy(q => q.DisplayOrder).Select(q => new FormQuestionResponse(q.Id, q.Question, q.Required)).ToArray();
 }
-public record RegistrationAnswerResponse(Guid QuestionId, string Answer);
+public record RegistrationAnswerResponse(Guid QuestionId, string? Answer);
 
 public record PublicRegistrationResponse(string PublicReference, string Status, string? StatusSecret,
     string? InvitationToken, string? QrPngBase64, string? RsvpStatus, string? EmailDeliveryStatus,

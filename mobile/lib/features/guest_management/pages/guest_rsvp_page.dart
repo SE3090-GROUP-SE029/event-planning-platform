@@ -326,15 +326,15 @@ class _GuestRsvpPageState extends State<GuestRsvpPage> {
           ),
         ] else ...[
           // Show confirmation that we have the secret
-          PastelCard(
+          const PastelCard(
             backgroundColor: AppColors.pastelBlueLight,
-            padding: const EdgeInsets.all(AppDimens.space12),
+            padding: EdgeInsets.all(AppDimens.space12),
             child: Row(
               children: [
-                const Icon(Icons.lock_outline_rounded,
+                Icon(Icons.lock_outline_rounded,
                     size: 16, color: AppColors.pastelBlueText),
-                const SizedBox(width: 8),
-                const Expanded(
+                SizedBox(width: 8),
+                Expanded(
                   child: Text(
                     'Your registration identity has been verified automatically.',
                     style: TextStyle(

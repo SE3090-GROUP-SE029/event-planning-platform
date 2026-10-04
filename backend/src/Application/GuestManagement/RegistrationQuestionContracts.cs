@@ -5,9 +5,9 @@ namespace Application.GuestManagement;
 
 public record QuestionSelection(
     [Required, StringLength(500)] string Question,
-    [property: JsonRequired] bool Required);
+    bool? Required);
 public record QuestionSuggestions(IReadOnlyList<QuestionSelection> Questions);
-public record AnswerSubmission(Guid QuestionId, [Required, StringLength(4000)] string Answer);
+public record AnswerSubmission(Guid QuestionId, [StringLength(4000)] string? Answer);
 public record AiQuestionAnswer(string Question, bool Required, string? Answer);
 
 public interface IRegistrationQuestionClient

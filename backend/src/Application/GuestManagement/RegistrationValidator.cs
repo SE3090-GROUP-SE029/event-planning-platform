@@ -7,9 +7,9 @@ public static class RegistrationValidator
 {
     public static IReadOnlyList<QuestionSelection> ValidateQuestions(IReadOnlyList<QuestionSelection>? questions)
     {
-        if (questions is null || questions.Count > 10 || questions.Any(q => q is null))
-            throw new RegistrationException(400, "invalid_questions", "Provide at most 10 questions.");
-        var result = questions.Select(q => q with { Question = Required(q.Question, 500, "Question") }).ToArray();
+        if (questions is null || questions.Count > 10 || questions.Any(q => q is null) || questions.Any(q => q.Required is null))
+            throw new RegistrationException(400, "invalid_questions", "Provide at most 10 questions with an explicit required flag.");
+        var result = questions.Select(q => q with { Question = Required(q.Question, 500, "Question"), Required = q.Required ?? false }).ToArray();
         if (result.Select(q => q.Question).Distinct(StringComparer.OrdinalIgnoreCase).Count() != result.Length)
             throw new RegistrationException(400, "invalid_questions", "Questions must be distinct.");
         return result;
@@ -23,8 +23,8 @@ public static class RegistrationValidator
         if (answers.Count > 10 || answers.Any(a => a is null) || answers.Select(a => a.QuestionId).Distinct().Count() != answers.Count ||
             answers.Any(a => !questions.ContainsKey(a.QuestionId)))
             throw new RegistrationException(400, "invalid_answers", "Answers must reference distinct questions on this published form.");
-        var result = answers.Select(a => a with { Answer = Required(a.Answer, 4000, "Answer") }).ToArray();
-        if (questions.Values.Any(q => q.Required && !result.Any(a => a.QuestionId == q.Id)))
+        var result = answers.Select(a => a with { Answer = a.Answer is null ? null : Required(a.Answer, 4000, "Answer") }).ToArray();
+        if (questions.Values.Any(q => q.Required && !result.Any(a => a.QuestionId == q.Id && !string.IsNullOrWhiteSpace(a.Answer))))
             throw new RegistrationException(400, "required_answer", "Answer all required registration questions.");
         return result;
     }

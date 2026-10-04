@@ -516,7 +516,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                   MaterialPageRoute<void>(
                                     settings:
                                         const RouteSettings(name: '/guests'),
-                                    builder: (_) => GuestManagementPage(),
+                                    builder: (_) => const GuestManagementPage(),
                                   ),
                                 ),
                               ),

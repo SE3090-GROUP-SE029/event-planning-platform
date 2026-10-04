@@ -273,20 +273,20 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
   }
 
   Widget _buildInfoBanner() {
-    return PastelCard(
+    return const PastelCard(
       backgroundColor: AppColors.pastelBlueLight,
-      padding: const EdgeInsets.all(AppDimens.space16),
+      padding: EdgeInsets.all(AppDimens.space16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PastelIconBadge(
+          PastelIconBadge(
             icon: Icons.info_outline_rounded,
             variant: PastelIconVariant.blue,
             size: 40,
             iconSize: 18,
           ),
-          const SizedBox(width: AppDimens.space12),
-          const Expanded(
+          SizedBox(width: AppDimens.space12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -372,19 +372,19 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
 
     return GestureDetector(
       onTap: _pickFile,
-      child: DottedBorderBox(
+      child: const DottedBorderBox(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const PastelIconBadge(
+            PastelIconBadge(
               icon: Icons.upload_file_rounded,
               variant: PastelIconVariant.lavender,
               size: 64,
               iconSize: 30,
               isCircle: false,
             ),
-            const SizedBox(height: AppDimens.space16),
-            const Text(
+            SizedBox(height: AppDimens.space16),
+            Text(
               'Tap to select a file',
               style: TextStyle(
                 color: AppColors.textPrimary,
@@ -392,8 +392,8 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: AppDimens.space6),
-            const Text(
+            SizedBox(height: AppDimens.space6),
+            Text(
               'CSV, PDF, or DOCX · Max 5 MB',
               style: TextStyle(
                 color: AppColors.textSecondary,

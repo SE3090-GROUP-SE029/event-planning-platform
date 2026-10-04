@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/features/guest_management/pages/guest_management_page.dart';
 
 void main() {
   testWidgets('GuestManagementPage builds loading state initially', (WidgetTester tester) async {
@@ -12,7 +11,7 @@ void main() {
           onGenerateRoute: (settings) {
             if (settings.name == '/guests') {
               return MaterialPageRoute(
-                settings: RouteSettings(
+                settings: const RouteSettings(
                   name: '/guests',
                   arguments: {
                     // Providing mock data is complicated because of missing mocked EventModel & AuthResponseModel.
