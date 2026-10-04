@@ -693,18 +693,21 @@ class _FileTypeSheet extends StatelessWidget {
             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: AppDimens.space20),
-          ListTile(
-            leading: const PastelIconBadge(
-              icon: Icons.photo_library_outlined,
-              variant: PastelIconVariant.blue,
-              size: 44,
-              iconSize: 22,
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              leading: const PastelIconBadge(
+                icon: Icons.photo_library_outlined,
+                variant: PastelIconVariant.blue,
+                size: 44,
+                iconSize: 22,
+              ),
+              title: const Text('Pick from Files / Gallery',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('Select a CSV, PDF, or DOCX file'),
+              onTap: onSelectFromGallery,
+              contentPadding: EdgeInsets.zero,
             ),
-            title: const Text('Pick from Files / Gallery',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: const Text('Select a CSV, PDF, or DOCX file'),
-            onTap: onSelectFromGallery,
-            contentPadding: EdgeInsets.zero,
           ),
           const SizedBox(height: AppDimens.space8),
           const Padding(

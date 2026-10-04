@@ -480,43 +480,46 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                           padding: const EdgeInsets.all(AppDimens.space4),
                           child: Column(
                             children: [
-                              ListTile(
-                                leading: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.pastelBlueLight,
-                                    borderRadius: BorderRadius.circular(
-                                        AppDimens.radiusMedium),
+                              Material(
+                                color: Colors.transparent,
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.pastelBlueLight,
+                                      borderRadius: BorderRadius.circular(
+                                          AppDimens.radiusMedium),
+                                    ),
+                                    child: const Icon(
+                                      Icons.people_outline_rounded,
+                                      size: 20,
+                                      color: AppColors.pastelBlueText,
+                                    ),
                                   ),
-                                  child: const Icon(
-                                    Icons.people_outline_rounded,
-                                    size: 20,
-                                    color: AppColors.pastelBlueText,
+                                  title: const Text(
+                                    'Manage Guests',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
-                                ),
-                                title: const Text(
-                                  'Manage Guests',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary,
+                                  subtitle: const Text(
+                                    'View, upload, and manage registrations',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12),
                                   ),
-                                ),
-                                subtitle: const Text(
-                                  'View, upload, and manage registrations',
-                                  style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12),
-                                ),
-                                trailing: const Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: AppColors.textMuted),
-                                onTap: () => Navigator.push<void>(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    settings:
-                                        const RouteSettings(name: '/guests'),
-                                    builder: (_) => const GuestManagementPage(),
+                                  trailing: const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.textMuted),
+                                  onTap: () => Navigator.push<void>(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      settings:
+                                          const RouteSettings(name: '/guests'),
+                                      builder: (_) => const GuestManagementPage(),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -525,43 +528,46 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                                   thickness: 0.8,
                                   color: Color(0x0C000000),
                                   indent: 56),
-                              ListTile(
-                                leading: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.pastelGreenLight,
-                                    borderRadius: BorderRadius.circular(
-                                        AppDimens.radiusMedium),
+                              Material(
+                                color: Colors.transparent,
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.pastelGreenLight,
+                                      borderRadius: BorderRadius.circular(
+                                          AppDimens.radiusMedium),
+                                    ),
+                                    child: const Icon(
+                                      Icons.bar_chart_rounded,
+                                      size: 20,
+                                      color: AppColors.pastelGreenText,
+                                    ),
                                   ),
-                                  child: const Icon(
-                                    Icons.bar_chart_rounded,
-                                    size: 20,
-                                    color: AppColors.pastelGreenText,
+                                  title: const Text(
+                                    'Guest Analytics',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
-                                ),
-                                title: const Text(
-                                  'Guest Analytics',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary,
+                                  subtitle: const Text(
+                                    'Check-in rates, RSVP breakdown',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12),
                                   ),
-                                ),
-                                subtitle: const Text(
-                                  'Check-in rates, RSVP breakdown',
-                                  style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12),
-                                ),
-                                trailing: const Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: AppColors.textMuted),
-                                onTap: () => Navigator.push<void>(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => GuestAnalyticsPage(
-                                      auth: _auth!,
-                                      event: _event!,
+                                  trailing: const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.textMuted),
+                                  onTap: () => Navigator.push<void>(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => GuestAnalyticsPage(
+                                        auth: _auth!,
+                                        event: _event!,
+                                      ),
                                     ),
                                   ),
                                 ),

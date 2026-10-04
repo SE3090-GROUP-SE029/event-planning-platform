@@ -290,19 +290,25 @@ class _VendorAvailabilityPageState extends State<VendorAvailabilityPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Start date/time'),
-                            subtitle: Text(_formatLocal(_startLocal)),
-                            trailing: const Icon(Icons.schedule_outlined),
-                            onTap: () => _pickDateTime(isStart: true),
+                          Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Start date/time'),
+                              subtitle: Text(_formatLocal(_startLocal)),
+                              trailing: const Icon(Icons.schedule_outlined),
+                              onTap: () => _pickDateTime(isStart: true),
+                            ),
                           ),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('End date/time'),
-                            subtitle: Text(_formatLocal(_endLocal)),
-                            trailing: const Icon(Icons.schedule_outlined),
-                            onTap: () => _pickDateTime(isStart: false),
+                          Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('End date/time'),
+                              subtitle: Text(_formatLocal(_endLocal)),
+                              trailing: const Icon(Icons.schedule_outlined),
+                              onTap: () => _pickDateTime(isStart: false),
+                            ),
                           ),
                           const SizedBox(height: AppDimens.space8),
                           const Text(
