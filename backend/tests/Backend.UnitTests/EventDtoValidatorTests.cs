@@ -100,14 +100,60 @@ public class EventDtoValidatorTests
     }
 
     [Fact]
-    public void Validate_ReturnsError_WhenEventDurationIsNotPositive()
+    public void Validate_IgnoresClientSuppliedEventDuration()
     {
         var request = ValidRequest();
         request.EventDuration = TimeSpan.Zero;
 
         var result = _validator.Validate(request);
 
-        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.EventDuration));
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_ReturnsError_WhenStartTimeIsMissing()
+    {
+        var request = ValidRequest();
+        request.StartTime = null;
+
+        var result = _validator.Validate(request);
+
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.StartTime));
+    }
+
+    [Fact]
+    public void Validate_ReturnsError_WhenEndTimeIsMissing()
+    {
+        var request = ValidRequest();
+        request.EndTime = null;
+
+        var result = _validator.Validate(request);
+
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.EndTime));
+    }
+
+    [Fact]
+    public void Validate_ReturnsError_WhenStartAndEndTimeAreEqual()
+    {
+        var request = ValidRequest();
+        request.StartTime = new TimeOnly(18, 0);
+        request.EndTime = new TimeOnly(18, 0);
+
+        var result = _validator.Validate(request);
+
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.EndTime));
+    }
+
+    [Fact]
+    public void Validate_ReturnsError_WhenEndTimeIsBeforeStartTime()
+    {
+        var request = ValidRequest();
+        request.StartTime = new TimeOnly(23, 0);
+        request.EndTime = new TimeOnly(18, 0);
+
+        var result = _validator.Validate(request);
+
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateEventRequest.EndTime));
     }
 
     private static CreateEventRequest ValidRequest() => new()
@@ -118,6 +164,8 @@ public class EventDtoValidatorTests
         Budget = 5000,
         PreferredVenue = "Grand Hall",
         PreferredDate = DateTime.UtcNow.AddDays(30),
+        StartTime = new TimeOnly(18, 0),
+        EndTime = new TimeOnly(23, 0),
         EventDuration = TimeSpan.FromHours(4)
     };
 }

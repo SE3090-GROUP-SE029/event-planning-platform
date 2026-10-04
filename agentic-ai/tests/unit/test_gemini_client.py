@@ -21,7 +21,11 @@ from src.coordinator_agent.models import CoordinatorPlanOutput
 from src.coordinator_agent.nodes.analyze import AnalysisOutput
 from src.coordinator_agent.nodes.assess import BudgetOutput
 from src.gemini_client import client as gemini_client_module
-from src.gemini_client.client import GeminiClient, configure_gemini
+from src.gemini_client.client import (
+    GeminiClient,
+    configure_gemini,
+    list_available_gemini_models,
+)
 from src.gemini_client.exceptions import (
     GeminiClientError,
     GeminiConfigurationError,
@@ -155,6 +159,11 @@ class _TransportFailureModel(_Model):
         raise self.failure
 
 
+class _ListedModel:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
 def test_client_generates_validated_plan_without_api_key() -> None:
     model = _Model()
     client = GeminiClient(model=model)
@@ -275,15 +284,65 @@ def test_gemini_model_is_loaded_from_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-flash")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-3.8-flash")
     monkeypatch.setenv("GEMINI_API_KEYS", "second-key, third-key")
-    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "gemini-2.0-flash")
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "gemini-3.7-flash,gemini-3.5-flash-lite")
 
     settings = Settings(_env_file=None)
 
-    assert settings.gemini_model == "gemini-2.5-flash"
+    assert settings.gemini_model == "gemini-3.8-flash"
     assert settings.get_gemini_api_keys() == ("second-key", "third-key")
-    assert settings.get_gemini_models() == ("gemini-2.5-flash", "gemini-2.0-flash")
+    assert settings.get_gemini_models() == (
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.5-flash-lite",
+    )
+
+
+def test_default_gemini_fallback_chain_excludes_legacy_2_5_flash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("GEMINI_FALLBACK_MODELS", raising=False)
+
+    settings = Settings(_env_file=None)
+
+    assert settings.get_gemini_models() == (
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.5-flash-lite",
+    )
+    assert "gemini-2.5-flash" not in settings.get_gemini_models()
+
+
+def test_primary_model_succeeds_without_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        gemini_api_key="primary-test-key",
+        gemini_model="gemini-primary",
+        gemini_fallback_models="gemini-fallback",
+    )
+    monkeypatch.setattr(gemini_client_module, "get_settings", lambda: settings)
+    calls: list[str] = []
+
+    def create_model(model_name: str, _api_key: str) -> _Model:
+        calls.append(model_name)
+        return _Model()
+
+    monkeypatch.setattr(gemini_client_module, "_configured_model", create_model)
+
+    result = asyncio.run(
+        GeminiClient().generate_with_prompt(
+            "Use the primary model for this unique request.",
+            AnalysisOutput,
+            node_name="test_primary_success",
+        )
+    )
+
+    assert result.analysis == "A detailed event analysis."
+    assert calls == ["gemini-primary"]
 
 
 def test_quota_rotates_to_secondary_api_key_without_logging_secrets(
@@ -394,6 +453,31 @@ def test_unavailable_model_is_skipped_for_remaining_keys(
     ]
 
 
+def test_all_unavailable_models_have_model_domain_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        gemini_api_key="primary-test-key",
+        gemini_model="gemini-unavailable",
+        gemini_fallback_models="gemini-also-unavailable",
+    )
+    monkeypatch.setattr(gemini_client_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        gemini_client_module,
+        "_configured_model",
+        lambda *_args: _NotFoundModel(),
+    )
+
+    with pytest.raises(GeminiInvalidModelError):
+        asyncio.run(
+            GeminiClient().generate_with_prompt(
+                "Classify unavailable models for this request.",
+                AnalysisOutput,
+            )
+        )
+
+
 def test_transient_errors_use_exponential_backoff(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -502,6 +586,35 @@ def test_all_quota_fallbacks_are_bounded(
         ("gemini-fallback", "primary-test-key"),
         ("gemini-fallback", "secondary-test-key"),
     ]
+
+
+def test_mixed_quota_and_unavailable_model_is_not_classified_as_quota(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        gemini_api_key="primary-test-key",
+        gemini_model="gemini-quota",
+        gemini_fallback_models="gemini-unavailable",
+        gemini_max_retries=0,
+    )
+    monkeypatch.setattr(gemini_client_module, "get_settings", lambda: settings)
+
+    def create_model(model_name: str, _api_key: str) -> _Model:
+        return _QuotaModel() if model_name == "gemini-quota" else _NotFoundModel()
+
+    monkeypatch.setattr(gemini_client_module, "_configured_model", create_model)
+
+    with pytest.raises(GeminiClientError) as exc_info:
+        asyncio.run(
+            GeminiClient().generate_with_prompt(
+                "Do not collapse mixed failures into quota.",
+                AnalysisOutput,
+            )
+        )
+
+    assert not isinstance(exc_info.value, GeminiQuotaError)
+    assert not isinstance(exc_info.value, GeminiInvalidModelError)
 
 
 def test_invalid_credentials_rotate_to_another_key(
@@ -628,7 +741,7 @@ def test_startup_validation_does_not_spend_provider_quota(
         gemini_client_module,
         "get_settings",
         lambda: Settings(
-            _env_file=None, gemini_api_key="test-key", gemini_model="gemini-2.5-flash"
+            _env_file=None, gemini_api_key="test-key", gemini_model="gemini-3.8-flash"
         ),
     )
     monkeypatch.setattr(
@@ -651,10 +764,47 @@ def test_startup_validation_requires_at_least_one_api_key(
     monkeypatch.setattr(
         gemini_client_module,
         "get_settings",
-        lambda: Settings(_env_file=None, gemini_model="gemini-2.5-flash"),
+        lambda: Settings(_env_file=None, gemini_model="gemini-3.8-flash"),
     )
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_API_KEYS", raising=False)
 
     with pytest.raises(GeminiConfigurationError):
         configure_gemini()
+
+
+def test_model_listing_diagnostic_uses_configured_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        gemini_api_key="primary-test-key",
+        gemini_model="gemini-3.8-flash",
+    )
+    monkeypatch.setattr(gemini_client_module, "get_settings", lambda: settings)
+    keys: list[str] = []
+
+    def create_model_service_client(api_key: str) -> object:
+        keys.append(api_key)
+        return object()
+
+    monkeypatch.setattr(
+        gemini_client_module,
+        "_configured_model_service_client",
+        create_model_service_client,
+    )
+    monkeypatch.setattr(
+        gemini_client_module.genai,
+        "list_models",
+        lambda **_kwargs: [
+            _ListedModel("models/gemini-3.8-flash"),
+            _ListedModel("models/gemini-3.7-flash"),
+            _ListedModel("models/gemini-3.8-flash"),
+        ],
+    )
+
+    assert list_available_gemini_models() == (
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+    )
+    assert keys == ["primary-test-key"]

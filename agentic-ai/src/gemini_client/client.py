@@ -13,6 +13,9 @@ from functools import lru_cache
 from typing import Any, TypeVar
 
 from google import generativeai as genai
+from google.ai.generativelanguage_v1beta.services.model_service.client import (
+    ModelServiceClient,
+)
 from google.ai.generativelanguage_v1beta.services.generative_service.async_client import (
     GenerativeServiceAsyncClient,
 )
@@ -74,6 +77,13 @@ def _configured_model(model_name: str, api_key: str) -> Any:
         client_options=ClientOptions(api_key=api_key)
     )
     return model
+
+
+@lru_cache(maxsize=32)
+def _configured_model_service_client(api_key: str) -> ModelServiceClient:
+    """Build a model-listing client scoped to one API key."""
+
+    return ModelServiceClient(client_options=ClientOptions(api_key=api_key))
 
 
 def _mask_api_key(api_key: str) -> str:
@@ -457,8 +467,13 @@ class GeminiClient:
             raise GeminiClientError("Gemini request failed without a provider response")
         categories = {category for category, _ in failures}
         cause = failures[-1][1]
-        if "quota" in categories or "rate_limit" in categories:
-            if "rate_limit" in categories and "quota" not in categories:
+        logger.error(
+            "Gemini request failed across configured fallbacks categories=%s final_error=%s",
+            ",".join(sorted(categories)),
+            type(cause).__name__,
+        )
+        if categories <= {"quota", "rate_limit"}:
+            if categories == {"rate_limit"}:
                 raise GeminiRateLimitError(
                     "Gemini rate limit persists across configured fallbacks"
                 ) from cause
@@ -473,7 +488,7 @@ class GeminiClient:
             raise GeminiInvalidModelError(
                 "No configured Gemini model is available for this request"
             ) from cause
-        if "network" in categories:
+        if categories == {"network"}:
             if isinstance(
                 cause,
                 (DeadlineExceeded, httpx.TimeoutException, TimeoutError),
@@ -482,16 +497,8 @@ class GeminiClient:
             raise GeminiNetworkError(
                 "Gemini is temporarily unavailable after bounded retries"
             ) from cause
-        if "credentials" in categories:
-            raise GeminiInvalidCredentialsError(
-                "Gemini rejected the configured API credentials"
-            ) from cause
-        if "model" in categories:
-            raise GeminiInvalidModelError(
-                "Gemini rejected the configured model"
-            ) from cause
         raise GeminiClientError(
-            "Gemini rejected the request; verify model access and request configuration"
+            "Gemini failed across configured fallbacks; see logs for failure categories"
         ) from cause
 
     def _parse_response(self, response: Any, schema: type[ModelT]) -> ModelT:
@@ -518,6 +525,47 @@ class GeminiClient:
                 f"maximum is {self.max_input_tokens}"
             )
         return token_count
+
+
+def list_available_gemini_models(api_key: str | None = None) -> tuple[str, ...]:
+    """List Gemini models visible to one configured API key for diagnostics."""
+
+    settings = get_settings()
+    api_keys = (api_key,) if api_key else settings.get_gemini_api_keys()
+    api_keys = tuple(key for key in api_keys if key)
+    if not api_keys:
+        raise GeminiConfigurationError("GEMINI_API_KEY or GEMINI_API_KEYS is required")
+
+    selected_key = api_keys[0]
+    try:
+        models = genai.list_models(
+            client=_configured_model_service_client(selected_key),
+            request_options={"timeout": settings.gemini_timeout_seconds},
+        )
+        names = []
+        for model in models:
+            name = str(getattr(model, "name", "") or "")
+            if name.startswith("models/"):
+                name = name.split("/", 1)[1]
+            if name:
+                names.append(name)
+        return tuple(dict.fromkeys(names))
+    except (Unauthenticated, PermissionDenied) as exc:
+        logger.error(
+            "Gemini model listing credentials rejected api_key=%s",
+            _mask_api_key(selected_key),
+        )
+        raise GeminiInvalidCredentialsError(
+            "Gemini rejected the configured API credentials"
+        ) from exc
+    except _RETRYABLE_ERRORS as exc:
+        logger.warning("Gemini model listing failed with transient error=%s", type(exc).__name__)
+        raise GeminiNetworkError(
+            "Gemini model listing is temporarily unavailable"
+        ) from exc
+    except GoogleAPIError as exc:
+        logger.error("Gemini model listing failed error=%s", type(exc).__name__)
+        raise GeminiClientError("Gemini model listing failed") from exc
 
 
 def configure_gemini() -> None:

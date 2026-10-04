@@ -92,6 +92,10 @@ public class SchedulesController : ControllerBase
         {
             return Forbid();
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("activities/{activityId:guid}")]
@@ -238,6 +242,10 @@ public class SchedulesController : ControllerBase
         catch (UnauthorizedAccessException)
         {
             return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 

@@ -13,12 +13,23 @@ from src.models.scheduling_models import (
 
 SYSTEM_PROMPT = """
 You are an expert AI Event Scheduling Agent.
-Given the event operational window and details, construct a logical run-of-show sequence.
+Given the event date, local wall-clock time window, title, type, and description,
+construct a logical run-of-show sequence that fits inside the event window.
+
 Rules:
-1. Setup and audio/visual checks must be scheduled before guests arrive.
-2. Main events/sessions must be ordered chronologically with realistic buffer times.
-3. Teardown/cleanup must conclude the event.
-4. Assign appropriate vendor categories (AudioVisual, Catering, Photography, Hospitality).
+1. Generate activities that are semantically related to the actual event.
+2. Use the title, event type, and description to decide what belongs in the timeline.
+3. Birthday examples include guest arrival, entertainment/games, dinner, cake cutting, photography, and music/social time.
+4. Wedding examples include guest arrival, ceremony, photography, reception, dinner, cake cutting, and entertainment.
+5. Conference examples include registration, opening, keynote, sessions, networking, and closing.
+6. These examples are guidance, not fixed lists or mandatory labels.
+7. Use realistic durations based on the activity type and total available time.
+8. Do not divide the whole window into equal fixed blocks.
+9. If everything cannot fit, generate fewer high-value activities.
+10. Never place an activity before the event start or after the event end.
+11. Every activity must be on the supplied event date.
+12. Return local event-date ISO timestamps without timezone, for example 2027-01-01T18:00:00.
+13. Assign appropriate vendor categories, such as AudioVisual, Catering, Photography, Hospitality, Entertainment, or Coordination.
 """
 
 
@@ -39,16 +50,27 @@ class SchedulingAgent:
             user_prompt = f"""
             Plan an execution schedule:
             Event: {state.title} ({state.event_type})
+            Description: {state.event_description or state.requirements or 'No additional description'}
             Date: {state.date}
-            Window: {state.start_time} to {state.end_time}
+            Local event window: {state.start_time} to {state.end_time}
             Guests: {state.guest_count}
+            Vendor/service context: {state.vendor_service_context or 'No booked vendor context supplied'}
             Notes: {state.requirements or 'Standard setup'}
+
+            Duration guidance:
+            - welcome/arrival: about 30-60 minutes
+            - short speech/opening: about 10-30 minutes
+            - cake cutting: about 30-60 minutes
+            - meal: about 60-90 minutes
+            - photography: about 30-60 minutes
+            - entertainment/dancing: about 60-120 minutes
             """
 
-            result = await self.client.generate_structured_output(
-                system_prompt=SYSTEM_PROMPT,
-                user_prompt=user_prompt,
-                response_schema=GeneratedList,
+            prompt = f"{SYSTEM_PROMPT.strip()}\n\n{user_prompt.strip()}"
+            result = await self.client.generate_with_prompt(
+                prompt,
+                GeneratedList,
+                node_name="generate_schedule",
             )
             return {"raw_activities": result.activities}
 

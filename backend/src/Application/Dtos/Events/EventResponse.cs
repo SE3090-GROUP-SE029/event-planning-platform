@@ -11,7 +11,10 @@ public class EventResponse
     public int GuestCount { get; set; }
     public decimal Budget { get; set; }
     public string PreferredVenue { get; set; } = default!;
+    public DateTime EventDate { get; set; }
     public DateTime PreferredDate { get; set; }
+    public TimeOnly StartTime { get; set; }
+    public TimeOnly EndTime { get; set; }
     public TimeSpan EventDuration { get; set; }
     public string? Requirements { get; set; }
     public EventStatus Status { get; set; }

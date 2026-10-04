@@ -73,6 +73,42 @@ public class ScheduleAuthorizationTests
     }
 
     [Fact]
+    public async Task AiGenerationDoesNotPersistPartialActivitiesWhenGeneratedOutputIsInvalid()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var aiClient = new FakeScheduleAiClient(new AiScheduleGenerationResult
+        {
+            Activities =
+            [
+                new AiScheduleActivity
+                {
+                    Title = "Generated setup",
+                    Description = "AI generated",
+                    StartTime = "2026-10-15T09:00:00Z",
+                    EndTime = "2026-10-15T10:00:00Z"
+                },
+                new AiScheduleActivity
+                {
+                    Title = "Generated teardown",
+                    Description = "AI generated",
+                    StartTime = "not-a-date",
+                    EndTime = "2026-10-15T12:00:00Z"
+                }
+            ]
+        });
+        var service = CreateService(db, aiClient);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GenerateScheduleWithAiForPlannerAsync(schedule.Id, plannerId));
+
+        Assert.Empty(db.TimelineActivities.Where(activity => activity.ScheduleId == schedule.Id));
+    }
+
+    [Fact]
     public async Task VendorCanRetrieveOnlyAssignedActivities()
     {
         using var db = CreateDb();
@@ -228,6 +264,94 @@ public class ScheduleAuthorizationTests
     }
 
     [Fact]
+    public async Task ManualActivityInsideEventWindowSucceeds()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+        var start = EventDateAt(19, 0);
+        var end = EventDateAt(20, 0);
+
+        var activity = await service.AddActivityForPlannerAsync(
+            schedule.Id,
+            plannerId,
+            "Dinner",
+            null,
+            start,
+            end,
+            null);
+
+        Assert.Equal(start, activity.StartTime);
+        Assert.Equal(end, activity.EndTime);
+    }
+
+    [Fact]
+    public async Task ManualActivityBeforeEventStartIsRejected()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AddActivityForPlannerAsync(
+                schedule.Id,
+                plannerId,
+                "Early setup",
+                null,
+                EventDateAt(8, 30),
+                EventDateAt(9, 30),
+                null));
+    }
+
+    [Fact]
+    public async Task ManualActivityAfterEventEndIsRejected()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AddActivityForPlannerAsync(
+                schedule.Id,
+                plannerId,
+                "Late teardown",
+                null,
+                EventDateAt(22, 30),
+                EventDateAt(23, 30),
+                null));
+    }
+
+    [Fact]
+    public async Task ManualActivityMustUseEventDate()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AddActivityForPlannerAsync(
+                schedule.Id,
+                plannerId,
+                "Wrong day",
+                null,
+                new DateTime(2026, 10, 16, 19, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 10, 16, 20, 0, 0, DateTimeKind.Utc),
+                null));
+    }
+
+    [Fact]
     public async Task NonexistentActivityIdsReturnNull()
     {
         using var db = CreateDb();
@@ -245,6 +369,128 @@ public class ScheduleAuthorizationTests
 
         Assert.Null(update);
         Assert.Null(delete);
+    }
+
+    [Fact]
+    public async Task AiActivityBeforeEventStartIsRejected()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeScheduleAiClient(AiResult(
+            new AiScheduleActivity
+            {
+                Title = "Too early",
+                StartTime = "2026-10-15T08:30:00",
+                EndTime = "2026-10-15T09:30:00"
+            })));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GenerateScheduleWithAiForPlannerAsync(schedule.Id, plannerId));
+
+        Assert.Empty(db.TimelineActivities.Where(activity => activity.ScheduleId == schedule.Id));
+    }
+
+    [Fact]
+    public async Task AiActivityAfterEventEndIsRejected()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeScheduleAiClient(AiResult(
+            new AiScheduleActivity
+            {
+                Title = "Too late",
+                StartTime = "2026-10-15T22:30:00",
+                EndTime = "2026-10-15T23:30:00"
+            })));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GenerateScheduleWithAiForPlannerAsync(schedule.Id, plannerId));
+
+        Assert.Empty(db.TimelineActivities.Where(activity => activity.ScheduleId == schedule.Id));
+    }
+
+    [Fact]
+    public async Task AiWrongDateActivityIsRejected()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeScheduleAiClient(AiResult(
+            new AiScheduleActivity
+            {
+                Title = "Wrong date",
+                StartTime = "2026-10-16T19:00:00",
+                EndTime = "2026-10-16T20:00:00"
+            })));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GenerateScheduleWithAiForPlannerAsync(schedule.Id, plannerId));
+
+        Assert.Empty(db.TimelineActivities.Where(activity => activity.ScheduleId == schedule.Id));
+    }
+
+    [Fact]
+    public async Task InvalidAiBatchPersistsZeroActivities()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeScheduleAiClient(AiResult(
+            new AiScheduleActivity
+            {
+                Title = "Valid welcome",
+                StartTime = "2026-10-15T19:00:00",
+                EndTime = "2026-10-15T19:30:00"
+            },
+            new AiScheduleActivity
+            {
+                Title = "Invalid overflow",
+                StartTime = "2026-10-15T22:45:00",
+                EndTime = "2026-10-15T23:15:00"
+            })));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GenerateScheduleWithAiForPlannerAsync(schedule.Id, plannerId));
+
+        Assert.Empty(db.TimelineActivities.Where(activity => activity.ScheduleId == schedule.Id));
+    }
+
+    [Fact]
+    public async Task ValidAiTimelineIsAccepted()
+    {
+        using var db = CreateDb();
+        var plannerId = Guid.NewGuid();
+        var eventEntity = SeedEvent(db, plannerId);
+        var schedule = SeedSchedule(db, eventEntity.Id);
+        await db.SaveChangesAsync();
+        var service = CreateService(db, new FakeScheduleAiClient(AiResult(
+            new AiScheduleActivity
+            {
+                Title = "Guest arrival",
+                StartTime = "2026-10-15T18:00:00",
+                EndTime = "2026-10-15T18:30:00"
+            },
+            new AiScheduleActivity
+            {
+                Title = "Dinner",
+                StartTime = "2026-10-15T19:00:00",
+                EndTime = "2026-10-15T20:00:00"
+            })));
+
+        var result = await service.GenerateScheduleWithAiForPlannerAsync(schedule.Id, plannerId);
+
+        Assert.Equal(2, result.Activities.Count);
+        Assert.Equal(2, db.TimelineActivities.Count(activity => activity.ScheduleId == schedule.Id));
     }
 
     [Fact]
@@ -372,8 +618,10 @@ public class ScheduleAuthorizationTests
             GuestCount = 50,
             Budget = 2500,
             PreferredVenue = "Hall",
-            PreferredDate = new DateTime(2026, 10, 15, 9, 0, 0, DateTimeKind.Utc),
-            EventDuration = TimeSpan.FromHours(4),
+            PreferredDate = new DateTime(2026, 10, 15, 0, 0, 0, DateTimeKind.Utc),
+            StartTime = new TimeOnly(9, 0),
+            EndTime = new TimeOnly(23, 0),
+            EventDuration = TimeSpan.FromHours(14),
             Status = EventStatus.DRAFT,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -451,6 +699,14 @@ public class ScheduleAuthorizationTests
             && !conflict.IsResolved
             && conflict.ConflictType == "VendorDoubleBooked");
 
+    private static DateTime EventDateAt(int hour, int minute) =>
+        new(2026, 10, 15, hour, minute, 0, DateTimeKind.Utc);
+
+    private static AiScheduleGenerationResult AiResult(params AiScheduleActivity[] activities) => new()
+    {
+        Activities = activities.ToList()
+    };
+
     private static void AssertPolicy(string methodName, string expectedPolicy)
     {
         var method = typeof(SchedulesController).GetMethod(methodName)
@@ -462,6 +718,13 @@ public class ScheduleAuthorizationTests
 
     private sealed class FakeScheduleAiClient : IScheduleAiClient
     {
+        private readonly AiScheduleGenerationResult? _result;
+
+        public FakeScheduleAiClient(AiScheduleGenerationResult? result = null)
+        {
+            _result = result;
+        }
+
         public bool WasCalled { get; private set; }
 
         public Task<AiScheduleGenerationResult> GenerateScheduleAsync(
@@ -469,7 +732,7 @@ public class ScheduleAuthorizationTests
             CancellationToken cancellationToken = default)
         {
             WasCalled = true;
-            return Task.FromResult(new AiScheduleGenerationResult
+            return Task.FromResult(_result ?? new AiScheduleGenerationResult
             {
                 Activities =
                 [

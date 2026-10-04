@@ -62,7 +62,7 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
                 onPressed: _isSubmitting
                     ? null
                     : () {
-                        _openActivityForm(context);
+                        _openActivityForm(context, schedule: schedule);
                       },
                 backgroundColor: AppColors.obsidianBlack,
                 foregroundColor: Colors.white,
@@ -231,6 +231,7 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
               ? (activity) {
                   _openActivityForm(
                     context,
+                    schedule: schedule,
                     existingActivity: activity,
                   );
                 }
@@ -242,7 +243,7 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
             canManage: isPlanner,
             isLoading: isLoading || _isSubmitting,
             onAdd: () {
-              _openActivityForm(context);
+              _openActivityForm(context, schedule: schedule);
             },
             onGenerateAi: () {
               _generateWithAi(context, notifier, schedule.id);
@@ -262,6 +263,7 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
               onEdit: () {
                 _openActivityForm(
                   context,
+                  schedule: schedule,
                   existingActivity: activity,
                 );
               },
@@ -308,6 +310,7 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
 
   Future<void> _openActivityForm(
     BuildContext context, {
+    required EventSchedule schedule,
     TimelineActivity? existingActivity,
   }) async {
     if (_isSubmitting) return;
@@ -323,6 +326,9 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
       builder: (context) => _ActivityFormSheet(
         activity: existingActivity,
         vendorOptions: _vendorOptions,
+        eventDate: schedule.eventDate,
+        eventStartTime: schedule.eventStartTime,
+        eventEndTime: schedule.eventEndTime,
       ),
     );
 
@@ -811,8 +817,8 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final startLabel = DateFormat('MMM d, h:mm a').format(activity.startTime.toLocal());
-    final endLabel = DateFormat('h:mm a').format(activity.endTime.toLocal());
+    final startLabel = DateFormat('MMM d, h:mm a').format(activity.startTime);
+    final endLabel = DateFormat('h:mm a').format(activity.endTime);
     final vendorLabel = vendor?.label ?? activity.assignedVendorId;
 
     return Container(
@@ -1014,10 +1020,16 @@ class _ActivityFormSheet extends StatefulWidget {
   const _ActivityFormSheet({
     required this.activity,
     required this.vendorOptions,
+    required this.eventDate,
+    required this.eventStartTime,
+    required this.eventEndTime,
   });
 
   final TimelineActivity? activity;
   final List<_ScheduleVendorOption> vendorOptions;
+  final DateTime? eventDate;
+  final Duration? eventStartTime;
+  final Duration? eventEndTime;
 
   @override
   State<_ActivityFormSheet> createState() => _ActivityFormSheetState();
@@ -1035,14 +1047,23 @@ class _ActivityFormSheetState extends State<_ActivityFormSheet> {
   void initState() {
     super.initState();
     final activity = widget.activity;
-    final now = DateTime.now();
+    final eventDate = widget.eventDate ?? DateTime.now();
+    final defaultStart = _combineDateAndDuration(
+      eventDate,
+      widget.eventStartTime ?? const Duration(hours: 9),
+    );
     _titleController = TextEditingController(text: activity?.title ?? '');
     _descriptionController = TextEditingController(
       text: activity?.description ?? '',
     );
-    _startTime = activity?.startTime.toLocal() ?? now.add(const Duration(hours: 1));
-    _endTime =
-        activity?.endTime.toLocal() ?? _startTime.add(const Duration(hours: 1));
+    _startTime = activity?.startTime ?? defaultStart;
+    _endTime = activity?.endTime ??
+        _combineDateAndDuration(
+          eventDate,
+          widget.eventEndTime ??
+              ((widget.eventStartTime ?? const Duration(hours: 9)) +
+                  const Duration(hours: 1)),
+        );
     _assignedVendorId = activity?.assignedVendorId;
   }
 
@@ -1112,19 +1133,25 @@ class _ActivityFormSheetState extends State<_ActivityFormSheet> {
                 maxLines: 4,
               ),
               const SizedBox(height: 12),
-              _DateTimePickerTile(
+              _EventDateContext(
+                eventDate: widget.eventDate,
+                eventStartTime: widget.eventStartTime,
+                eventEndTime: widget.eventEndTime,
+              ),
+              const SizedBox(height: 12),
+              _TimePickerTile(
                 label: 'Start time',
                 value: _startTime,
                 onPick: () {
-                  _pickDateTime(isStart: true);
+                  _pickTime(isStart: true);
                 },
               ),
               const SizedBox(height: 10),
-              _DateTimePickerTile(
+              _TimePickerTile(
                 label: 'End time',
                 value: _endTime,
                 onPick: () {
-                  _pickDateTime(isStart: false);
+                  _pickTime(isStart: false);
                 },
               ),
               const SizedBox(height: 12),
@@ -1200,22 +1227,15 @@ class _ActivityFormSheetState extends State<_ActivityFormSheet> {
     ];
   }
 
-  Future<void> _pickDateTime({required bool isStart}) async {
+  Future<void> _pickTime({required bool isStart}) async {
     final initial = isStart ? _startTime : _endTime;
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 3650)),
-    );
-    if (date == null || !mounted) return;
-
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initial),
     );
     if (time == null || !mounted) return;
 
+    final date = widget.eventDate ?? initial;
     final selected = DateTime(
       date.year,
       date.month,
@@ -1263,8 +1283,47 @@ class _ActivityFormSheetState extends State<_ActivityFormSheet> {
   }
 }
 
-class _DateTimePickerTile extends StatelessWidget {
-  const _DateTimePickerTile({
+class _EventDateContext extends StatelessWidget {
+  const _EventDateContext({
+    required this.eventDate,
+    required this.eventStartTime,
+    required this.eventEndTime,
+  });
+
+  final DateTime? eventDate;
+  final Duration? eventStartTime;
+  final Duration? eventEndTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = eventDate == null
+        ? 'Event date unavailable'
+        : DateFormat('MMM d, yyyy').format(eventDate!);
+    final window = eventStartTime == null || eventEndTime == null
+        ? null
+        : '${_formatDurationTime(context, eventStartTime!)} - ${_formatDurationTime(context, eventEndTime!)}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Text(
+        window == null ? date : '$date | $window',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+class _TimePickerTile extends StatelessWidget {
+  const _TimePickerTile({
     required this.label,
     required this.value,
     required this.onPick,
@@ -1278,11 +1337,11 @@ class _DateTimePickerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
       onPressed: onPick,
-      icon: const Icon(Icons.event_rounded),
+      icon: const Icon(Icons.schedule_rounded),
       label: Align(
         alignment: Alignment.centerLeft,
         child: Text(
-          '$label: ${DateFormat('MMM d, yyyy h:mm a').format(value)}',
+          '$label: ${DateFormat('h:mm a').format(value)}',
           overflow: TextOverflow.ellipsis,
         ),
       ),
@@ -1292,6 +1351,20 @@ class _DateTimePickerTile extends StatelessWidget {
       ),
     );
   }
+}
+
+DateTime _combineDateAndDuration(DateTime date, Duration time) => DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.inHours % 24,
+      time.inMinutes % 60,
+    );
+
+String _formatDurationTime(BuildContext context, Duration value) {
+  final normalized = value.inMinutes % (24 * 60);
+  return TimeOfDay(hour: normalized ~/ 60, minute: normalized % 60)
+      .format(context);
 }
 
 class _EmptySchedule extends StatelessWidget {

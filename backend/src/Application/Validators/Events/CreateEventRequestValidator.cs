@@ -24,10 +24,24 @@ public class CreateEventRequestValidator : AbstractValidator<CreateEventRequest>
         RuleFor(request => request.PreferredVenue)
             .NotEmpty();
 
-        RuleFor(request => request.PreferredDate)
-            .GreaterThan(_ => DateTime.UtcNow);
+        RuleFor(request => ResolveEventDate(request))
+            .GreaterThan(_ => DateTime.UtcNow)
+            .WithName(nameof(CreateEventRequest.PreferredDate));
 
-        RuleFor(request => request.EventDuration)
-            .GreaterThan(TimeSpan.Zero);
+        RuleFor(request => request.StartTime)
+            .NotNull();
+
+        RuleFor(request => request.EndTime)
+            .NotNull();
+
+        RuleFor(request => request)
+            .Must(request => !request.StartTime.HasValue
+                || !request.EndTime.HasValue
+                || request.EndTime.Value > request.StartTime.Value)
+            .WithName(nameof(CreateEventRequest.EndTime))
+            .WithMessage("EndTime must be strictly after StartTime.");
     }
+
+    private static DateTime ResolveEventDate(CreateEventRequest request) =>
+        request.EventDate ?? request.PreferredDate;
 }

@@ -17,6 +17,7 @@ from src.coordinator_agent.execution import (
 )
 from src.coordinator_agent.models import CoordinatorPlanOutput
 from src.gemini_client.client import GeminiClient
+from src.gemini_client.exceptions import GeminiClientError
 from src.models.scheduling_models import (
     GenerateScheduleRequest,
     GenerateScheduleResponse,
@@ -169,12 +170,14 @@ async def generate_schedule(
     state = ScheduleState(
         event_id=request.event_id,
         title=request.title,
+        event_description=request.event_description or request.requirements,
         event_type=request.event_type,
         date=request.date,
         start_time=request.start_time,
         end_time=request.end_time,
         guest_count=request.guest_count,
         requirements=request.requirements,
+        vendor_service_context=request.vendor_service_context,
     )
 
     try:
@@ -187,6 +190,16 @@ async def generate_schedule(
                 "code": "provider_timeout",
                 "message": "Schedule generation took too long. Please try again.",
             },
+        ) from exc
+    except GeminiClientError as exc:
+        logger.warning(
+            "Schedule generation provider unavailable for event %s error=%s",
+            request.event_id,
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="AI schedule generation is temporarily unavailable. Please try again later.",
         ) from exc
     except Exception as exc:
         logger.exception("Schedule generation failed for event %s", request.event_id)

@@ -19,19 +19,28 @@ public sealed class ScheduleAiClient(
         CancellationToken cancellationToken = default)
     {
         var client = httpClientFactory.CreateClient("AgenticAI");
-        var eventStart = eventEntity.PreferredDate.ToUniversalTime();
-        var eventEnd = eventStart.Add(eventEntity.EventDuration).ToUniversalTime();
+        var eventDate = eventEntity.PreferredDate.Date;
+        var eventDescription = string.IsNullOrWhiteSpace(eventEntity.Requirements)
+            ? string.Empty
+            : eventEntity.Requirements.Trim();
 
         var request = new
         {
-            event_id = eventEntity.Id.ToString(),
+            eventId = eventEntity.Id.ToString(),
+            eventTitle = eventEntity.EventName,
+            eventDescription,
+            eventType = eventEntity.EventType.ToString(),
+            eventDate = eventDate.ToString("yyyy-MM-dd"),
+            eventStartTime = eventEntity.StartTime.ToString("HH:mm:ss"),
+            eventEndTime = eventEntity.EndTime.ToString("HH:mm:ss"),
+            vendorServiceContext = Array.Empty<object>(),
             title = eventEntity.EventName,
             event_type = eventEntity.EventType.ToString(),
-            date = eventStart.Date.ToString("yyyy-MM-dd"),
-            start_time = eventStart.ToString("O"),
-            end_time = eventEnd.ToString("O"),
+            date = eventDate.ToString("yyyy-MM-dd"),
+            start_time = eventEntity.StartTime.ToString("HH:mm:ss"),
+            end_time = eventEntity.EndTime.ToString("HH:mm:ss"),
             guest_count = eventEntity.GuestCount,
-            requirements = string.IsNullOrWhiteSpace(eventEntity.Requirements) ? string.Empty : eventEntity.Requirements
+            requirements = eventDescription
         };
 
         var path = string.IsNullOrWhiteSpace(options.Value.ScheduleGeneratePath)

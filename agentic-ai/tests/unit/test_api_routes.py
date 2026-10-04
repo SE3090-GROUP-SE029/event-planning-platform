@@ -11,6 +11,7 @@ from src.coordinator_agent.execution import (
     CoordinatorProviderError,
     CoordinatorValidationError,
 )
+from src.gemini_client.exceptions import GeminiClientError, GeminiQuotaError
 
 
 def _valid_generate_payload() -> dict[str, object]:
@@ -34,6 +35,29 @@ async def _post_generate(payload: dict[str, object]) -> httpx.Response:
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         return await client.post("/api/coordinator/generate", json=payload)
+
+
+def _valid_schedule_payload() -> dict[str, object]:
+    return {
+        "eventId": str(uuid4()),
+        "eventTitle": "Gala",
+        "eventDescription": "Vegetarian catering",
+        "eventType": "CORPORATE",
+        "eventDate": "2027-06-15",
+        "eventStartTime": "18:00:00",
+        "eventEndTime": "22:00:00",
+        "vendorServiceContext": [{"serviceType": "Catering"}],
+        "guestCount": 100,
+    }
+
+
+async def _post_schedule_generate(gemini_client: object) -> httpx.Response:
+    app = FastAPI()
+    app.state.gemini_client = gemini_client
+    app.include_router(routes.schedule_router)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        return await client.post("/api/schedules/generate", json=_valid_schedule_payload())
 
 
 def _request_status(
@@ -226,3 +250,27 @@ def test_coordinator_route_returns_unprocessable_entity_for_invalid_plan(
     assert response.json()["detail"] == (
         "The generated plan did not pass validation. Please try again."
     )
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        GeminiQuotaError("internal quota details"),
+        GeminiClientError("internal mixed fallback details"),
+    ],
+)
+def test_schedule_route_returns_safe_unavailable_for_provider_failure(
+    failure: GeminiClientError,
+) -> None:
+    class FailingGeminiClient:
+        async def generate_with_prompt(self, *_args: object, **_kwargs: object) -> object:
+            raise failure
+
+    response = asyncio.run(_post_schedule_generate(FailingGeminiClient()))
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "AI schedule generation is temporarily unavailable. Please try again later."
+    }
+    assert str(failure) not in response.text
+    assert "Traceback" not in response.text

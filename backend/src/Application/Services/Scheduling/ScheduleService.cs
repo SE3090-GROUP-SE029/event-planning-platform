@@ -33,7 +33,7 @@ public class ScheduleService
         Guid plannerUserId,
         CancellationToken cancellationToken = default)
     {
-        await RequirePlannerEventAsync(eventId, plannerUserId);
+        var eventEntity = await RequirePlannerEventAsync(eventId, plannerUserId);
 
         var schedule = await _scheduleRepository.GetByEventIdAsync(eventId, cancellationToken);
 
@@ -43,6 +43,7 @@ public class ScheduleService
             schedule = await _scheduleRepository.CreateScheduleAsync(schedule, cancellationToken);
         }
 
+        ApplyEventContext(schedule, eventEntity);
         return schedule;
     }
 
@@ -56,21 +57,22 @@ public class ScheduleService
         Guid? vendorId,
         CancellationToken cancellationToken = default)
     {
-        await RequirePlannerScheduleAsync(scheduleId, plannerUserId, cancellationToken);
-        await ValidateActivityFieldsAsync(title, startTime, endTime, vendorId);
+        var (schedule, eventEntity) = await RequirePlannerScheduleWithEventAsync(scheduleId, plannerUserId, cancellationToken);
+        await ValidateActivityFieldsAsync(title, startTime, endTime, vendorId, eventEntity);
 
         var activity = new TimelineActivity
         {
             ScheduleId = scheduleId,
             Title = title.Trim(),
             Description = NormalizeDescription(description),
-            StartTime = startTime,
-            EndTime = endTime,
+            StartTime = NormalizeWallClockTimestamp(startTime),
+            EndTime = NormalizeWallClockTimestamp(endTime),
             AssignedVendorId = vendorId,
             Status = ActivityStatus.SCHEDULED.ToString()
         };
 
         activity = await _scheduleRepository.AddActivityAsync(activity, cancellationToken);
+        ApplyEventContext(schedule, eventEntity);
 
         await RecalculateDeterministicConflictsAsync(scheduleId, cancellationToken);
 
@@ -93,15 +95,15 @@ public class ScheduleService
             return null;
         }
 
-        await RequirePlannerScheduleAsync(activity.ScheduleId, plannerUserId, cancellationToken);
-        await ValidateActivityFieldsAsync(title, startTime, endTime, vendorId);
+        var (_, eventEntity) = await RequirePlannerScheduleWithEventAsync(activity.ScheduleId, plannerUserId, cancellationToken);
+        await ValidateActivityFieldsAsync(title, startTime, endTime, vendorId, eventEntity);
 
         var updated = await _scheduleRepository.UpdateActivityAsync(
             activityId,
             title.Trim(),
             NormalizeDescription(description),
-            startTime,
-            endTime,
+            NormalizeWallClockTimestamp(startTime),
+            NormalizeWallClockTimestamp(endTime),
             vendorId,
             cancellationToken);
 
@@ -207,36 +209,36 @@ public class ScheduleService
         Guid plannerUserId,
         CancellationToken cancellationToken = default)
     {
-        var schedule = await RequirePlannerScheduleAsync(scheduleId, plannerUserId, cancellationToken);
-
-        var eventEntity = await _eventRepository.GetByIdAsync(schedule.EventId)
-            ?? throw new KeyNotFoundException($"Event {schedule.EventId} associated with schedule {scheduleId} was not found.");
+        var (schedule, eventEntity) = await RequirePlannerScheduleWithEventAsync(scheduleId, plannerUserId, cancellationToken);
 
         var aiResponse = await _scheduleAiClient.GenerateScheduleAsync(eventEntity, cancellationToken);
 
-        var generatedActivities = new List<TimelineActivity>();
-        foreach (var activityDto in aiResponse.Activities)
-        {
-            var activity = new TimelineActivity
+        var generatedActivities = aiResponse.Activities
+            .Select(activityDto => new TimelineActivity
             {
                 ScheduleId = scheduleId,
                 Title = activityDto.Title,
                 Description = activityDto.Description,
-                StartTime = ParseTimestamp(activityDto.StartTime, "start_time"),
-                EndTime = ParseTimestamp(activityDto.EndTime, "end_time"),
+                StartTime = NormalizeWallClockTimestamp(ParseTimestamp(activityDto.StartTime, "start_time")),
+                EndTime = NormalizeWallClockTimestamp(ParseTimestamp(activityDto.EndTime, "end_time")),
                 AssignedVendorId = null,
                 Status = ActivityStatus.SCHEDULED.ToString()
-            };
+            })
+            .ToList();
 
-            activity = await _scheduleRepository.AddActivityAsync(activity, cancellationToken);
-            generatedActivities.Add(activity);
+        ValidateGeneratedActivities(generatedActivities, eventEntity);
+
+        var persistedActivities = new List<TimelineActivity>();
+        foreach (var activity in generatedActivities)
+        {
+            persistedActivities.Add(await _scheduleRepository.AddActivityAsync(activity, cancellationToken));
         }
 
         var generatedConflicts = aiResponse.Conflicts
             .Select(conflict => new ScheduleConflict
             {
                 ScheduleId = scheduleId,
-                ActivityId1 = generatedActivities.FirstOrDefault()?.Id ?? Guid.Empty,
+                ActivityId1 = persistedActivities.FirstOrDefault()?.Id ?? Guid.Empty,
                 ActivityId2 = Guid.Empty,
                 ConflictType = "AIGenerated",
                 Description = conflict,
@@ -245,7 +247,7 @@ public class ScheduleService
             })
             .ToList();
 
-        var detectedConflicts = _conflictDetector.DetectConflicts(scheduleId, generatedActivities);
+        var detectedConflicts = _conflictDetector.DetectConflicts(scheduleId, persistedActivities);
         var allConflicts = generatedConflicts.Concat(detectedConflicts).ToList();
 
         if (allConflicts.Count != 0)
@@ -255,9 +257,10 @@ public class ScheduleService
 
         await RecalculateDeterministicConflictsAsync(scheduleId, cancellationToken);
 
-        schedule.Activities = generatedActivities;
+        schedule.Activities = persistedActivities;
         schedule.Conflicts = allConflicts;
         schedule.UpdatedAt = DateTime.UtcNow;
+        ApplyEventContext(schedule, eventEntity);
         return schedule;
     }
 
@@ -286,6 +289,19 @@ public class ScheduleService
         return schedule;
     }
 
+    private async Task<(EventSchedule Schedule, Event Event)> RequirePlannerScheduleWithEventAsync(
+        Guid scheduleId,
+        Guid plannerUserId,
+        CancellationToken cancellationToken)
+    {
+        var schedule = await _scheduleRepository.GetByIdAsync(scheduleId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Schedule {scheduleId} was not found.");
+
+        var eventEntity = await RequirePlannerEventAsync(schedule.EventId, plannerUserId);
+        ApplyEventContext(schedule, eventEntity);
+        return (schedule, eventEntity);
+    }
+
     private async Task<Vendor> RequireVendorAsync(Guid vendorUserId)
     {
         return await _vendorRepository.GetByUserIdAsync(vendorUserId)
@@ -296,7 +312,8 @@ public class ScheduleService
         string title,
         DateTime startTime,
         DateTime endTime,
-        Guid? vendorId)
+        Guid? vendorId,
+        Event eventEntity)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -312,6 +329,12 @@ public class ScheduleService
         {
             throw new ArgumentException("EndTime must be strictly after StartTime.");
         }
+
+        ValidateActivityWindow(
+            NormalizeWallClockTimestamp(startTime),
+            NormalizeWallClockTimestamp(endTime),
+            eventEntity,
+            "Activity");
 
         if (vendorId.HasValue && await _vendorRepository.GetByIdAsync(vendorId.Value) == null)
         {
@@ -341,11 +364,78 @@ public class ScheduleService
 
     private static DateTime ParseTimestamp(string value, string fieldName)
     {
-        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsed))
+        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var parsed))
         {
             return parsed;
         }
 
         throw new InvalidOperationException($"AI schedule returned an invalid {fieldName} timestamp: {value}");
+    }
+
+    private static void ValidateGeneratedActivities(
+        IReadOnlyList<TimelineActivity> activities,
+        Event eventEntity)
+    {
+        foreach (var activity in activities)
+        {
+            if (string.IsNullOrWhiteSpace(activity.Title))
+            {
+                throw new InvalidOperationException("AI schedule returned an activity without a title.");
+            }
+
+            if (activity.EndTime <= activity.StartTime)
+            {
+                throw new InvalidOperationException($"AI schedule returned an invalid duration for '{activity.Title}'.");
+            }
+
+            try
+            {
+                ValidateActivityWindow(activity.StartTime, activity.EndTime, eventEntity, $"AI activity '{activity.Title}'");
+            }
+            catch (ArgumentException ex)
+            {
+                throw new InvalidOperationException(ex.Message, ex);
+            }
+        }
+    }
+
+    private static void ValidateActivityWindow(
+        DateTime startTime,
+        DateTime endTime,
+        Event eventEntity,
+        string label)
+    {
+        var eventDate = DateOnly.FromDateTime(eventEntity.PreferredDate);
+        var activityDate = DateOnly.FromDateTime(startTime);
+        var activityEndDate = DateOnly.FromDateTime(endTime);
+
+        if (activityDate != eventDate || activityEndDate != eventDate)
+        {
+            throw new ArgumentException($"{label} must be scheduled on the event date.");
+        }
+
+        var activityStartTime = TimeOnly.FromDateTime(startTime);
+        var activityEndTime = TimeOnly.FromDateTime(endTime);
+
+        if (activityStartTime < eventEntity.StartTime)
+        {
+            throw new ArgumentException($"{label} starts before the event window.");
+        }
+
+        if (activityEndTime > eventEntity.EndTime)
+        {
+            throw new ArgumentException($"{label} ends after the event window.");
+        }
+    }
+
+    private static DateTime NormalizeWallClockTimestamp(DateTime value) =>
+        DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+    private static void ApplyEventContext(EventSchedule schedule, Event eventEntity)
+    {
+        schedule.EventName = eventEntity.EventName;
+        schedule.EventDate = eventEntity.PreferredDate.Date;
+        schedule.EventStartTime = eventEntity.StartTime;
+        schedule.EventEndTime = eventEntity.EndTime;
     }
 }

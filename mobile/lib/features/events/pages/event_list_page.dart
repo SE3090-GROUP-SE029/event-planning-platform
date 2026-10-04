@@ -218,7 +218,6 @@ class _EventListPageState extends ConsumerState<EventListPage> {
 
                           final event = controller.events[index];
                           final dateText = event.preferredDate
-                              .toLocal()
                               .toString()
                               .split(' ')
                               .first;

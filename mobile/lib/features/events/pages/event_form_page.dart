@@ -30,6 +30,8 @@ class _EventFormPageState extends State<EventFormPage> {
   EventType _type = EventType.wedding;
   EventStatus _status = EventStatus.draft;
   DateTime _date = DateTime.now().add(const Duration(days: 1));
+  TimeOfDay _startTime = const TimeOfDay(hour: 18, minute: 0);
+  TimeOfDay _endTime = const TimeOfDay(hour: 23, minute: 0);
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -57,6 +59,8 @@ class _EventFormPageState extends State<EventFormPage> {
       _type = event.eventType;
       _status = event.status;
       _date = event.preferredDate;
+      _startTime = _timeOfDayFromDuration(event.startTime);
+      _endTime = _timeOfDayFromDuration(event.endTime);
       _guests.text = '${event.guestCount}';
       _budget.text = '${event.budget}';
       _venue.text = event.preferredVenue;
@@ -122,8 +126,38 @@ class _EventFormPageState extends State<EventFormPage> {
     if (value != null) setState(() => _date = value);
   }
 
+  Future<void> _pickEventTime({required bool isStart}) async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _startTime : _endTime,
+    );
+    if (selected == null) return;
+
+    setState(() {
+      if (isStart) {
+        _startTime = selected;
+        if (_timeOfDayToDuration(_endTime)
+                .compareTo(_timeOfDayToDuration(_startTime)) <=
+            0) {
+          final nextEnd = _timeOfDayToDuration(_startTime) + const Duration(hours: 1);
+          _endTime = _timeOfDayFromDuration(nextEnd);
+        }
+      } else {
+        _endTime = selected;
+      }
+    });
+  }
+
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false) || _auth == null) return;
+    final startDuration = _timeOfDayToDuration(_startTime);
+    final endDuration = _timeOfDayToDuration(_endTime);
+    if (endDuration.compareTo(startDuration) <= 0) {
+      setState(() {
+        _error = 'End time must be after start time.';
+      });
+      return;
+    }
     final event = EventModel(
       id: _event?.id ?? '',
       ownerId: _auth!.userId,
@@ -133,7 +167,9 @@ class _EventFormPageState extends State<EventFormPage> {
       budget: double.parse(_budget.text),
       preferredVenue: _venue.text.trim(),
       preferredDate: _date,
-      eventDuration: _event?.eventDuration ?? const Duration(hours: 1),
+      startTime: startDuration,
+      endTime: endDuration,
+      eventDuration: endDuration - startDuration,
       requirements:
           _requirements.text.trim().isEmpty ? null : _requirements.text.trim(),
       status: _status,
@@ -369,11 +405,7 @@ class _EventFormPageState extends State<EventFormPage> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        _date
-                                            .toLocal()
-                                            .toString()
-                                            .split(' ')
-                                            .first,
+                                        _date.toString().split(' ').first,
                                         style: const TextStyle(
                                           color: AppColors.textPrimary,
                                           fontSize: 15,
@@ -394,6 +426,26 @@ class _EventFormPageState extends State<EventFormPage> {
                               ],
                             ),
                           ),
+                        ),
+                        const SizedBox(height: AppDimens.space16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _TimeTile(
+                                label: 'Start time',
+                                value: _startTime.format(context),
+                                onTap: () => _pickEventTime(isStart: true),
+                              ),
+                            ),
+                            const SizedBox(width: AppDimens.space12),
+                            Expanded(
+                              child: _TimeTile(
+                                label: 'End time',
+                                value: _endTime.format(context),
+                                onTap: () => _pickEventTime(isStart: false),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -483,6 +535,79 @@ class _EventFormPageState extends State<EventFormPage> {
                 ],
               ),
             ),
+    );
+  }
+
+  TimeOfDay _timeOfDayFromDuration(Duration value) {
+    final normalized = value.inMinutes % (24 * 60);
+    return TimeOfDay(hour: normalized ~/ 60, minute: normalized % 60);
+  }
+
+  Duration _timeOfDayToDuration(TimeOfDay value) =>
+      Duration(hours: value.hour, minutes: value.minute);
+}
+
+class _TimeTile extends StatelessWidget {
+  const _TimeTile({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimens.space16,
+          vertical: AppDimens.space14,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.schedule_rounded,
+              color: AppColors.textSecondary,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

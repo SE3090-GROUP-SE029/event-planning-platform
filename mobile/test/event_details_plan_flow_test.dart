@@ -195,6 +195,8 @@ EventModel _event() => EventModel(
       budget: 1000,
       preferredVenue: 'Community Hall',
       preferredDate: DateTime.utc(2027, 1, 1),
+      startTime: const Duration(hours: 18),
+      endTime: const Duration(hours: 23),
       eventDuration: const Duration(hours: 1),
       requirements: null,
       status: EventStatus.draft,

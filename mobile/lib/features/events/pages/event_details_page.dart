@@ -370,10 +370,21 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                               variant: PastelIconVariant.yellow,
                               label: 'Event date',
                               value: event.preferredDate
-                                  .toLocal()
                                   .toString()
                                   .split(' ')
                                   .first,
+                            ),
+                            const Divider(
+                              height: 24,
+                              thickness: 0.8,
+                              color: Color(0x0C000000),
+                              indent: 56,
+                            ),
+                            _buildDetailRow(
+                              icon: Icons.schedule_rounded,
+                              variant: PastelIconVariant.blue,
+                              label: 'Time window',
+                              value: _formatTimeRange(context, event),
                             ),
                             const Divider(
                               height: 24,
@@ -410,7 +421,6 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                               variant: PastelIconVariant.blue,
                               label: 'Created',
                               value: event.createdAt
-                                  .toLocal()
                                   .toString()
                                   .split(' ')
                                   .first,
@@ -664,5 +674,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       case EventStatus.cancelled:
         return PastelBadgeStyle.neutral;
     }
+  }
+
+  String _formatTimeRange(BuildContext context, EventModel event) {
+    final start = _timeOfDayFromDuration(event.startTime).format(context);
+    final end = _timeOfDayFromDuration(event.endTime).format(context);
+    return '$start - $end';
+  }
+
+  TimeOfDay _timeOfDayFromDuration(Duration value) {
+    final normalized = value.inMinutes % (24 * 60);
+    return TimeOfDay(hour: normalized ~/ 60, minute: normalized % 60);
   }
 }

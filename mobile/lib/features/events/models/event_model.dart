@@ -39,11 +39,31 @@ Duration _parseDuration(dynamic value) {
   return Duration.zero;
 }
 
+Duration _parseTimeOfDay(dynamic value) {
+  if (value is num) return Duration(microseconds: value.toInt());
+  final parts = (value?.toString() ?? '').split(':');
+  if (parts.length >= 2) {
+    return Duration(
+      hours: int.tryParse(parts[0]) ?? 0,
+      minutes: int.tryParse(parts[1]) ?? 0,
+      seconds: parts.length > 2 ? int.tryParse(parts[2].split('.').first) ?? 0 : 0,
+    );
+  }
+  return Duration.zero;
+}
+
 String _durationJson(Duration value) {
   final hours = value.inHours.toString().padLeft(2, '0');
   final minutes = (value.inMinutes % 60).toString().padLeft(2, '0');
   final seconds = (value.inSeconds % 60).toString().padLeft(2, '0');
   return '$hours:$minutes:$seconds';
+}
+
+String _dateOnlyJson(DateTime value) {
+  final year = value.year.toString().padLeft(4, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '${year}-${month}-${day}T00:00:00';
 }
 
 class EventModel {
@@ -55,6 +75,8 @@ class EventModel {
   final double budget;
   final String preferredVenue;
   final DateTime preferredDate;
+  final Duration startTime;
+  final Duration endTime;
   final Duration eventDuration;
   final String? requirements;
   final EventStatus status;
@@ -70,6 +92,8 @@ class EventModel {
     required this.budget,
     required this.preferredVenue,
     required this.preferredDate,
+    required this.startTime,
+    required this.endTime,
     required this.eventDuration,
     required this.requirements,
     required this.status,
@@ -85,7 +109,10 @@ class EventModel {
         guestCount: (json['guestCount'] as num?)?.toInt() ?? 0,
         budget: (json['budget'] as num?)?.toDouble() ?? 0,
         preferredVenue: json['preferredVenue'] as String? ?? '',
-        preferredDate: DateTime.parse(json['preferredDate'] as String),
+        preferredDate: DateTime.parse(
+            (json['eventDate'] ?? json['preferredDate']) as String),
+        startTime: _parseTimeOfDay(json['startTime']),
+        endTime: _parseTimeOfDay(json['endTime']),
         eventDuration: _parseDuration(json['eventDuration']),
         requirements: json['requirements'] as String?,
         status: _parseEnum(json['status'], EventStatus.values),
@@ -101,8 +128,10 @@ class EventModel {
         'guestCount': guestCount,
         'budget': budget,
         'preferredVenue': preferredVenue,
-        'preferredDate': preferredDate.toUtc().toIso8601String(),
-        'eventDuration': _durationJson(eventDuration),
+        'eventDate': _dateOnlyJson(preferredDate),
+        'preferredDate': _dateOnlyJson(preferredDate),
+        'startTime': _durationJson(startTime),
+        'endTime': _durationJson(endTime),
         'requirements': requirements,
       };
 
@@ -112,7 +141,10 @@ class EventModel {
         'guestCount': guestCount,
         'budget': budget,
         'preferredVenue': preferredVenue,
-        'preferredDate': preferredDate.toUtc().toIso8601String(),
+        'eventDate': _dateOnlyJson(preferredDate),
+        'preferredDate': _dateOnlyJson(preferredDate),
+        'startTime': _durationJson(startTime),
+        'endTime': _durationJson(endTime),
         'requirements': requirements,
         'status': status.index,
       };

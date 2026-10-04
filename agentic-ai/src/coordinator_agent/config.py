@@ -11,6 +11,8 @@ _DEVELOPMENT_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 )
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_FALLBACK_MODELS = "gemini-3.7-flash,gemini-3.5-flash-lite"
 
 
 def _parse_cors_origins(value: str) -> tuple[str, ...]:
@@ -54,9 +56,12 @@ class Settings(BaseSettings):
         default="http://localhost:5207", validation_alias="BACKEND_API_URL"
     )
     gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-3.8-flash", validation_alias="GEMINI_MODEL")
+    gemini_model: str = Field(default=DEFAULT_GEMINI_MODEL, validation_alias="GEMINI_MODEL")
     gemini_api_keys: str = Field(default="", validation_alias="GEMINI_API_KEYS")
-    gemini_fallback_models: str = Field(default="", validation_alias="GEMINI_FALLBACK_MODELS")
+    gemini_fallback_models: str = Field(
+        default=DEFAULT_GEMINI_FALLBACK_MODELS,
+        validation_alias="GEMINI_FALLBACK_MODELS",
+    )
     gemini_timeout_seconds: float = Field(
         default=15.0, gt=0, validation_alias="GEMINI_TIMEOUT_SECONDS"
     )
@@ -147,7 +152,7 @@ class Settings(BaseSettings):
     def validate_gemini_model_name(cls, value: str) -> str:
         model_name = value.strip()
         if not model_name.startswith("gemini-") or any(character.isspace() for character in model_name):
-            raise ValueError("GEMINI_MODEL must be a Gemini model ID, such as gemini-2.5-flash")
+            raise ValueError("GEMINI_MODEL must be a Gemini model ID, such as gemini-3.8-flash")
         return model_name
 
     @field_validator("gemini_fallback_models")

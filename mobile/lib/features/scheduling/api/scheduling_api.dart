@@ -125,8 +125,8 @@ class SchedulingApi {
       'description': description?.trim().isEmpty == true
           ? null
           : description?.trim(),
-      'startTime': startTime.toUtc().toIso8601String(),
-      'endTime': endTime.toUtc().toIso8601String(),
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime.toIso8601String(),
       'assignedVendorId': assignedVendorId?.trim().isEmpty == true
           ? null
           : assignedVendorId?.trim(),
