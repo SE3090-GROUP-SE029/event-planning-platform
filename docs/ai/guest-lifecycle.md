@@ -25,7 +25,9 @@ seat, create an invitation, or send an invitation.
 5. **Seat allocation** — The allocation worker processes accepted submissions
    in registration order. Eligible guests become `CONFIRMED` while capacity is
    available; the remainder become `WAITLISTED`. When capacity opens, the
-   oldest eligible waitlisted guest is promoted.
+   oldest eligible waitlisted guest is promoted. AI-reviewed registrations can
+   be promoted only with a current completed acceptance decision; historical
+   advisory reviews are re-evaluated before they can authorize promotion.
 6. **Invitation** — Only confirmed registrations receive an `Invitation` with
    a QR token. The delivery worker sends the invitation email and retries
    pending delivery.

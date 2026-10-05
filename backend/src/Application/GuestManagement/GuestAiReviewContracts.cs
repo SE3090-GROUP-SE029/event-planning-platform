@@ -26,6 +26,11 @@ public record GuestAiDecision(AiDecision Decision, double Confidence, string[] R
         => !string.IsNullOrWhiteSpace(value) && value.Length <= maximum && !value.Any(char.IsControl);
 }
 
+public static class GuestAiReviewVersions
+{
+    public const string CurrentPromptVersion = "guest-filtering-v2";
+}
+
 public record GuestAiClaim(Guid ReviewId, long RegistrationSubmissionId, Guid AttemptId);
 
 public interface IGuestAiClient

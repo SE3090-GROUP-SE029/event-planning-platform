@@ -201,7 +201,7 @@ public class EventService : IEventService
         request.EventDate ?? request.PreferredDate;
 
     private static DateTime NormalizeEventDate(DateTime eventDate) =>
-        DateTime.SpecifyKind(eventDate.Date, DateTimeKind.Utc);
+        DateTime.SpecifyKind(eventDate, DateTimeKind.Utc);
 
     private static TimeSpan CalculateDuration(TimeOnly startTime, TimeOnly endTime) =>
         endTime.ToTimeSpan() - startTime.ToTimeSpan();

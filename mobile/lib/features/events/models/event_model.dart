@@ -46,7 +46,8 @@ Duration _parseTimeOfDay(dynamic value) {
     return Duration(
       hours: int.tryParse(parts[0]) ?? 0,
       minutes: int.tryParse(parts[1]) ?? 0,
-      seconds: parts.length > 2 ? int.tryParse(parts[2].split('.').first) ?? 0 : 0,
+      seconds:
+          parts.length > 2 ? int.tryParse(parts[2].split('.').first) ?? 0 : 0,
     );
   }
   return Duration.zero;
@@ -63,7 +64,7 @@ String _dateOnlyJson(DateTime value) {
   final year = value.year.toString().padLeft(4, '0');
   final month = value.month.toString().padLeft(2, '0');
   final day = value.day.toString().padLeft(2, '0');
-  return '${year}-${month}-${day}T00:00:00';
+  return '$year-$month-${day}T00:00:00Z';
 }
 
 class EventModel {

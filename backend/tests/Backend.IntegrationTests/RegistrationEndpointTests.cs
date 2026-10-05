@@ -254,6 +254,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         var path = PlannerPath(eventDetails.Id) + $"/registrations/{firstId}/cancel";
         await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: RegistrationHostFixture.PlannerId));
         await JsonAsync(await SendAsync(HttpMethod.Post, path, planner: RegistrationHostFixture.PlannerId));
+        await fixture.DrainAiAsync();
         var firstStatus = await StatusAsync(first);
         var secondStatus = await StatusAsync(second);
         var thirdStatus = await StatusAsync(third);
@@ -386,9 +387,9 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         var secretProtector = new RegistrationSecretProtector(DataProtectionProvider.Create("RegistrationIntegrationTests"));
         var guestOptions = new GuestRegistrationOptions { PublicWebBaseUrl = "https://event.example.test/" };
         var invitations = new InvitationService(repository, fixture.Email, tokens, secretProtector, guestOptions, fixture.Clock);
-        var allocation = new SeatAllocationService(repository, new HoldPolicy(), fixture.Clock);
         var aiReviews = new GuestAiReviewRepository(db, repository,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<GuestAiReviewRepository>.Instance);
+        var allocation = new SeatAllocationService(repository, aiReviews, new HoldPolicy(), fixture.Clock);
         var reviewService = new RegistrationReviewService(repository, aiReviews, fixture.Email, fixture.Clock);
         var service = new RegistrationService(repository, tokens, fixture.Clock, secretProtector, allocation);
         var held = await service.SubmitAsync(publicId, new GuestDetails("Hold", "hold@example.com", null, null), Ct);
@@ -399,6 +400,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
             Assert.NotNull(claim);
             await reviewService.ApplyAiDecisionAsync(claim!, fixture.Ai.Decision, Ct);
         }
+        await allocation.AllocateAsync(eventDetails.Id, Ct);
         held = held with { Registration = (await service.GetPublicStatusAsync(held.Registration.PublicReference, held.StatusSecret, Ct)) };
         eligible = eligible with { Registration = (await service.GetPublicStatusAsync(eligible.Registration.PublicReference, eligible.StatusSecret, Ct)) };
         Assert.Equal(RegistrationStatus.WAITLISTED, held.Registration.Status);

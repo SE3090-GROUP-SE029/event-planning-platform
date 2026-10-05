@@ -56,8 +56,16 @@ public class RegistrationReviewService(
         var rejected = await repository.WithEventLockAsync(lookup.EventId, async _ =>
         {
             var registration = await RequireRegistrationAsync(lookup.EventId, lookup.Id, ct);
+            var previousReview = await aiReviews.FindAsync(registration.Id, ct);
+            var reprocessingLegacyReview = previousReview is
+            {
+                Status: AiAnalysisStatus.COMPLETED
+            } && previousReview.PromptVersion != GuestAiReviewVersions.CurrentPromptVersion;
             if (!await aiReviews.CompleteAsync(claim, decision, clock.GetUtcNow(), ct)) return false;
-            if (registration.Status != RegistrationStatus.PENDING_REVIEW) return false;
+            if (registration.Status != RegistrationStatus.PENDING_REVIEW &&
+                !(reprocessingLegacyReview &&
+                    registration.Status is RegistrationStatus.ACCEPTED or RegistrationStatus.WAITLISTED))
+                return false;
 
             var outcome = decision.Decision == AiDecision.ACCEPTED
                 ? RegistrationDecision.ACCEPTED

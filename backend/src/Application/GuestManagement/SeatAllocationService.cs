@@ -5,6 +5,7 @@ namespace Application.GuestManagement;
 
 public class SeatAllocationService(
     IGuestRegistrationRepository repository,
+    IGuestAiReviewRepository aiReviews,
     IRegistrationEligibilityPolicy eligibility,
     TimeProvider clock)
 {
@@ -44,6 +45,7 @@ public class SeatAllocationService(
             foreach (var registration in waiting)
             {
                 if (available <= 0) break;
+                if (!await HasCurrentAiAcceptanceAsync(registration, ct)) continue;
                 if (!await eligibility.IsEligibleAsync(registration.Guest, eventDetails, ct)) continue;
                 var confirmedAt = clock.GetUtcNow();
                 registration.Status = RegistrationStatus.CONFIRMED;
@@ -55,6 +57,21 @@ public class SeatAllocationService(
         }, ct);
 
         return changed;
+    }
+
+    private async Task<bool> HasCurrentAiAcceptanceAsync(
+        RegistrationSubmission registration,
+        CancellationToken ct)
+    {
+        if (registration.ReviewSource != ReviewSource.AI) return true;
+
+        var review = await aiReviews.FindAsync(registration.Id, ct);
+        return review is
+        {
+            Status: AiAnalysisStatus.COMPLETED,
+            Decision: AiDecision.ACCEPTED,
+            PromptVersion: GuestAiReviewVersions.CurrentPromptVersion
+        };
     }
 
     private static DateTimeOffset EventEnd(Event eventDetails)

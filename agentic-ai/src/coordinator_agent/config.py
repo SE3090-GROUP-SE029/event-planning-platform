@@ -13,8 +13,8 @@ _DEVELOPMENT_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 )
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
-DEFAULT_GEMINI_FALLBACK_MODELS = "gemini-3.7-flash,gemini-2.5-flash-lite,gemini-2.0-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_FALLBACK_MODELS = "gemini-2.5-flash-lite,gemini-2.0-flash"
 RETIRED_GEMINI_MODELS = {
     "gemini-2.5-flash",
     "gemini-2.5-flash-preview",

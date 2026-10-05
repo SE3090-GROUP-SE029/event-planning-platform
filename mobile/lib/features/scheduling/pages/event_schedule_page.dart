@@ -360,6 +360,7 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
           endTime: payload.endTime,
           assignedVendorId: payload.assignedVendorId,
         );
+        if (!context.mounted) return;
         _showSnack(context, 'Activity added.');
       } else {
         await notifier.updateActivity(
@@ -370,9 +371,11 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
           endTime: payload.endTime,
           assignedVendorId: payload.assignedVendorId,
         );
+        if (!context.mounted) return;
         _showSnack(context, 'Activity updated.');
       }
     } catch (error) {
+      if (!context.mounted) return;
       _showSnack(context, error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -408,8 +411,10 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
     setState(() => _busyActivityId = activity.id);
     try {
       await notifier.deleteActivity(activity.id);
+      if (!context.mounted) return;
       _showSnack(context, 'Activity deleted.');
     } catch (error) {
+      if (!context.mounted) return;
       _showSnack(context, error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _busyActivityId = null);
@@ -425,8 +430,10 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
     setState(() => _busyActivityId = activity.id);
     try {
       await notifier.updateActivityStatus(activity.id, status);
+      if (!context.mounted) return;
       _showSnack(context, 'Activity status updated.');
     } catch (error) {
+      if (!context.mounted) return;
       _showSnack(context, error.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _busyActivityId = null);

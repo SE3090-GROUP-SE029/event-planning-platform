@@ -486,10 +486,13 @@ def test_configured_interactions_client_disables_sdk_managed_retries(
 
     monkeypatch.setattr(gemini_client_module.genai_v2, "Client", create_v2_client)
 
-    gemini_client_module._configured_model.__wrapped__(
-        "gemini-3.8-flash",
-        "test-api-key",
-    )
+    async def create_model() -> None:
+        gemini_client_module._configured_model.__wrapped__(
+            "gemini-3.8-flash",
+            "test-api-key",
+        )
+
+    asyncio.run(create_model())
 
     assert captured["http_options"].retry_options.attempts == 1
 

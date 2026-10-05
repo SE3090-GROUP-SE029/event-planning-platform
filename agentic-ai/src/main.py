@@ -145,8 +145,6 @@ def _require_development_diagnostics(request: Request) -> None:
 async def analyze_guest(request: Request, context: GuestReviewRequest,
                         service: GuestReviewService = Depends(get_guest_review_service)):
     # Planner retrieval is exclusively through the protected ASP.NET API.
-    if request.client is None or request.client.host not in {"127.0.0.1", "::1"}:
-        raise HTTPException(status_code=403, detail="Local backend access required")
     return await service.analyze(context)
 
 @app.get("/health", tags=["Health"])
@@ -162,8 +160,6 @@ async def health_check():
 @app.post("/api/registration-questions/suggest", response_model=QuestionSuggestions, tags=["Internal Registration Questions"])
 async def suggest_questions(request: Request, context: QuestionSuggestionRequest,
                             service: RegistrationQuestionService = Depends(get_registration_question_service)):
-    if request.client is None or request.client.host not in {"127.0.0.1", "::1"}:
-        raise HTTPException(status_code=403, detail="Local backend access required")
     return await service.suggest(context)
 
 @app.post("/api/test/ping", response_model=PingResponse, tags=["Test"])

@@ -51,9 +51,16 @@ public class GuestAiReviewRepository(AppDbContext db, IGuestRegistrationReposito
         var rows = await db.GuestAiReviews.FromSqlInterpolated($"""
             SELECT a.* FROM "GuestAiReviews" a
             JOIN "RegistrationSubmissions" r ON r."Id" = a."RegistrationSubmissionId"
-            WHERE r."Status" = 'PENDING_REVIEW' AND
-            (a."Status" = 'PENDING' OR (a."Status" = 'PROCESSING' AND a."LeaseExpiresAt" <= {now})
-             OR (a."Status" = 'COMPLETED' AND a."Decision" IS NULL))
+            WHERE
+            (r."Status" = 'PENDING_REVIEW' AND
+             (a."Status" = 'PENDING' OR (a."Status" = 'PROCESSING' AND a."LeaseExpiresAt" <= {now})
+              OR (a."Status" = 'COMPLETED' AND a."Decision" IS NULL)))
+            OR
+            (r."Status" IN ('ACCEPTED', 'WAITLISTED') AND
+             ((a."Status" = 'COMPLETED' AND
+               a."PromptVersion" IS DISTINCT FROM {GuestAiReviewVersions.CurrentPromptVersion})
+              OR (a."Status" = 'PROCESSING' AND a."LeaseExpiresAt" <= {now} AND
+                  a."PromptVersion" IS DISTINCT FROM {GuestAiReviewVersions.CurrentPromptVersion})))
             ORDER BY a."RequestedAt", a."Id" LIMIT 1 FOR UPDATE OF a SKIP LOCKED
             """).ToListAsync(ct);
         var review = rows.SingleOrDefault();
