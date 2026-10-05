@@ -41,52 +41,118 @@ public sealed class VendorRecommendationService : IVendorRecommendationService
         var eventEntity = await RequireOwnedEventAsync(eventId, userId);
         var plan = await RequireApprovedPlanAsync(eventId, request?.PlanId, cancellationToken);
 
-        var categories = VendorRecommendationCandidateBuilder.ResolveCategories(
-            plan.ServiceCategories,
-            plan.TargetVendorTypes);
+        var active = await _recommendations.GetActiveForEventAsync(eventId, cancellationToken);
+        if (active is not null)
+            return MapRun(active, fromCache: false);
 
-        var candidates = await BuildCandidatesAsync(plan, categories, cancellationToken);
+        var latest = await _recommendations.GetLatestForEventAsync(eventId, cancellationToken);
+        if (request?.ForceRefresh != true &&
+            latest is not null &&
+            latest.EventPlanDraftId == plan.Id &&
+            latest.Status == VendorRecommendationRun.CompletedStatus)
+        {
+            return MapRun(latest, fromCache: false);
+        }
 
-        if (candidates.Count == 0)
-            throw new InvalidOperationException(
-                "No APPROVED vendors match this plan's categories, budget, and availability constraints.");
+        var now = DateTime.UtcNow;
+        var run = new VendorRecommendationRun
+        {
+            Id = Guid.NewGuid(),
+            EventId = eventId,
+            EventPlanDraftId = plan.Id,
+            RequestedByUserId = userId,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Status = VendorRecommendationRun.PendingStatus,
+            Stage = "Preparing recommendations"
+        };
 
-        var aiRequest = ToAiRequest(eventEntity.Id, plan, candidates);
+        if (await _recommendations.TryAddRunAsync(run, cancellationToken))
+        {
+            _logger.LogInformation(
+                "Vendor recommendation GenerationQueued event {EventId}, run {RunId}, plan {PlanId}",
+                eventId,
+                run.Id,
+                plan.Id);
+            return MapRun(run, fromCache: false);
+        }
+
+        active = await _recommendations.GetActiveForEventAsync(eventId, cancellationToken);
+        if (active is not null)
+            return MapRun(active, fromCache: false);
+
+        latest = await _recommendations.GetLatestForEventAsync(eventId, cancellationToken);
+        if (latest is not null &&
+            latest.EventPlanDraftId == plan.Id &&
+            latest.Status == VendorRecommendationRun.CompletedStatus)
+            return MapRun(latest, fromCache: false);
+
+        throw new InvalidOperationException(
+            "A concurrent recommendation request could not be resolved. Please retry.");
+    }
+
+    public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var staleRunningBefore = now.AddMinutes(-35);
+        var candidate = await _recommendations.GetNextRunnableAsync(
+            staleRunningBefore,
+            cancellationToken);
+        if (candidate is null)
+            return false;
+
+        if (!await _recommendations.TryClaimAsync(
+                candidate.Id,
+                now,
+                staleRunningBefore,
+                cancellationToken))
+            return true;
+
+        var run = await _recommendations.GetByIdAsync(candidate.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Claimed recommendation run disappeared.");
+        _logger.LogInformation(
+            "Vendor recommendation GenerationStarted event {EventId}, run {RunId}, plan {PlanId}",
+            run.EventId,
+            run.Id,
+            run.EventPlanDraftId);
 
         try
         {
-            var aiResponse = await _ai.RecommendAsync(aiRequest, cancellationToken);
-            var validated = ValidateAiResponse(aiResponse, candidates);
-            if (validated.Count == 0)
-                throw new InvalidOperationException(
-                    "The AI service returned no recommendations matching the candidate vendors.");
-
-            var run = PersistRun(eventId, plan.Id, userId, candidates.Count, validated);
-            await _recommendations.AddRunAsync(run, cancellationToken);
-            await _recommendations.SaveChangesAsync(cancellationToken);
-            return MapRun(run, fromCache: false);
+            await ProcessRunAsync(run, cancellationToken);
+            return true;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning(ex, "Vendor recommendation AI failed for event {EventId}", eventId);
-            var previous = await _recommendations.GetLatestForEventAsync(eventId, cancellationToken);
-            if (previous is not null)
-            {
-                var cached = MapRun(previous, fromCache: true);
-                cached.SourceNote =
-                    "Showing the last saved recommendations because the AI service is temporarily unavailable.";
-                return cached;
-            }
-
-            if (ex is TaskCanceledException)
-            {
-                throw new HttpRequestException(
-                    "The AI recommendation service timed out.",
-                    ex,
-                    HttpStatusCode.GatewayTimeout);
-            }
-
+            _logger.LogWarning(
+                "Vendor recommendation processing cancelled event {EventId}, run {RunId}; it will be resumed after its lease expires",
+                run.EventId,
+                run.Id);
             throw;
+        }
+        catch (Exception exception)
+        {
+            var failureMessage = GetFailureMessage(exception);
+            await _recommendations.MarkFailedIfRunningAsync(
+                run.Id,
+                failureMessage,
+                DateTime.UtcNow,
+                cancellationToken);
+            _logger.LogError(
+                exception,
+                "Vendor recommendation GenerationFailed event {EventId}, run {RunId}, failure type {FailureType}",
+                run.EventId,
+                run.Id,
+                exception.GetType().Name);
+            if (exception is OperationCanceledException or
+                HttpRequestException { StatusCode: HttpStatusCode.GatewayTimeout })
+            {
+                _logger.LogWarning(
+                    "Vendor recommendation Timeout event {EventId}, run {RunId}, failure type {FailureType}",
+                    run.EventId,
+                    run.Id,
+                    exception.GetType().Name);
+            }
+            return true;
         }
     }
 
@@ -99,6 +165,134 @@ public sealed class VendorRecommendationService : IVendorRecommendationService
         var run = await _recommendations.GetLatestForEventAsync(eventId, cancellationToken);
         return run is null ? null : MapRun(run, fromCache: false);
     }
+
+    public async Task<VendorRecommendationRunResponse?> GetRunAsync(
+        Guid eventId,
+        Guid runId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        await RequireOwnedEventAsync(eventId, userId);
+        var run = await _recommendations.GetByIdAsync(runId, cancellationToken);
+        return run?.EventId == eventId ? MapRun(run, fromCache: false) : null;
+    }
+
+    private async Task ProcessRunAsync(
+        VendorRecommendationRun run,
+        CancellationToken cancellationToken)
+    {
+        var eventEntity = await RequireOwnedEventAsync(
+            run.EventId,
+            run.RequestedByUserId);
+        var plan = await RequireApprovedPlanAsync(
+            run.EventId,
+            run.EventPlanDraftId,
+            cancellationToken);
+        var categories = VendorRecommendationCandidateBuilder.ResolveCategories(
+            plan.ServiceCategories,
+            plan.TargetVendorTypes);
+
+        await UpdateProgressAsync(run.Id, "Finding candidate vendors", null, cancellationToken);
+        var candidates = await BuildCandidatesAsync(plan, categories, cancellationToken);
+        if (candidates.Count == 0)
+            throw new InvalidOperationException(
+                "No approved vendors match this plan's categories, budget, and availability constraints.");
+
+        await UpdateProgressAsync(
+            run.Id,
+            "Analyzing services",
+            candidates.Count,
+            cancellationToken);
+        var aiRequest = ToAiRequest(eventEntity.Id, plan, candidates);
+        await UpdateProgressAsync(run.Id, "Ranking vendors", null, cancellationToken);
+        await UpdateProgressAsync(run.Id, "Generating recommendations", null, cancellationToken);
+
+        var aiResponse = await _ai.RecommendAsync(aiRequest, cancellationToken);
+        var validated = ValidateAiResponse(aiResponse, candidates);
+        if (validated.Count == 0)
+            throw new InvalidOperationException(
+                "The AI service returned no recommendations matching the candidate vendors.");
+
+        await UpdateProgressAsync(run.Id, "Almost complete", null, cancellationToken);
+        var completed = PersistRun(
+            run.EventId,
+            run.EventPlanDraftId,
+            run.RequestedByUserId,
+            candidates.Count,
+            validated);
+        run.CandidateCount = completed.CandidateCount;
+        run.Items = completed.Items;
+        foreach (var item in run.Items)
+        {
+            item.RunId = run.Id;
+            item.Run = run;
+        }
+        await _recommendations.AddItemsAsync(run.Items, cancellationToken);
+        run.Status = VendorRecommendationRun.CompletedStatus;
+        run.Stage = VendorRecommendationRun.CompletedStatus;
+        run.FailureMessage = null;
+        run.CompletedAt = DateTime.UtcNow;
+        run.UpdatedAt = run.CompletedAt.Value;
+        try
+        {
+            await _recommendations.SaveChangesAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Vendor recommendation SaveFailure event {EventId}, run {RunId}, plan {PlanId}",
+                run.EventId,
+                run.Id,
+                run.EventPlanDraftId);
+            throw;
+        }
+        _logger.LogInformation(
+            "Vendor recommendation SaveSuccess event {EventId}, run {RunId}, plan {PlanId}, candidate count {CandidateCount}, result count {ResultCount}",
+            run.EventId,
+            run.Id,
+            run.EventPlanDraftId,
+            run.CandidateCount,
+            run.Items.Count);
+        _logger.LogInformation(
+            "Vendor recommendation GenerationCompleted event {EventId}, run {RunId}, plan {PlanId}",
+            run.EventId,
+            run.Id,
+            run.EventPlanDraftId);
+    }
+
+    private async Task UpdateProgressAsync(
+        Guid runId,
+        string stage,
+        int? candidateCount,
+        CancellationToken cancellationToken)
+    {
+        if (!await _recommendations.UpdateProgressAsync(
+                runId,
+                stage,
+                candidateCount,
+                DateTime.UtcNow,
+                cancellationToken))
+            throw new InvalidOperationException("Recommendation run is no longer running.");
+    }
+
+    private static string GetFailureMessage(Exception exception) =>
+        exception switch
+        {
+            OperationCanceledException =>
+                "Vendor recommendation timed out. Please retry.",
+            HttpRequestException { StatusCode: HttpStatusCode.GatewayTimeout } =>
+                "Vendor recommendation timed out. Please retry.",
+            _ when !string.IsNullOrWhiteSpace(exception.Message) =>
+                exception.Message.Length <= 1000
+                    ? exception.Message
+                    : exception.Message[..1000],
+            _ => "Vendor recommendation failed. Please retry."
+        };
 
     private async Task<Event> RequireOwnedEventAsync(Guid eventId, Guid userId)
     {
@@ -324,7 +518,6 @@ public sealed class VendorRecommendationService : IVendorRecommendationService
 
     private static VendorRecommendationRunResponse MapRun(VendorRecommendationRun run, bool fromCache)
     {
-        // SourceNote is set by caller for cache fallback; entity SourceNote used otherwise.
         return new VendorRecommendationRunResponse
         {
             Id = run.Id,
@@ -332,6 +525,9 @@ public sealed class VendorRecommendationService : IVendorRecommendationService
             EventPlanDraftId = run.EventPlanDraftId,
             CandidateCount = run.CandidateCount,
             CreatedAt = run.CreatedAt,
+            Status = run.Status,
+            Stage = run.Stage,
+            FailureMessage = run.FailureMessage,
             SourceNote = run.SourceNote,
             FromCache = fromCache,
             Items = run.Items

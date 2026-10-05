@@ -246,6 +246,24 @@ def test_coordinator_route_exposes_quota_category_and_retry_after(
     assert "internal provider details" not in response.text
 
 
+def test_coordinator_route_reports_all_gemini_keys_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    failure = CoordinatorProviderError(
+        "internal provider details",
+        code="all_gemini_keys_exhausted",
+        status_code=503,
+        retry_after=600,
+    )
+
+    response = _request_status(monkeypatch, failure)
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "600"
+    assert response.json()["detail"]["error"] == "all_gemini_keys_exhausted"
+    assert response.json()["detail"]["available_keys"] == 0
+
+
 def test_coordinator_route_returns_unprocessable_entity_for_invalid_plan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

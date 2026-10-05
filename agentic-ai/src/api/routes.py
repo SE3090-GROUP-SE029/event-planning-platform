@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from time import perf_counter
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
@@ -35,6 +35,9 @@ SCHEDULE_GENERATION_TIMEOUT_MESSAGE = (
     "AI schedule generation exceeded the maximum allowed processing time."
 )
 _PROVIDER_MESSAGES = {
+    "all_gemini_keys_exhausted": (
+        "All Gemini API keys are temporarily exhausted. Retry after the cooldown."
+    ),
     "quota_exhausted": "Gemini quota is exhausted. Retry later.",
     "rate_limit": "Gemini is rate limiting requests. Retry later.",
     "network_issue": "Gemini is temporarily unavailable.",
@@ -107,6 +110,12 @@ async def generate_coordinator_plan(
 ) -> CoordinatorPlanOutput:
     """Generate a validated plan for the backend integration."""
 
+    request_id = http_request.headers.get("x-request-id", "unavailable")
+    logger.info(
+        "AI coordinator generation started for event %s, request %s",
+        request.event_id,
+        request_id,
+    )
     try:
         return await execute_coordinator_agent(
             str(request.event_id),
@@ -115,6 +124,7 @@ async def generate_coordinator_plan(
             checkpointer=getattr(
                 http_request.app.state, "coordinator_checkpointer", None
             ),
+            request_id=request_id,
         )
     except TimeoutError as exc:
         logger.warning("Coordinator request timed out for event %s", request.event_id)
@@ -131,15 +141,21 @@ async def generate_coordinator_plan(
             request.event_id,
             exc.code,
         )
+        detail: dict[str, Any] = {
+            "code": exc.code,
+            "message": _PROVIDER_MESSAGES.get(
+                exc.code,
+                "The AI provider could not generate a plan. Please try again later.",
+            ),
+        }
+        if exc.code == "all_gemini_keys_exhausted":
+            detail.update(
+                error="all_gemini_keys_exhausted",
+                available_keys=0,
+            )
         raise HTTPException(
             status_code=exc.status_code,
-            detail={
-                "code": exc.code,
-                "message": _PROVIDER_MESSAGES.get(
-                    exc.code,
-                    "The AI provider could not generate a plan. Please try again later.",
-                ),
-            },
+            detail=detail,
             headers=(
                 {"Retry-After": str(exc.retry_after)}
                 if exc.retry_after is not None

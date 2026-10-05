@@ -14,6 +14,7 @@ public sealed class PlanGenerationService(
     IEventRepository eventRepository,
     IEventPlanDraftRepository planRepository,
     ICurrentUserService currentUser,
+    IPlanGenerationJobRepository generationJobRepository,
     IAgenticAiClient aiClient,
     ICoordinatorPlanValidationService validator,
     AppDbContext db,
@@ -24,10 +25,55 @@ public sealed class PlanGenerationService(
         CancellationToken cancellationToken = default,
         bool regenerate = false)
     {
-        logger.LogInformation("Generating plan for event {EventId}", eventId);
+        var requestedByUserId = currentUser.UserId
+            ?? throw new UnauthorizedAccessException("User identity is missing.");
+        return await GeneratePlanCoreAsync(
+            eventId,
+            requestedByUserId,
+            null,
+            cancellationToken,
+            regenerate);
+    }
+
+    public async Task<EventPlanDraft> GeneratePlanAsync(
+        Guid eventId,
+        Guid requestedByUserId,
+        Guid generationJobId,
+        CancellationToken cancellationToken = default,
+        bool regenerate = false) =>
+        await GeneratePlanCoreAsync(
+            eventId,
+            requestedByUserId,
+            generationJobId,
+            cancellationToken,
+            regenerate);
+
+    private async Task<EventPlanDraft> GeneratePlanCoreAsync(
+        Guid eventId,
+        Guid requestedByUserId,
+        Guid? generationJobId,
+        CancellationToken cancellationToken,
+        bool regenerate)
+    {
+        var generationStartedAt = DateTime.UtcNow;
         var eventEntity = await eventRepository.GetByIdAsync(eventId)
             ?? throw new KeyNotFoundException("Event not found.");
-        EnsureAuthorized(eventEntity);
+        EnsureAuthorized(eventEntity, requestedByUserId);
+        var job = generationJobId.HasValue
+            ? await generationJobRepository.GetByIdAsync(generationJobId.Value, cancellationToken)
+                ?? throw new KeyNotFoundException("Plan generation job was not found.")
+            : null;
+        if (job is not null &&
+            (job.EventId != eventId ||
+             job.RequestedById != requestedByUserId ||
+             job.Status != PlanGenerationJobStatus.Processing))
+            throw new InvalidOperationException("Plan generation job state does not match this request.");
+        var requestId = job?.RequestId;
+        logger.LogInformation(
+            "Plan generation started for event {EventId}, generation job {GenerationJobId}, request {RequestId}",
+            eventId,
+            generationJobId,
+            requestId);
 
         var existingPlans = await planRepository.ListAsync(eventId, null, null, cancellationToken);
         if (existingPlans.Count > 0 && !regenerate)
@@ -35,16 +81,28 @@ public sealed class PlanGenerationService(
         if (regenerate && existingPlans.FirstOrDefault()?.Status != PlanStatus.Rejected)
             throw new InvalidOperationException("Only a rejected plan can be regenerated.");
 
-        var response = await aiClient.GeneratePlanAsync(eventEntity, cancellationToken);
+        var response = await aiClient.GeneratePlanAsync(eventEntity, requestId, cancellationToken);
+        logger.LogInformation(
+            "Coordinator plan received for event {EventId}, generation job {GenerationJobId}, elapsed {ElapsedMilliseconds}ms",
+            eventId,
+            generationJobId,
+            (long)(DateTime.UtcNow - generationStartedAt).TotalMilliseconds);
         var validation = validator.ValidateCoordinatorPlan(response, eventEntity);
         if (!validation.IsValid)
             throw new InvalidOperationException(
                 $"Generated plan failed validation: {string.Join("; ", validation.Errors)}");
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var version = regenerate
-            ? await CreateNextVersionAsync(eventId, existingPlans[0].Id, cancellationToken)
-            : await planRepository.GetNextVersionAsync(eventId, cancellationToken);
+        if (regenerate)
+        {
+            var oldPlan = await planRepository.GetByIdAsync(existingPlans[0].Id, cancellationToken)
+                ?? throw new KeyNotFoundException("Plan to supersede was not found.");
+            if (oldPlan.EventId != eventId || oldPlan.Status != PlanStatus.Rejected)
+                throw new InvalidOperationException("Only a rejected plan for this event can be regenerated.");
+            oldPlan.Status = PlanStatus.Superseded;
+            oldPlan.UpdatedAt = DateTime.UtcNow;
+        }
+        var version = await planRepository.GetNextVersionAsync(eventId, cancellationToken);
         var now = DateTime.UtcNow;
         var plan = new EventPlanDraft
         {
@@ -63,7 +121,7 @@ public sealed class PlanGenerationService(
             GeneratedAt = now,
             CreatedAt = now,
             UpdatedAt = now,
-            CreatedById = currentUser.UserId ?? throw new UnauthorizedAccessException("User identity is missing.")
+            CreatedById = requestedByUserId
         };
 
         foreach (var risk in response.IdentifiedRisks)
@@ -79,10 +137,41 @@ public sealed class PlanGenerationService(
                 RequirementCategory.Other));
         }
 
-        await planRepository.AddAsync(plan, cancellationToken);
-        await planRepository.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        logger.LogInformation("Plan generation completed for event {EventId}, version {Version}", eventId, version);
+        if (job is not null)
+        {
+            job.PlanId = plan.Id;
+            job.Status = PlanGenerationJobStatus.Succeeded;
+            job.FailureMessage = null;
+            job.CompletedAt = now;
+            job.UpdatedAt = now;
+        }
+
+        try
+        {
+            await planRepository.AddAsync(plan, cancellationToken);
+            await planRepository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "Plan save failed for event {EventId}, plan {PlanId}, generation job {GenerationJobId}, request {RequestId}, failure type {FailureType}",
+                eventId,
+                plan.Id,
+                generationJobId,
+                requestId,
+                exception.GetType().Name);
+            throw;
+        }
+
+        logger.LogInformation(
+            "Plan save succeeded for event {EventId}, plan {PlanId}, generation job {GenerationJobId}, request {RequestId}, version {Version}",
+            eventId,
+            plan.Id,
+            generationJobId,
+            requestId,
+            version);
         return plan;
     }
 
@@ -109,9 +198,10 @@ public sealed class PlanGenerationService(
         return await planRepository.GetNextVersionAsync(eventId, cancellationToken);
     }
 
-    private void EnsureAuthorized(Event eventEntity)
+    private void EnsureAuthorized(Event eventEntity, Guid? requestedByUserId = null)
     {
-        if (currentUser.IsAdmin || currentUser.UserId != eventEntity.OwnerId)
+        var userId = requestedByUserId ?? currentUser.UserId;
+        if (currentUser.IsAdmin || userId != eventEntity.OwnerId)
             throw new UnauthorizedAccessException("You are not authorized to plan this event.");
     }
 }

@@ -31,6 +31,11 @@ public class SelectRegistrationQuestionsRequest
     [Required, MaxLength(10)] public List<QuestionSelection> Questions { get; set; } = [];
 }
 
+public class RegistrationReviewRequest
+{
+    [Required, StringLength(20)] public string Decision { get; set; } = string.Empty;
+}
+
 public class RegistrationAccessRequest
 {
     [Required, StringLength(43, MinimumLength = 43)] public string Secret { get; set; } = string.Empty;

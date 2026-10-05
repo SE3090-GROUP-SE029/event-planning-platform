@@ -9,5 +9,11 @@ public interface IPlanGenerationService
         Guid eventId,
         CancellationToken cancellationToken = default,
         bool regenerate = false);
+    Task<EventPlanDraft> GeneratePlanAsync(
+        Guid eventId,
+        Guid requestedByUserId,
+        Guid generationJobId,
+        CancellationToken cancellationToken = default,
+        bool regenerate = false);
     Task<int> CreateNextVersionAsync(Guid eventId, Guid? planIdToSupersede = null, CancellationToken cancellationToken = default);
 }

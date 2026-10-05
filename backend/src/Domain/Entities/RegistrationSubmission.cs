@@ -10,9 +10,13 @@ public class RegistrationSubmission
     public Guid GuestId { get; set; }
     public RegistrationForm RegistrationForm { get; set; } = null!;
     public Guest Guest { get; set; } = null!;
-    public RegistrationStatus Status { get; set; } = RegistrationStatus.WAITING_LIST;
+    public RegistrationStatus Status { get; set; } = RegistrationStatus.PENDING_REVIEW;
     public string PublicReference { get; set; } = string.Empty;
     public string StatusSecretHash { get; set; } = string.Empty;
+    public string? ProtectedStatusSecret { get; set; }
+    public RegistrationDecision? ReviewDecision { get; set; }
+    public ReviewSource? ReviewSource { get; set; }
+    public DateTimeOffset? ReviewedAt { get; set; }
     public DateTimeOffset RegisteredAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? ConfirmedAt { get; set; }
@@ -23,6 +27,5 @@ public class RegistrationSubmission
     public int RejectionDeliveryAttempts { get; set; }
     public DateTimeOffset? RejectionLastAttemptAt { get; set; }
     public DateTimeOffset? RejectionSentAt { get; set; }
-    public DateTimeOffset? CheckedInAt { get; set; }
-    public CheckedInMethod? CheckedInMethod { get; set; }
+    public GuestCheckIn? CheckIn { get; set; }
 }

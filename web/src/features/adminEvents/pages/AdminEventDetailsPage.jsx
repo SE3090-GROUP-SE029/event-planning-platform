@@ -78,7 +78,7 @@ export default function AdminEventDetailsPage() {
           disabled
           sx={{ borderRadius: 9999, px: 2.5 }}
         >
-          Upload Guest List
+          Invite Guests
         </Button>
         <Button
           variant="outlined"

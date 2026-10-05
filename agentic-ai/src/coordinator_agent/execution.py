@@ -100,8 +100,9 @@ async def execute_coordinator_agent(
     event_id: str,
     event_data: dict[str, Any],
     max_retries: int | None = None,
-    timeout_seconds: int | None = None,
+    timeout_seconds: int | float | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
+    request_id: str | None = None,
 ) -> CoordinatorPlanOutput:
     """Execute the coordinator graph with timeout and final-state validation."""
 
@@ -129,7 +130,11 @@ async def execute_coordinator_agent(
             f"{parsed_event_id.hex}:{_WORKFLOW_CHECKPOINT_VERSION}:{event_fingerprint}"
         )
         config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
-        logger.info("Starting coordinator agent for event %s", event_id)
+        logger.info(
+            "Starting coordinator agent for event %s, request %s",
+            event_id,
+            request_id or "unavailable",
+        )
 
         async def run_with_lock() -> CoordinatorState:
             async with _execution_lock(thread_id):
@@ -175,17 +180,33 @@ async def execute_coordinator_agent(
                 "Generated plan failed coordinator validation: "
                 + "; ".join(final_state.validation_errors)
             )
-        logger.info("Coordinator agent completed for event %s", event_id)
+        logger.info(
+            "Coordinator agent completed for event %s, request %s",
+            event_id,
+            request_id or "unavailable",
+        )
         if checkpointer is not None:
-            await checkpointer.adelete_thread(thread_id)
+            try:
+                await checkpointer.adelete_thread(thread_id)
+            except Exception:
+                logger.exception(
+                    "Coordinator checkpoint cleanup failed for event %s, request %s; returning the validated plan",
+                    event_id,
+                    request_id or "unavailable",
+                )
         return final_state.to_coordinator_plan_response()
     except GeminiQuotaError as exc:
         logger.warning("Gemini quota exhausted for event %s", event_id)
         raise CoordinatorProviderError(
-            "The AI provider quota is exhausted. Retry this request later.",
-            code="quota_exhausted",
-            status_code=429,
-            retry_after=60,
+            (
+                "All configured Gemini API keys are exhausted or temporarily "
+                "quarantined."
+                if exc.error_code == "all_gemini_keys_exhausted"
+                else "The AI provider quota is exhausted. Retry this request later."
+            ),
+            code=exc.error_code,
+            status_code=503 if exc.error_code == "all_gemini_keys_exhausted" else 429,
+            retry_after=exc.retry_after or 60,
         ) from exc
     except GeminiRateLimitError as exc:
         logger.warning("Gemini rate limit reached for event %s", event_id)
@@ -245,5 +266,9 @@ async def execute_coordinator_agent(
         logger.error("Gemini provider failed for event %s: %s", event_id, type(exc).__name__)
         raise CoordinatorProviderError("The AI provider could not generate a plan") from exc
     except Exception as exc:
-        logger.exception("Coordinator agent failed for event %s", event_id)
+        logger.exception(
+            "Coordinator agent failed for event %s, request %s",
+            event_id,
+            request_id or "unavailable",
+        )
         raise CoordinatorExecutionError(f"Plan generation failed: {exc}") from exc

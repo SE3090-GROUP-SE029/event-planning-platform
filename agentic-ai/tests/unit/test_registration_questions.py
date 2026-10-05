@@ -17,7 +17,7 @@ def context():
 def service(raw):
     async def generate(request, settings):
         assert set(request.model_dump()) == {"event"}
-        assert settings.model == "gemini-3.8-flash"
+        assert settings.model == "gemini-2.5-flash"
         return raw
     return RegistrationQuestionService(ReviewSettings(), generate)
 

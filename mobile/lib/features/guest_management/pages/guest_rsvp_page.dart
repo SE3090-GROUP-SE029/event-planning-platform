@@ -15,11 +15,13 @@ import '../models/guest_registration_model.dart';
 class GuestRsvpPage extends StatefulWidget {
   final PublicRegistrationModel registration;
   final String eventName;
+  final GuestManagementRemoteDataSource? api;
 
   const GuestRsvpPage({
     super.key,
     required this.registration,
     required this.eventName,
+    this.api,
   });
 
   @override
@@ -27,7 +29,7 @@ class GuestRsvpPage extends StatefulWidget {
 }
 
 class _GuestRsvpPageState extends State<GuestRsvpPage> {
-  final _api = GuestManagementRemoteDataSource();
+  late final GuestManagementRemoteDataSource _api;
 
   // The secret is saved in statusSecret from the original submission response.
   // On RSVP, we also need to allow the user to input it if they're coming
@@ -69,6 +71,7 @@ class _GuestRsvpPageState extends State<GuestRsvpPage> {
   @override
   void initState() {
     super.initState();
+    _api = widget.api ?? GuestManagementRemoteDataSource();
     // Pre-fill secret if available from initial submission
     if (widget.registration.statusSecret != null) {
       _secretController.text = widget.registration.statusSecret!;
@@ -88,11 +91,13 @@ class _GuestRsvpPageState extends State<GuestRsvpPage> {
     }
     final secret = _secretController.text.trim();
     if (secret.isEmpty) {
-      setState(() => _error = 'Your registration secret is required to submit RSVP.');
+      setState(() =>
+          _error = 'Your registration secret is required to submit RSVP.');
       return;
     }
     if (secret.length != 43) {
-      setState(() => _error = 'Invalid secret format. Please use the secret from your confirmation email.');
+      setState(() => _error =
+          'Invalid secret format. Please use the secret from your confirmation email.');
       return;
     }
 
@@ -321,7 +326,8 @@ class _GuestRsvpPageState extends State<GuestRsvpPage> {
               ),
             ),
             maxLength: 43,
-            buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
+            buildCounter: (_,
+                    {required currentLength, required isFocused, maxLength}) =>
                 null,
           ),
         ] else ...[
@@ -382,15 +388,15 @@ class _GuestRsvpPageState extends State<GuestRsvpPage> {
           width: double.infinity,
           child: ElevatedButton.icon(
             style: AppButtonStyles.primary(),
-            onPressed: _submitting || _selectedResponse == null ? null : _submit,
+            onPressed:
+                _submitting || _selectedResponse == null ? null : _submit,
             icon: _submitting
                 ? const SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
                 : const Icon(Icons.how_to_vote_rounded, size: 18),
@@ -414,7 +420,8 @@ class _GuestRsvpPageState extends State<GuestRsvpPage> {
             color: selected ? AppColors.surfacePure : AppColors.surfacePure,
             borderRadius: BorderRadius.circular(AppDimens.radiusCard),
             border: Border.all(
-              color: selected ? AppColors.obsidianBlack : AppColors.borderSubtle,
+              color:
+                  selected ? AppColors.obsidianBlack : AppColors.borderSubtle,
               width: selected ? 2 : 1,
             ),
             boxShadow: selected

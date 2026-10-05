@@ -21,7 +21,23 @@ export async function generatePlan(eventId, regenerationReason) {
     ? { eventId, regenerate: true, regenerationReason }
     : undefined;
   const response = await apiClient.post(`/api/events/${eventId}/plans/generate`, data);
-  return response.data?.data || response.data;
+  let job = response.data?.data;
+
+  while (job?.status === 'Queued' || job?.status === 'Processing') {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const statusResponse = await apiClient.get(
+      `/api/events/${eventId}/plans/generation/${job.jobId}`,
+    );
+    job = statusResponse.data?.data;
+  }
+
+  if (job?.status === 'Failed') {
+    throw new Error(job.message || 'Plan generation failed. Please retry.');
+  }
+  if (job?.status !== 'Succeeded' || !job.planId) {
+    throw new Error('The plan generation job returned an invalid status.');
+  }
+  return getPlan(job.planId);
 }
 
 export async function approvePlan(id, approverNotes) {

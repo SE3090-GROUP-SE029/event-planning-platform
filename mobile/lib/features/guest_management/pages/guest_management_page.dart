@@ -670,11 +670,12 @@ class _GuestCard extends StatelessWidget {
     switch (status) {
       case RegistrationStatus.confirmed:
         return AppColors.pastelGreenLight;
-      case RegistrationStatus.pendingAi:
+      case RegistrationStatus.pendingReview:
+      case RegistrationStatus.accepted:
         return AppColors.pastelYellowLight;
       case RegistrationStatus.rejected:
         return AppColors.errorBg;
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.waitlisted:
         return AppColors.pastelBlueLight;
       case RegistrationStatus.cancelled:
         return AppColors.surfaceMuted;
@@ -687,11 +688,13 @@ class _GuestCard extends StatelessWidget {
     switch (status) {
       case RegistrationStatus.confirmed:
         return AppColors.pastelGreenText;
-      case RegistrationStatus.pendingAi:
+      case RegistrationStatus.pendingReview:
         return AppColors.pastelYellowText;
+      case RegistrationStatus.accepted:
+        return AppColors.pastelBlueText;
       case RegistrationStatus.rejected:
         return AppColors.error;
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.waitlisted:
         return AppColors.pastelBlueText;
       default:
         return AppColors.textSecondary;
@@ -701,12 +704,14 @@ class _GuestCard extends StatelessWidget {
   String _statusLabel(RegistrationStatus status) {
     switch (status) {
       case RegistrationStatus.confirmed:
+        return 'CONFIRMED';
+      case RegistrationStatus.pendingReview:
+        return 'PENDING REVIEW';
+      case RegistrationStatus.accepted:
         return 'ACCEPTED';
-      case RegistrationStatus.pendingAi:
-        return 'PENDING AI';
       case RegistrationStatus.rejected:
         return 'REJECTED';
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.waitlisted:
         return 'WAITLISTED';
       case RegistrationStatus.cancelled:
         return 'CANCELLED';
@@ -719,11 +724,13 @@ class _GuestCard extends StatelessWidget {
     switch (status) {
       case RegistrationStatus.confirmed:
         return PastelBadgeStyle.green;
-      case RegistrationStatus.pendingAi:
+      case RegistrationStatus.pendingReview:
         return PastelBadgeStyle.yellow;
+      case RegistrationStatus.accepted:
+        return PastelBadgeStyle.blue;
       case RegistrationStatus.rejected:
         return PastelBadgeStyle.pink;
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.waitlisted:
         return PastelBadgeStyle.blue;
       default:
         return PastelBadgeStyle.neutral;
@@ -791,9 +798,10 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   static const _statuses = [
     'CONFIRMED',
-    'PENDING_AI',
+    'PENDING_REVIEW',
+    'ACCEPTED',
     'REJECTED',
-    'WAITING_LIST',
+    'WAITLISTED',
     'CANCELLED',
   ];
   static const _rsvps = [

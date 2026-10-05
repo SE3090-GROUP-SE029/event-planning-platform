@@ -1,15 +1,23 @@
 import asyncio
 import logging
+from typing import cast
 from uuid import uuid4
 
 import pytest
+from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from src.coordinator_agent import execution
 from src.coordinator_agent.execution import (
     CoordinatorValidationError,
     execute_coordinator_agent,
 )
-from src.coordinator_agent.models import RiskModel
+from src.coordinator_agent.models import (
+    BudgetAllocationOutput,
+    CoordinatorPlanResponse,
+    RiskModel,
+    RiskOutput,
+    TimelinePhaseOutput,
+)
 from src.coordinator_agent.nodes.validate import (
     calculate_completeness,
     self_validate,
@@ -138,3 +146,62 @@ def test_execution_preserves_actionable_final_validation_errors(
 
     assert "Coordinator final validation failed" in caplog.text
     assert "budget allocation total 900.00 does not match event budget 1000.00" in caplog.text
+
+
+def test_checkpoint_cleanup_failure_does_not_discard_validated_plan(
+    monkeypatch: pytest.MonkeyPatch, caplog
+) -> None:
+    caplog.set_level(logging.INFO)
+    state = _valid_state()
+    state.validation_passed = True
+    state.final_plan = CoordinatorPlanResponse(
+        service_categories=["Catering"],
+        budget_allocation=[
+            BudgetAllocationOutput(
+                category="Catering",
+                amount=1000,
+                percentage_of_total=100,
+            )
+        ],
+        target_vendor_types=["Catering provider"],
+        proposed_timeline=[
+            TimelinePhaseOutput(phase_name=name, timing="in advance", description="Confirm details")
+            for name in ("Planning", "Booking", "Confirmation")
+        ],
+        rationale=(
+            "The catering plan matches the guest count and budget, with clear "
+            "milestones to confirm suppliers before the event."
+        ),
+        identified_risks=[
+            RiskOutput(
+                risk="A supplier may become unavailable.",
+                severity="Medium",
+                recommendation="Confirm bookings and keep a backup option.",
+            )
+        ],
+        missing_requirements=[],
+        plan_completeness_score=80,
+        validation_summary="Plan passed validation.",
+    )
+
+    class _FailingCheckpointer:
+        async def adelete_thread(self, _thread_id: str) -> None:
+            raise RuntimeError("checkpoint unavailable")
+
+    async def _return_state(*_args) -> CoordinatorState:
+        return state
+
+    monkeypatch.setattr(execution, "_run_graph_async", _return_state)
+
+    result = asyncio.run(
+        execute_coordinator_agent(
+            str(state.event_id),
+            state.event,
+            timeout_seconds=5,
+            checkpointer=cast(BaseCheckpointSaver, _FailingCheckpointer()),
+        )
+    )
+
+    assert result is state.final_plan
+    assert "Coordinator agent completed" in caplog.text
+    assert "Coordinator checkpoint cleanup failed" in caplog.text

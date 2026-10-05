@@ -3,16 +3,18 @@ from collections.abc import Iterator
 import pytest
 
 from src.coordinator_agent.config import get_settings
+from src.gemini_client.client import _reset_gemini_key_pools
 
 
 @pytest.fixture(autouse=True)
 def isolate_gemini_credentials(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[None]:
+    _reset_gemini_key_pools()
     isolated_gemini_environment = {
         "GEMINI_API_KEY": "",
         "GEMINI_API_KEYS": "",
-        "GEMINI_MODEL": "gemini-3.8-flash",
+        "GEMINI_MODEL": "gemini-2.5-flash",
         "GEMINI_FALLBACK_MODELS": "",
         "GEMINI_TIMEOUT_SECONDS": "15",
         "GEMINI_MAX_RETRIES": "5",
@@ -24,3 +26,4 @@ def isolate_gemini_credentials(
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+    _reset_gemini_key_pools()

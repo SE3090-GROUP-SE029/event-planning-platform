@@ -69,6 +69,15 @@ the deployment platform's environment/configuration provider. Environment
 variables may override JSON values in production. `ASPNETCORE_HTTPS_PORT` is
 only a hosting-provided HTTPS port.
 
+Development defaults `GuestRegistration:PublicWebBaseUrl` to
+`http://localhost:5173` for the local Vite web app. The API allows HTTP only for
+loopback URLs while running in the Development environment. In every other
+environment, set `GuestRegistration__PublicWebBaseUrl` to the hosted web-app
+HTTPS base URL. Planner guest-list uploads email public form links based on this
+value. Registration status secrets are stored encrypted
+with ASP.NET Core Data Protection; deployments must preserve the Data Protection
+key ring across restarts and share it between API instances.
+
 Backend integration tests require a PostgreSQL database. Set
 `TEST_DATABASE_CONNECTION` to a dedicated test database connection string, or
 use `ConnectionStrings__DefaultConnection` as a fallback. The test fixture

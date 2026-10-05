@@ -9,6 +9,7 @@ import '../../../shared/widgets/pastel_card.dart';
 import '../../../shared/widgets/pastel_icon_badge.dart';
 import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../models/guest_registration_model.dart';
+import '../api/guest_management_remote_datasource.dart';
 import 'guest_rsvp_page.dart';
 
 /// Shows the result of a public guest registration submission.
@@ -19,11 +20,13 @@ import 'guest_rsvp_page.dart';
 class RegistrationStatusPage extends StatefulWidget {
   final PublicRegistrationModel registration;
   final String eventName;
+  final GuestManagementRemoteDataSource? api;
 
   const RegistrationStatusPage({
     super.key,
     required this.registration,
     required this.eventName,
+    this.api,
   });
 
   @override
@@ -31,13 +34,61 @@ class RegistrationStatusPage extends StatefulWidget {
 }
 
 class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
+  late final GuestManagementRemoteDataSource _api;
   late PublicRegistrationModel _registration;
+  bool _refreshing = false;
+  String? _refreshError;
 
   @override
   void initState() {
     super.initState();
+    _api = widget.api ?? GuestManagementRemoteDataSource();
     _registration = widget.registration;
   }
+
+  Future<void> _refreshStatus() async {
+    final secret = _registration.statusSecret;
+    if (secret == null) {
+      setState(() =>
+          _refreshError = 'A registration secret is required to check status.');
+      return;
+    }
+
+    setState(() {
+      _refreshing = true;
+      _refreshError = null;
+    });
+    try {
+      final updated = await _api.getRegistrationStatus(
+        _registration.publicReference,
+        secret,
+      );
+      if (!mounted) return;
+      setState(() => _registration = _retainStatusSecret(updated, secret));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _refreshError = error.toString());
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  PublicRegistrationModel _retainStatusSecret(
+    PublicRegistrationModel registration,
+    String? secret,
+  ) =>
+      PublicRegistrationModel(
+        publicReference: registration.publicReference,
+        status: registration.status,
+        statusSecret: secret,
+        invitationToken: registration.invitationToken,
+        qrPngBase64: registration.qrPngBase64,
+        rsvpStatus: registration.rsvpStatus,
+        emailDeliveryStatus: registration.emailDeliveryStatus,
+        registeredAt: registration.registeredAt,
+        confirmedAt: registration.confirmedAt,
+        cancelledAt: registration.cancelledAt,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +108,29 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
         children: [
           // Status hero card
           _buildStatusCard(),
+          if (_registration.statusSecret != null) ...[
+            const SizedBox(height: AppDimens.space8),
+            OutlinedButton.icon(
+              onPressed: _refreshing ? null : _refreshStatus,
+              icon: _refreshing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(_refreshing ? 'Refreshing status' : 'Refresh status'),
+            ),
+            if (_refreshError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: AppDimens.space8),
+                child: Text(
+                  _refreshError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+              ),
+          ],
           const SizedBox(height: AppDimens.space16),
 
           // QR code card (only when CONFIRMED and QR PNG available)
@@ -197,9 +271,8 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
     final rsvp = _registration.rsvpStatus;
     final hasResponded = rsvp != null && rsvp != RsvpStatus.notResponded;
     return PastelCard(
-      backgroundColor: hasResponded
-          ? AppColors.pastelGreenLight
-          : AppColors.pastelBlueLight,
+      backgroundColor:
+          hasResponded ? AppColors.pastelGreenLight : AppColors.pastelBlueLight,
       padding: const EdgeInsets.all(AppDimens.space18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,11 +333,13 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
                       builder: (_) => GuestRsvpPage(
                         registration: _registration,
                         eventName: widget.eventName,
+                        api: _api,
                       ),
                     ),
                   );
                   if (updated != null && mounted) {
-                    setState(() => _registration = updated);
+                    setState(() => _registration = _retainStatusSecret(
+                        updated, _registration.statusSecret));
                   }
                 },
                 icon: const Icon(Icons.how_to_vote_rounded, size: 16),
@@ -342,16 +417,17 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
 
   Widget _buildStatusExplanation() {
     final explanations = {
-      RegistrationStatus.pendingAi:
-          'Your registration is being reviewed by our AI system. This usually takes a few minutes. Check back later for your confirmation.',
+      RegistrationStatus.pendingReview:
+          'Your registration is being reviewed by the event team. Check back later for an update.',
+      RegistrationStatus.accepted:
+          'Your registration passed review and is waiting for seat allocation. We will notify you when its seat is confirmed.',
       RegistrationStatus.confirmed:
           'Congratulations! You have been confirmed for this event. You should receive an email invitation with your QR code.',
-      RegistrationStatus.waitingList:
+      RegistrationStatus.waitlisted:
           'You\'ve been placed on the waiting list. If a space opens up, you\'ll be automatically moved to confirmed status.',
       RegistrationStatus.rejected:
           'Unfortunately your registration was not accepted for this event. You may have received an email with more details.',
-      RegistrationStatus.cancelled:
-          'Your registration has been cancelled.',
+      RegistrationStatus.cancelled: 'Your registration has been cancelled.',
     };
     final text = explanations[_registration.status];
     if (text == null) return const SizedBox.shrink();
@@ -372,8 +448,19 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
   String _formatDate(DateTime dt) {
     final local = dt.toLocal();
     final months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${local.day} ${months[local.month]} ${local.year}';
   }
@@ -382,11 +469,13 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
     switch (status) {
       case RegistrationStatus.confirmed:
         return 'CONFIRMED';
-      case RegistrationStatus.pendingAi:
+      case RegistrationStatus.pendingReview:
         return 'UNDER REVIEW';
+      case RegistrationStatus.accepted:
+        return 'ACCEPTED';
       case RegistrationStatus.rejected:
         return 'NOT ACCEPTED';
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.waitlisted:
         return 'WAITING LIST';
       case RegistrationStatus.cancelled:
         return 'CANCELLED';
@@ -399,11 +488,13 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
     switch (status) {
       case RegistrationStatus.confirmed:
         return PastelBadgeStyle.green;
-      case RegistrationStatus.pendingAi:
+      case RegistrationStatus.pendingReview:
         return PastelBadgeStyle.yellow;
+      case RegistrationStatus.accepted:
+        return PastelBadgeStyle.blue;
       case RegistrationStatus.rejected:
         return PastelBadgeStyle.pink;
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.waitlisted:
         return PastelBadgeStyle.blue;
       default:
         return PastelBadgeStyle.neutral;
@@ -436,7 +527,7 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
           subtitle:
               'Your registration is confirmed. Check your email for the invitation with your QR code.',
         );
-      case RegistrationStatus.pendingAi:
+      case RegistrationStatus.pendingReview:
         return const _StatusInfo(
           icon: Icons.hourglass_top_rounded,
           iconBg: AppColors.pastelYellowLight,
@@ -447,7 +538,18 @@ class _RegistrationStatusPageState extends State<RegistrationStatusPage> {
           subtitle:
               'Your registration has been received and is being reviewed. We\'ll notify you by email.',
         );
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.accepted:
+        return const _StatusInfo(
+          icon: Icons.hourglass_top_rounded,
+          iconBg: AppColors.pastelBlueLight,
+          iconColor: AppColors.pastelBlueText,
+          bgColor: AppColors.pastelBlueLight,
+          textColor: AppColors.pastelBlueText,
+          title: 'Accepted — Awaiting a Seat',
+          subtitle:
+              'Your registration passed review and is waiting for seat allocation. We\'ll notify you when its seat is confirmed.',
+        );
+      case RegistrationStatus.waitlisted:
         return const _StatusInfo(
           icon: Icons.pending_outlined,
           iconBg: AppColors.pastelBlueLight,

@@ -3,7 +3,7 @@ using Domain.Entities;
 namespace Application.GuestManagement;
 
 public class GuestAiReviewService(IGuestAiReviewRepository repository, IGuestAiClient client,
-    RegistrationService registrations, TimeProvider clock)
+    RegistrationService registrations, RegistrationReviewService reviews, TimeProvider clock)
 {
     public async Task<GuestAiReview> GetAsync(Guid eventId, string plannerId, long registrationId, CancellationToken ct)
     {
@@ -14,14 +14,15 @@ public class GuestAiReviewService(IGuestAiReviewRepository repository, IGuestAiC
 
     public async Task<GuestAiReview> RetryAsync(Guid eventId, string plannerId, long registrationId, CancellationToken ct)
     {
-        await registrations.GetRegistrationAsync(eventId, plannerId, registrationId, ct);
+        var registration = await registrations.GetRegistrationAsync(eventId, plannerId, registrationId, ct);
+        if (registration.Status != Domain.Enums.RegistrationStatus.PENDING_REVIEW)
+            throw new RegistrationException(409, "analysis_unavailable", "Only pending registrations can be analyzed.");
         var review = await repository.QueueAsync(eventId, registrationId, clock.GetUtcNow(), ct);
         return review;
     }
 
     public async Task<bool> ProcessNextAsync(TimeSpan leaseDuration, CancellationToken ct)
     {
-        if (await registrations.ProcessPendingDeliveryAsync(ct)) return true;
         var now = clock.GetUtcNow();
         var claim = await repository.ClaimAsync(now, now.Add(leaseDuration), ct);
         if (claim is null) return false;
@@ -45,7 +46,7 @@ public class GuestAiReviewService(IGuestAiReviewRepository repository, IGuestAiC
             return true;
         }
 
-        await registrations.ApplyDecisionAsync(claim, decision, repository, ct);
+        await reviews.ApplyAiDecisionAsync(claim, decision, ct);
         return true;
     }
 }

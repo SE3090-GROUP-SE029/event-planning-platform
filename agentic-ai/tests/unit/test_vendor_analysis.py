@@ -10,6 +10,8 @@ import pytest
 from fastapi import FastAPI
 from pydantic import ValidationError
 
+from src.gemini_client import client as gemini_client_module
+from src.gemini_client.exceptions import GeminiInvalidRequestError
 from src.vendor_analysis import routes
 from src.vendor_analysis.models import (
     VendorAnalysisCandidateInput,
@@ -20,8 +22,10 @@ from src.vendor_analysis.models import (
     VendorRecommendationResponse,
 )
 from src.vendor_analysis.service import (
+    VendorAnalysisConfigurationError,
     VendorAnalysisProviderError,
     VendorAnalysisValidationError,
+    execute_vendor_analysis,
     filter_to_candidates,
 )
 
@@ -68,6 +72,29 @@ def _request(candidates: list[VendorAnalysisCandidateInput] | None = None) -> Ve
     )
 
 
+def test_schema_route_returns_sanitized_interactions_json_schema() -> None:
+    app = FastAPI()
+    app.include_router(routes.router)
+
+    async def call() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.get("/api/vendor-analysis/schema")
+
+    response = asyncio.run(call())
+    assert response.status_code == 200
+    body = response.json()
+    assert body["properties"]["recommendations"]["type"] == "array"
+    assert "minItems" not in body["properties"]["recommendations"]
+    assert "maxItems" not in body["properties"]["recommendations"]
+    item_properties = body["properties"]["recommendations"]["items"]["properties"]
+    assert item_properties["vendorId"] == {"type": "string"}
+    assert item_properties["vendorServiceId"] == {
+        "type": "string",
+        "nullable": True,
+    }
+
+
 def test_response_schema_requires_reasons_and_score_bounds() -> None:
     with pytest.raises(ValidationError):
         VendorRecommendationItemOutput(
@@ -80,6 +107,18 @@ def test_response_schema_requires_reasons_and_score_bounds() -> None:
             vendorId=uuid4(),
             score=80,
             reasons=["   "],
+        )
+    with pytest.raises(ValidationError):
+        VendorRecommendationItemOutput(
+            vendorId=uuid4(),
+            score=80,
+            reasons=[],
+        )
+    with pytest.raises(ValidationError):
+        VendorRecommendationItemOutput(
+            vendorId=uuid4(),
+            score=80,
+            reasons=["reason"] * 6,
         )
 
 
@@ -106,6 +145,35 @@ def test_filter_drops_unknown_vendor_ids() -> None:
 
     assert len(filtered.recommendations) == 1
     assert filtered.recommendations[0].vendor_id == known.vendor_id
+
+
+def test_filter_ranks_multiple_known_candidates() -> None:
+    first = _candidate()
+    second = _candidate()
+    request = _request([first, second])
+    response = VendorRecommendationResponse(
+        recommendations=[
+            VendorRecommendationItemOutput(
+                vendorId=first.vendor_id,
+                score=72,
+                reasons=["Good fit"],
+            ),
+            VendorRecommendationItemOutput(
+                vendorId=second.vendor_id,
+                vendorServiceId=None,
+                score=91,
+                reasons=["Excellent fit"],
+            ),
+        ]
+    )
+
+    filtered = filter_to_candidates(response, request)
+
+    assert [item.vendor_id for item in filtered.recommendations] == [
+        second.vendor_id,
+        first.vendor_id,
+    ]
+    assert filtered.recommendations[0].vendor_service_id == second.matched_service.vendor_service_id
 
 
 def test_filter_rejects_when_all_ids_unknown() -> None:
@@ -222,6 +290,126 @@ def test_recommend_route_success(monkeypatch: pytest.MonkeyPatch) -> None:
     body = response.json()
     assert body["recommendations"][0]["score"] == 91
     assert body["recommendations"][0]["vendorId"] == str(candidate.vendor_id)
+
+
+def test_recommend_route_returns_200_through_real_service_with_fake_gemini(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = _candidate()
+
+    class FakeGeminiClient:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def generate_with_prompt(self, prompt, schema, node_name):
+            assert str(candidate.vendor_id) in prompt
+            assert schema is VendorRecommendationResponse
+            assert node_name == "vendor_analysis_recommend"
+            return VendorRecommendationResponse(
+                recommendations=[
+                    VendorRecommendationItemOutput(
+                        vendorId=candidate.vendor_id,
+                        vendorServiceId=None,
+                        score=91,
+                        reasons=["Matches budget and category"],
+                    )
+                ]
+            )
+
+    monkeypatch.setattr(gemini_client_module, "GeminiClient", FakeGeminiClient)
+    app = FastAPI()
+    app.include_router(routes.router)
+    payload = _request([candidate]).model_dump(mode="json", by_alias=True)
+
+    async def call() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.post("/api/vendor-analysis/recommend", json=payload)
+
+    response = asyncio.run(call())
+    assert response.status_code == 200
+    assert response.json()["recommendations"][0]["vendorId"] == str(candidate.vendor_id)
+    assert response.json()["recommendations"][0]["vendorServiceId"] == str(
+        candidate.matched_service.vendor_service_id
+    )
+
+
+def test_recommend_route_rejects_empty_candidates_before_gemini(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def should_not_run(*_args, **_kwargs):
+        raise AssertionError("Gemini must not be called for an empty candidate list")
+
+    monkeypatch.setattr(routes, "execute_vendor_analysis", should_not_run)
+    app = FastAPI()
+    app.include_router(routes.router)
+    payload = _request().model_dump(mode="json", by_alias=True)
+    payload["candidates"] = []
+
+    async def call() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.post("/api/vendor-analysis/recommend", json=payload)
+
+    response = asyncio.run(call())
+    assert response.status_code == 422
+
+
+def test_recommend_route_rejects_malformed_vendor_id_before_gemini(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def should_not_run(*_args, **_kwargs):
+        raise AssertionError("Gemini must not be called for an invalid vendor ID")
+
+    monkeypatch.setattr(routes, "execute_vendor_analysis", should_not_run)
+    app = FastAPI()
+    app.include_router(routes.router)
+    payload = _request().model_dump(mode="json", by_alias=True)
+    payload["candidates"][0]["vendorId"] = "not-a-uuid"
+
+    async def call() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.post("/api/vendor-analysis/recommend", json=payload)
+
+    response = asyncio.run(call())
+    assert response.status_code == 422
+
+
+def test_recommend_route_reports_schema_rejection_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fail(*_args, **_kwargs):
+        raise VendorAnalysisConfigurationError("invalid structured-output schema")
+
+    monkeypatch.setattr(routes, "execute_vendor_analysis", fail)
+    app = FastAPI()
+    app.include_router(routes.router)
+    payload = _request().model_dump(mode="json", by_alias=True)
+
+    async def call() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.post("/api/vendor-analysis/recommend", json=payload)
+
+    response = asyncio.run(call())
+    assert response.status_code == 500
+    assert response.json()["detail"]["code"] == "gemini_request_invalid"
+
+
+def test_service_maps_gemini_invalid_argument_to_configuration_error() -> None:
+    class InvalidRequestGeminiClient:
+        async def generate_with_prompt(self, *_args, **_kwargs):
+            raise GeminiInvalidRequestError("structured-output schema rejected")
+
+    async def test_call() -> None:
+        with pytest.raises(VendorAnalysisConfigurationError):
+            await execute_vendor_analysis(
+                _request(),
+                gemini_client=InvalidRequestGeminiClient(),
+            )
+
+    asyncio.run(test_call())
 
 
 def test_request_requires_at_least_one_candidate() -> None:

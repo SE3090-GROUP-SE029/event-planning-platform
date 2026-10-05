@@ -13,8 +13,8 @@ _DEVELOPMENT_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 )
-DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
-DEFAULT_GEMINI_FALLBACK_MODELS = "gemini-3.7-flash,gemini-3.5-flash-lite"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_FALLBACK_MODELS = "gemini-2.5-flash-lite,gemini-2.0-flash"
 
 
 def _parse_cors_origins(value: str) -> tuple[str, ...]:
@@ -158,7 +158,7 @@ class Settings(BaseSettings):
     def validate_gemini_model_name(cls, value: str) -> str:
         model_name = value.strip()
         if not model_name.startswith("gemini-") or any(character.isspace() for character in model_name):
-            raise ValueError("GEMINI_MODEL must be a Gemini model ID, such as gemini-3.8-flash")
+            raise ValueError("GEMINI_MODEL must be a Gemini model ID, such as gemini-2.5-flash")
         return model_name
 
     @field_validator("gemini_fallback_models")

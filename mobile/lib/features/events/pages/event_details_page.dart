@@ -10,6 +10,7 @@ import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
 import '../../plans/api/plan_remote_datasource.dart';
+import '../../plans/models/plan_generation_job_model.dart';
 import '../../plans/models/plan_model.dart';
 import '../../guest_management/pages/guest_management_page.dart';
 import '../../guest_management/pages/guest_analytics_page.dart';
@@ -100,17 +101,69 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     });
     try {
       final plans = await _planApi.listForEvent(auth.accessToken, event.id);
+      if (plans.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _existingPlan = plans.first;
+            _plansLoading = false;
+          });
+        }
+        return;
+      }
+
+      final latestJob =
+          await _planApi.getLatestGeneration(auth.accessToken, event.id);
+      if (latestJob != null &&
+          latestJob.status == PlanGenerationJobStatus.failed) {
+        if (mounted) {
+          setState(() {
+            _plansLoading = false;
+            _generatingPlan = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                latestJob.message ?? 'Plan generation failed. Please retry.',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+      if (latestJob != null) {
+        if (mounted) {
+          setState(() {
+            _plansLoading = false;
+            _generatingPlan = true;
+          });
+        }
+        final plan =
+            await _planApi.waitForGeneration(auth.accessToken, latestJob);
+        if (mounted) {
+          setState(() {
+            _existingPlan = plan;
+            _generatingPlan = false;
+          });
+          await Navigator.pushNamed(context, '/plans/review', arguments: plan.id);
+        }
+        return;
+      }
+
       if (mounted) {
         setState(() {
-          _existingPlan = plans.isEmpty ? null : plans.first;
+          _existingPlan = null;
           _plansLoading = false;
         });
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(() {
-          _planError = 'Could not check for an existing AI plan. Please retry.';
+          _planError = error is PlanGenerationFailedException
+              ? error.message
+              : 'Could not check for an existing AI plan. Please retry.';
           _plansLoading = false;
+          _generatingPlan = false;
         });
       }
     }
@@ -156,6 +209,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   }
 
   String _planGenerationError(Object error) {
+    if (error is PlanGenerationFailedException) return error.message;
     if (error is DioException) {
       final response = error.response;
       final responseData = response?.data;
@@ -168,6 +222,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         }
       }
       if (response?.statusCode == 504 ||
+          response?.statusCode == 408 ||
           error.type == DioExceptionType.receiveTimeout) {
         return 'Plan generation timed out. Please retry.';
       }
@@ -176,6 +231,12 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       }
       if (error.type == DioExceptionType.connectionTimeout) {
         return 'Could not connect to the planning service. Check your connection and retry.';
+      }
+      if (error.type == DioExceptionType.cancel) {
+        return 'The request was interrupted. Plan generation may still be running; reopen this event to check its status.';
+      }
+      if (error.type == DioExceptionType.connectionError) {
+        return 'Network connection lost while checking plan generation. Reopen this event to check its status.';
       }
     }
     return 'We could not generate the AI plan. Please try again.';

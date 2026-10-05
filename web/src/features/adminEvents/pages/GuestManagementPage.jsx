@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   Alert, Box, Button, Chip, CircularProgress, FormControl, InputLabel, MenuItem, Select,
   Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, Typography, Avatar
@@ -7,7 +8,7 @@ import {
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
 import AppLayout from '../../../shared/components/layout/AppLayout';
 import SurfaceCard from '../../../shared/components/ui/SurfaceCard';
-import { useEventGuests } from '../api/guestListApi';
+import { reviewGuestRegistration, useEventGuests } from '../api/guestListApi';
 import { useAdminEvent } from '../api/adminEventApi';
 import { tokens } from '../../../shared/theme/tokens';
 
@@ -15,10 +16,15 @@ export default function GuestManagementPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const eventQuery = useAdminEvent(id);
+  const queryClient = useQueryClient();
+  const reviewMutation = useMutation({
+    mutationFn: ({ registrationId, decision }) => reviewGuestRegistration(id, registrationId, decision),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['planner-registrations', id] }),
+  });
 
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [statusFilter, setStatusFilter] = useState('ALL'); // PENDING_AI, CONFIRMED, REJECTED, WAITING_LIST
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [rsvpFilter, setRsvpFilter] = useState('ALL'); // ACCEPTED, DECLINED, MAYBE
   const [checkInFilter, setCheckInFilter] = useState('ALL'); // Checked-in, Not checked-in
 
@@ -26,14 +32,27 @@ export default function GuestManagementPage() {
     eventId: id,
     page: page + 1,
     pageSize,
-    status: statusFilter === 'ALL' ? undefined : (statusFilter === 'WAITING_LIST' ? undefined : statusFilter),
-    isWaitlisted: statusFilter === 'WAITING_LIST' ? true : undefined,
+    status: statusFilter === 'ALL' ? undefined : statusFilter,
+    isWaitlisted: statusFilter === 'WAITLISTED' ? true : undefined,
     rsvpStatus: rsvpFilter === 'ALL' ? undefined : rsvpFilter,
     checkedIn: checkInFilter === 'ALL' ? undefined : checkInFilter === 'CHECKED_IN',
   });
 
   const guests = guestsQuery.data?.items || [];
   const isLoading = guestsQuery.isLoading;
+  const canReview = (guest) => ['PENDING_REVIEW', 'ACCEPTED', 'REJECTED'].includes(guest.status);
+  const reviewActions = (guest) => canReview(guest) && (
+    <Stack direction="row" spacing={1}>
+      <Button size="small" disabled={reviewMutation.isPending || (guest.status === 'REJECTED' && guest.emailDeliveryStatus === 'SENT')}
+        onClick={() => reviewMutation.mutate({ registrationId: guest.id, decision: 'ACCEPTED' })}>
+        Accept
+      </Button>
+      <Button size="small" color="error" disabled={reviewMutation.isPending}
+        onClick={() => reviewMutation.mutate({ registrationId: guest.id, decision: 'REJECTED' })}>
+        Reject
+      </Button>
+    </Stack>
+  );
 
   return (
     <AppLayout
@@ -62,10 +81,11 @@ export default function GuestManagementPage() {
               onChange={(e) => { setPage(0); setStatusFilter(e.target.value); }}
             >
               <MenuItem value="ALL">All Statuses</MenuItem>
-              <MenuItem value="PENDING_AI">Pending AI</MenuItem>
-              <MenuItem value="CONFIRMED">Accepted (Confirmed)</MenuItem>
+              <MenuItem value="PENDING_REVIEW">Pending review</MenuItem>
+              <MenuItem value="ACCEPTED">Accepted (awaiting allocation)</MenuItem>
+              <MenuItem value="CONFIRMED">Confirmed</MenuItem>
               <MenuItem value="REJECTED">Rejected</MenuItem>
-              <MenuItem value="WAITING_LIST">Waitlisted</MenuItem>
+              <MenuItem value="WAITLISTED">Waitlisted</MenuItem>
             </Select>
           </FormControl>
 
@@ -112,6 +132,11 @@ export default function GuestManagementPage() {
 
       {/* Guests Table */}
       <SurfaceCard sx={{ p: 3 }}>
+        {reviewMutation.isError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            The review decision could not be saved. {reviewMutation.error.message}
+          </Alert>
+        )}
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
             <CircularProgress />
@@ -136,6 +161,7 @@ export default function GuestManagementPage() {
                     <TableCell>RSVP</TableCell>
                     <TableCell>Check-In</TableCell>
                     <TableCell>Registered At</TableCell>
+                    <TableCell>Review</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -179,6 +205,7 @@ export default function GuestManagementPage() {
                           />
                         </TableCell>
                         <TableCell>{new Date(g.registeredAt).toLocaleDateString()}</TableCell>
+                        <TableCell>{reviewActions(g)}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -222,6 +249,7 @@ export default function GuestManagementPage() {
                         <Typography variant="body2" color="text.secondary">Registered</Typography>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>{new Date(g.registeredAt).toLocaleDateString()}</Typography>
                       </Box>
+                      {reviewActions(g)}
                     </Stack>
                   </Box>
                 );

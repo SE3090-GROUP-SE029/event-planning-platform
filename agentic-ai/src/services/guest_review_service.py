@@ -37,7 +37,7 @@ class AdkGenerationResult:
 
 @dataclass(frozen=True)
 class ReviewSettings:
-    model: str = "gemini-3.8-flash"
+    model: str = "gemini-2.5-flash"
     api_keys: tuple[str, ...] = ()
     fallback_models: tuple[str, ...] = ()
     timeout_seconds: float = float(AGENTIC_AI_REQUEST_TIMEOUT_SECONDS)

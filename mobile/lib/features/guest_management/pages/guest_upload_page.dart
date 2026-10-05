@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -186,11 +188,8 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
       return e.message?.toString() ?? 'The selected file is not supported.';
     }
     if (e is DioException) {
-      final data = e.response?.data;
-      if (data is Map<String, dynamic>) {
-        final message = data['error'] ?? data['message'];
-        if (message != null) return message.toString();
-      }
+      final serverMessage = _serverMessage(e.response?.data);
+      if (serverMessage != null) return serverMessage;
       if (e.response?.statusCode == 401) {
         return 'Your session has expired. Please sign in again.';
       }
@@ -202,9 +201,8 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
       }
     }
     final msg = e.toString();
-    final jsonMatch =
-        RegExp(r'"(?:message|error)"\s*:\s*"([^"]+)"').firstMatch(msg);
-    if (jsonMatch != null) return jsonMatch.group(1)!;
+    final serverMessage = _serverMessage(msg);
+    if (serverMessage != null) return serverMessage;
     if (msg.contains('invalid_file_type')) {
       return 'Only CSV, PDF, and DOCX files are supported.';
     }
@@ -213,12 +211,51 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
     return 'Upload failed. Please try again.';
   }
 
+  String? _serverMessage(Object? payload) {
+    Object? decoded = payload;
+    if (payload is String) {
+      try {
+        decoded = jsonDecode(payload);
+      } on FormatException {
+        final text = payload.trim();
+        return text.isEmpty ? null : text;
+      }
+    }
+
+    if (decoded is Map) {
+      for (final key in const ['message', 'error', 'detail', 'title']) {
+        final value = decoded[key];
+        if (value is String && value.trim().isNotEmpty) return value;
+      }
+      final details = decoded['details'];
+      if (details is List) {
+        for (final detail in details) {
+          if (detail is Map && detail['message'] is String) {
+            final message = (detail['message'] as String).trim();
+            if (message.isNotEmpty) return message;
+          }
+          if (detail is String && detail.trim().isNotEmpty) return detail;
+        }
+      }
+      final errors = decoded['errors'];
+      if (errors is Map) {
+        for (final messages in errors.values) {
+          if (messages is List && messages.isNotEmpty) {
+            return messages.first.toString();
+          }
+          if (messages is String && messages.trim().isNotEmpty) return messages;
+        }
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.canvas,
       appBar: AppBar(
-        title: const Text('Upload Guest List'),
+        title: const Text('Invite Guests'),
       ),
       body: SafeArea(
         child: ListView(
@@ -246,7 +283,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
                   style: AppButtonStyles.primary(),
                   onPressed: _upload,
                   icon: const Icon(Icons.upload_rounded, size: 18),
-                  label: const Text('Upload Guest List'),
+                  label: const Text('Send Registration Links'),
                 ),
               ),
               const SizedBox(height: AppDimens.space8),
@@ -272,7 +309,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Uploading and processing guest list…',
+                      'Sending registration links…',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 14,
@@ -337,7 +374,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Maximum file size: 5 MB. Guests will enter the AI review pipeline automatically. Duplicate emails are skipped.',
+                  'Maximum file size: 5 MB. Valid guests receive a registration link by email. Duplicate emails in the file are skipped.',
                   style: TextStyle(
                     color: AppColors.pastelBlueText,
                     fontSize: 12,
@@ -534,7 +571,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
                   Expanded(
                     child: _statItem(
                       '${result.successfulRows}',
-                      'Queued',
+                      'Links queued',
                       AppColors.pastelGreenText,
                     ),
                   ),
@@ -642,7 +679,7 @@ class _GuestUploadPageState extends State<GuestUploadPage> {
         // Note about processing
         const SizedBox(height: AppDimens.space12),
         const Text(
-          'Successfully queued guests are now being processed by the AI review pipeline. Check the guest list for status updates.',
+          'Guests enter AI review after they submit the emailed registration form.',
           style: TextStyle(
             color: AppColors.textMuted,
             fontSize: 12,

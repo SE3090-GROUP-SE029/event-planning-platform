@@ -45,8 +45,20 @@ public class RegistrationFormsController(RegistrationService service) : Controll
         => Ok(PlannerFormResponse.From(await service.SelectQuestionsAsync(eventId, PlannerId, request.Questions, ct)));
 
     [HttpPost("registrations/{registrationId:long}/retry-rejection-email")]
-    public async Task<IActionResult> RetryRejection(Guid eventId, long registrationId, CancellationToken ct)
-        => Ok(PlannerRegistrationResponse.From(await service.RetryRejectionAsync(eventId, PlannerId, registrationId, ct)));
+    public async Task<IActionResult> RetryRejection(Guid eventId, long registrationId,
+        [FromServices] RegistrationReviewService reviews, CancellationToken ct)
+        => Ok(PlannerRegistrationResponse.From(await reviews.RetryRejectionAsync(eventId, PlannerId, registrationId, ct)));
+
+    [HttpPost("registrations/{registrationId:long}/review")]
+    public async Task<IActionResult> Review(Guid eventId, long registrationId, RegistrationReviewRequest request,
+        [FromServices] RegistrationReviewService reviews, CancellationToken ct)
+    {
+        if (!Enum.TryParse<Domain.Enums.RegistrationDecision>(request.Decision, true, out var decision) ||
+            !Enum.IsDefined(decision))
+            throw new RegistrationException(400, "invalid_review_decision", "Decision must be ACCEPTED or REJECTED.");
+        return Ok(PlannerRegistrationResponse.From(
+            await reviews.DecideManuallyAsync(eventId, PlannerId, registrationId, decision, ct)));
+    }
 
     [HttpPut("seat-limit")]
     public async Task<IActionResult> SeatLimit(Guid eventId, SeatLimitRequest request, CancellationToken ct)
@@ -68,18 +80,20 @@ public class RegistrationFormsController(RegistrationService service) : Controll
         => Ok(PlannerRegistrationResponse.From(await service.CancelAsync(eventId, PlannerId, registrationId, ct)));
 
     [HttpPost("registrations/{registrationId:long}/retry-invitation")]
-    public async Task<IActionResult> Retry(Guid eventId, long registrationId, CancellationToken ct)
-        => Ok(PlannerRegistrationResponse.From(await service.RetryInvitationAsync(eventId, PlannerId, registrationId, ct)));
+    public async Task<IActionResult> Retry(Guid eventId, long registrationId,
+        [FromServices] InvitationService invitations, CancellationToken ct)
+        => Ok(PlannerRegistrationResponse.From(await invitations.RetryAsync(eventId, PlannerId, registrationId, ct)));
 
     [HttpPost("invitations/validate")]
-    public async Task<IActionResult> ValidateInvitation(Guid eventId, ValidateInvitationRequest request, CancellationToken ct)
-        => Ok(new { valid = await service.ValidateInvitationAsync(eventId, PlannerId, request.Token, ct) });
+    public async Task<IActionResult> ValidateInvitation(Guid eventId, ValidateInvitationRequest request,
+        [FromServices] InvitationService invitations, CancellationToken ct)
+        => Ok(new { valid = await invitations.ValidateAsync(eventId, PlannerId, request.Token, ct) });
 
     [HttpPost("check-in")]
-    public async Task<IActionResult> CheckIn(Guid eventId, ValidateInvitationRequest request, CancellationToken ct)
+    public async Task<IActionResult> CheckIn(Guid eventId, ValidateInvitationRequest request,
+        [FromServices] GuestCheckInService checkIns, CancellationToken ct)
     {
-        var registration = await service.CheckInGuestAsync(eventId, PlannerId, request.Token, ct);
-        // Check-in state is persisted by the event-locked registration operation.
+        var registration = await checkIns.CheckInAsync(eventId, PlannerId, request.Token, ct);
         return Ok(new { message = "Guest checked in successfully.", guest = PlannerRegistrationResponse.From(registration) });
     }
 

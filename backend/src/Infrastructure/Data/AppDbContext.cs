@@ -42,6 +42,8 @@ public class AppDbContext : DbContext
     public DbSet<RegistrationSubmission> RegistrationSubmissions { get; set; }
     public DbSet<Invitation> Invitations { get; set; }
     public DbSet<GuestAiReview> GuestAiReviews { get; set; }
+    public DbSet<RegistrationLinkEmailJob> RegistrationLinkEmailJobs => Set<RegistrationLinkEmailJob>();
+    public DbSet<GuestCheckIn> GuestCheckIns { get; set; }
     public DbSet<RegistrationQuestion> RegistrationQuestions { get; set; }
     public DbSet<RegistrationAnswer> RegistrationAnswers { get; set; }
 
@@ -59,6 +61,7 @@ public class AppDbContext : DbContext
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<VendorRating> VendorRatings => Set<VendorRating>();
     public DbSet<EventPlanDraft> EventPlanDrafts => Set<EventPlanDraft>();
+    public DbSet<PlanGenerationJob> PlanGenerationJobs => Set<PlanGenerationJob>();
     public DbSet<VendorRecommendationRun> VendorRecommendationRuns => Set<VendorRecommendationRun>();
     public DbSet<VendorRecommendationItem> VendorRecommendationItems => Set<VendorRecommendationItem>();
 

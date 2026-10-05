@@ -41,6 +41,7 @@ public interface IGuestAiReviewRepository
     Task<GuestAiContext> ContextAsync(long registrationId, CancellationToken ct);
     Task<bool> CompleteAsync(GuestAiClaim claim, GuestAiDecision decision, DateTimeOffset now, CancellationToken ct);
     Task<bool> FailAsync(GuestAiClaim claim, string code, CancellationToken ct);
+    Task SupersedeAsync(long registrationId, CancellationToken ct);
 }
 
 // Only stable, non-sensitive codes cross the service boundary or enter logs.

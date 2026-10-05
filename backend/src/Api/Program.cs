@@ -27,6 +27,8 @@ using Microsoft.OpenApi.Models;
 using Infrastructure.Services.Planning;
 using Infrastructure.Services.Scheduling;
 using Infrastructure.Services.Vendors;
+using Api.Planning;
+using Api.Recommendations;
 
 var builder = WebApplication.CreateBuilder(args);
 var configuredVendorImagePath = builder.Configuration["VENDOR_IMAGE_STORAGE_PATH"];
@@ -81,7 +83,7 @@ builder.Services.AddScoped<ITestService, TestService>();
 builder.Services.AddScoped<IAdminVendorApprovalService, AdminVendorApprovalService>();
 
 // C4 Guest Management — AI, email, registration, invitation, QR services
-builder.Services.AddGuestManagement(builder.Configuration);
+builder.Services.AddGuestManagement(builder.Configuration, builder.Environment);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
@@ -140,6 +142,7 @@ builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IVendorRatingService, VendorRatingService>();
 builder.Services.AddScoped<IVendorRecommendationService, VendorRecommendationService>();
 builder.Services.AddScoped<IVendorAnalysisAiClient, VendorAnalysisAiClient>();
+builder.Services.AddHostedService<VendorRecommendationWorker>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IAdminVendorService, AdminVendorService>();
@@ -149,10 +152,13 @@ builder.Services.AddScoped<IAdminScheduleRepository, AdminScheduleRepository>();
 builder.Services.AddScoped<IAdminScheduleService, AdminScheduleService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IEventPlanDraftRepository, EventPlanDraftRepository>();
+builder.Services.AddScoped<IPlanGenerationJobRepository, PlanGenerationJobRepository>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICoordinatorPlanValidationService, CoordinatorPlanValidationService>();
 builder.Services.AddScoped<IPlanGenerationService, PlanGenerationService>();
+builder.Services.AddScoped<IPlanGenerationJobService, PlanGenerationJobService>();
+builder.Services.AddHostedService<PlanGenerationWorker>();
 builder.Services.AddScoped<IPlanDecisionService, PlanDecisionService>();
 builder.Services.AddScoped<IAgenticAiClient, AgenticAiClient>();
 builder.Services.AddScoped<IScheduleAiClient, ScheduleAiClient>();
@@ -218,6 +224,7 @@ builder.Services.AddCors(options =>
     });
 });
 var app = builder.Build();
+app.UseMiddleware<GuestUploadTimingMiddleware>();
 app.Logger.LogInformation(
     "Vendor image storage directory configured at {VendorImageStoragePath}",
     vendorImageStoragePath);

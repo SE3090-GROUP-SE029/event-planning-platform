@@ -6,6 +6,7 @@ using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.ExternalServices;
 using Infrastructure.Repositories;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.IntegrationTests;
@@ -46,7 +47,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
     private async Task<JsonElement> SubmitAsync(string publicId, int number)
     {
         var receipt = await JsonAsync(await SendAsync(HttpMethod.Post, PublicPath(publicId) + "/registrations", GuestBody(number)), HttpStatusCode.Created);
-        Assert.Equal("PENDING_AI", receipt.GetProperty("status").GetString());
+        Assert.Equal("PENDING_REVIEW", receipt.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, receipt.GetProperty("invitationToken").ValueKind);
         await fixture.DrainAiAsync();
         var result = System.Text.Json.Nodes.JsonNode.Parse((await StatusAsync(receipt)).GetRawText())!;
@@ -118,8 +119,9 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         await using var db = fixture.CreateDb();
         var saved = await db.RegistrationSubmissions
             .SingleAsync(s => s.EventId == eventDetails.Id);
-        Assert.NotNull(saved.CheckedInAt);
-        Assert.Equal(CheckedInMethod.QR_CODE, saved.CheckedInMethod);
+        var savedCheckIn = await db.GuestCheckIns.SingleAsync(c => c.RegistrationSubmissionId == saved.Id);
+        Assert.NotEqual(default, savedCheckIn.CheckedInAt);
+        Assert.Equal(CheckedInMethod.QR_CODE, savedCheckIn.Method);
     }
 
     [Fact]
@@ -136,7 +138,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         Assert.Equal("SENT", first.GetProperty("emailDeliveryStatus").GetString());
         var png = Convert.FromBase64String(first.GetProperty("qrPngBase64").GetString()!);
         Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, png.Take(8));
-        Assert.Equal("WAITING_LIST", third.GetProperty("status").GetString());
+        Assert.Equal("WAITLISTED", third.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, third.GetProperty("invitationToken").ValueKind);
         Assert.Equal(JsonValueKind.Null, third.GetProperty("qrPngBase64").ValueKind);
         Assert.False(first.TryGetProperty("id", out _));
@@ -146,7 +148,12 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         Assert.Equal(2, await db.Invitations.CountAsync(i => i.RegistrationSubmission.EventId == eventDetails.Id));
         var saved = await db.RegistrationSubmissions.SingleAsync(r => r.PublicReference == first.GetProperty("publicReference").GetString());
         Assert.NotEqual(first.GetProperty("statusSecret").GetString(), saved.StatusSecretHash);
+        Assert.NotNull(saved.ProtectedStatusSecret);
+        Assert.NotEqual(first.GetProperty("statusSecret").GetString(), saved.ProtectedStatusSecret);
         Assert.Contains(fixture.Email.Messages, m => m.Token == first.GetProperty("invitationToken").GetString());
+        var email = fixture.Email.Messages.Single(m => m.Token == first.GetProperty("invitationToken").GetString());
+        Assert.NotNull(email.StatusUrl);
+        Assert.Contains($"/guest/status/{first.GetProperty("publicReference").GetString()}#secret=", email.StatusUrl!);
     }
 
     [Theory]
@@ -201,7 +208,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
             var receipt = await fixture.WithServiceAsync(service => service.SubmitAsync(publicId,
                 new GuestDetails($"Guest {index}", $"scale{index}@example.com", null, null), Ct));
             receipt = receipt with { Registration = await fixture.AcceptAsync(receipt) };
-            Assert.Equal(index < 100 ? RegistrationStatus.CONFIRMED : RegistrationStatus.WAITING_LIST, receipt.Registration.Status);
+            Assert.Equal(index < 100 ? RegistrationStatus.CONFIRMED : RegistrationStatus.WAITLISTED, receipt.Registration.Status);
             Assert.Equal(index < 100, receipt.Registration.Invitation is not null);
         }
         await using var db = fixture.CreateDb();
@@ -215,11 +222,11 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         var (eventDetails, publicId) = await PublishedAsync(3);
         var replies = await Task.WhenAll(Enumerable.Range(0, 20).Select(i => SendAsync(HttpMethod.Post, PublicPath(publicId) + "/registrations", GuestBody(i))));
         var rows = await Task.WhenAll(replies.Select(r => JsonAsync(r, HttpStatusCode.Created)));
-        Assert.All(rows, r => Assert.Equal("PENDING_AI", r.GetProperty("status").GetString()));
+        Assert.All(rows, r => Assert.Equal("PENDING_REVIEW", r.GetProperty("status").GetString()));
         await fixture.DrainAiAsync();
         rows = await Task.WhenAll(rows.Select(StatusAsync));
         Assert.Equal(3, rows.Count(r => r.GetProperty("status").GetString() == "CONFIRMED"));
-        Assert.Equal(17, rows.Count(r => r.GetProperty("status").GetString() == "WAITING_LIST"));
+        Assert.Equal(17, rows.Count(r => r.GetProperty("status").GetString() == "WAITLISTED"));
         await using var db = fixture.CreateDb();
         Assert.Equal(3, await db.Invitations.CountAsync(i => i.RegistrationSubmission.EventId == eventDetails.Id));
     }
@@ -254,7 +261,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         Assert.Equal(JsonValueKind.Null, firstStatus.GetProperty("invitationToken").ValueKind);
         Assert.Equal("CONFIRMED", secondStatus.GetProperty("status").GetString());
         Assert.Equal("SENT", secondStatus.GetProperty("emailDeliveryStatus").GetString());
-        Assert.Equal("WAITING_LIST", thirdStatus.GetProperty("status").GetString());
+        Assert.Equal("WAITLISTED", thirdStatus.GetProperty("status").GetString());
         var invalid = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/invitations/validate",
             new { token = first.GetProperty("invitationToken").GetString() }, RegistrationHostFixture.PlannerId));
         var valid = await JsonAsync(await SendAsync(HttpMethod.Post, PlannerPath(eventDetails.Id) + "/invitations/validate",
@@ -272,7 +279,7 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
         var third = await SubmitAsync(publicId, 3);
         await JsonAsync(await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 2 }, RegistrationHostFixture.PlannerId));
         Assert.Equal("CONFIRMED", (await StatusAsync(second)).GetProperty("status").GetString());
-        Assert.Equal("WAITING_LIST", (await StatusAsync(third)).GetProperty("status").GetString());
+        Assert.Equal("WAITLISTED", (await StatusAsync(third)).GetProperty("status").GetString());
         Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 1 }, RegistrationHostFixture.PlannerId)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id) + "/seat-limit", new { seatLimit = 0 }, RegistrationHostFixture.PlannerId)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(HttpMethod.Put, PlannerPath(eventDetails.Id), Settings(1), RegistrationHostFixture.PlannerId)).StatusCode);
@@ -374,20 +381,27 @@ public class RegistrationEndpointTests(RegistrationHostFixture fixture) : IClass
     {
         var (eventDetails, publicId) = await PublishedAsync(1);
         await using var db = fixture.CreateDb();
-        var service = new RegistrationService(new GuestRegistrationRepository(db), new RegistrationTokenGenerator(), new HoldPolicy(), fixture.Email, fixture.Clock);
+        var repository = new GuestRegistrationRepository(db);
+        var tokens = new RegistrationTokenGenerator();
+        var secretProtector = new RegistrationSecretProtector(DataProtectionProvider.Create("RegistrationIntegrationTests"));
+        var guestOptions = new GuestRegistrationOptions { PublicWebBaseUrl = "https://event.example.test/" };
+        var invitations = new InvitationService(repository, fixture.Email, tokens, secretProtector, guestOptions, fixture.Clock);
+        var allocation = new SeatAllocationService(repository, new HoldPolicy(), fixture.Clock);
+        var aiReviews = new GuestAiReviewRepository(db, repository,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<GuestAiReviewRepository>.Instance);
+        var reviewService = new RegistrationReviewService(repository, aiReviews, fixture.Email, fixture.Clock);
+        var service = new RegistrationService(repository, tokens, fixture.Clock, secretProtector, allocation);
         var held = await service.SubmitAsync(publicId, new GuestDetails("Hold", "hold@example.com", null, null), Ct);
         var eligible = await service.SubmitAsync(publicId, new GuestDetails("Eligible", "eligible@example.com", null, null), Ct);
-        var reviews = new GuestAiReviewRepository(db, new GuestRegistrationRepository(db),
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<GuestAiReviewRepository>.Instance);
         for (var i = 0; i < 2; i++)
         {
-            var claim = await reviews.ClaimAsync(fixture.Clock.GetUtcNow(), fixture.Clock.GetUtcNow().AddMinutes(3), Ct);
+            var claim = await aiReviews.ClaimAsync(fixture.Clock.GetUtcNow(), fixture.Clock.GetUtcNow().AddMinutes(3), Ct);
             Assert.NotNull(claim);
-            await service.ApplyDecisionAsync(claim!, fixture.Ai.Decision, reviews, Ct);
+            await reviewService.ApplyAiDecisionAsync(claim!, fixture.Ai.Decision, Ct);
         }
         held = held with { Registration = (await service.GetPublicStatusAsync(held.Registration.PublicReference, held.StatusSecret, Ct)) };
         eligible = eligible with { Registration = (await service.GetPublicStatusAsync(eligible.Registration.PublicReference, eligible.StatusSecret, Ct)) };
-        Assert.Equal(RegistrationStatus.WAITING_LIST, held.Registration.Status);
+        Assert.Equal(RegistrationStatus.WAITLISTED, held.Registration.Status);
         Assert.Null(held.Registration.Invitation);
         Assert.Equal(RegistrationStatus.CONFIRMED, eligible.Registration.Status);
     }

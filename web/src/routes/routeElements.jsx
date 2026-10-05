@@ -3,6 +3,8 @@ import { Box, CircularProgress } from '@mui/material';
 import ProtectedRoute from '../shared/components/ProtectedRoute';
 
 const LandingPage = lazy(() => import('../features/landing/pages/LandingPage'));
+const PublicGuestRegistrationPage = lazy(() => import('../features/guestRegistration/pages/PublicGuestRegistrationPage'));
+const PublicRegistrationStatusPage = lazy(() => import('../features/guestRegistration/pages/PublicRegistrationStatusPage'));
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'));
 const DashboardPage = lazy(() => import('../features/dashboard/pages/DashboardPage'));
 const AdminEventManagementPage = lazy(() => import('../features/adminEvents/pages/AdminEventManagementPage'));
@@ -46,6 +48,14 @@ function AdminPage({ page: Page }) {
 
 export function LandingRoute() {
   return <SuspendedPage><LandingPage /></SuspendedPage>;
+}
+
+export function PublicGuestRegistrationRoute() {
+  return <SuspendedPage><PublicGuestRegistrationPage /></SuspendedPage>;
+}
+
+export function PublicRegistrationStatusRoute() {
+  return <SuspendedPage><PublicRegistrationStatusPage /></SuspendedPage>;
 }
 
 export function LoginRoute() {

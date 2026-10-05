@@ -417,8 +417,26 @@ namespace Infrastructure.Data.Migrations
 
                             t.HasCheckConstraint("CK_GuestAiReviews_Result", "(\"Status\" = 'COMPLETED' AND (\"Decision\" IS NOT NULL OR \"Recommendation\" IS NOT NULL) AND \"Confidence\" IS NOT NULL AND \"AnalyzedAt\" IS NOT NULL AND cardinality(\"Reasons\") > 0 AND \"Model\" IS NOT NULL AND \"PromptVersion\" IS NOT NULL) OR (\"Status\" <> 'COMPLETED' AND \"Decision\" IS NULL AND \"Confidence\" IS NULL AND \"AnalyzedAt\" IS NULL)");
 
-                            t.HasCheckConstraint("CK_GuestAiReviews_Status", "\"Status\" IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED')");
+                            t.HasCheckConstraint("CK_GuestAiReviews_Status", "\"Status\" IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'SUPERSEDED')");
                         });
+                });
+
+            modelBuilder.Entity("Domain.Entities.GuestCheckIn", b =>
+                {
+                    b.Property<long>("RegistrationSubmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CheckedInAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("RegistrationSubmissionId");
+
+                    b.ToTable("GuestCheckIns", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Invitation", b =>
@@ -475,6 +493,69 @@ namespace Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Invitations");
+                });
+
+            modelBuilder.Entity("Domain.Entities.PlanGenerationJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("PlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Regenerate")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("RequestedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN ('Queued', 'Processing')");
+
+                    b.HasIndex("PlanId")
+                        .IsUnique();
+
+                    b.HasIndex("RequestedById");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("PlanGenerationJobs", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Quotation", b =>
@@ -663,6 +744,75 @@ namespace Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Domain.Entities.RegistrationLinkEmailJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailAddress")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LastFailureCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RegistrationUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId");
+
+                    b.HasIndex("Status", "NextAttemptAt", "CreatedAt");
+
+                    b.ToTable("RegistrationLinkEmailJobs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RegistrationLinkEmailJobs_AttemptCount", "\"AttemptCount\" BETWEEN 0 AND 5");
+
+                            t.HasCheckConstraint("CK_RegistrationLinkEmailJobs_Lease", "(\"Status\" = 'PROCESSING' AND \"LockedUntil\" IS NOT NULL) OR (\"Status\" <> 'PROCESSING' AND \"LockedUntil\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_RegistrationLinkEmailJobs_Status", "\"Status\" IN ('QUEUED', 'PROCESSING', 'SENT', 'FAILED')");
+                        });
+                });
+
             modelBuilder.Entity("Domain.Entities.RegistrationQuestion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -706,13 +856,6 @@ namespace Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("CancelledAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTimeOffset?>("CheckedInAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CheckedInMethod")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<DateTimeOffset?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -721,6 +864,10 @@ namespace Infrastructure.Data.Migrations
 
                     b.Property<Guid>("GuestId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ProtectedStatusSecret")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
                     b.Property<string>("PublicReference")
                         .IsRequired()
@@ -746,6 +893,17 @@ namespace Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("RejectionSentAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ReviewDecision")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ReviewSource")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -767,7 +925,8 @@ namespace Infrastructure.Data.Migrations
                     b.HasIndex("PublicReference")
                         .IsUnique();
 
-                    b.HasIndex("GuestId", "EventId");
+                    b.HasIndex("GuestId", "EventId")
+                        .IsUnique();
 
                     b.HasIndex("RegistrationFormId", "EventId");
 
@@ -775,7 +934,7 @@ namespace Infrastructure.Data.Migrations
 
                     b.ToTable("RegistrationSubmissions", null, t =>
                         {
-                            t.HasCheckConstraint("CK_RegistrationSubmissions_Status", "\"Status\" IN ('CONFIRMED', 'WAITING_LIST', 'CANCELLED', 'PENDING_AI', 'REJECTED')");
+                            t.HasCheckConstraint("CK_RegistrationSubmissions_Status", "\"Status\" IN ('PENDING_REVIEW', 'ACCEPTED', 'REJECTED', 'CONFIRMED', 'WAITLISTED', 'CANCELLED')");
                         });
                 });
 
@@ -903,9 +1062,6 @@ namespace Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -1267,6 +1423,9 @@ namespace Infrastructure.Data.Migrations
                     b.Property<int>("CandidateCount")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1276,6 +1435,10 @@ namespace Infrastructure.Data.Migrations
                     b.Property<Guid>("EventPlanDraftId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<Guid>("RequestedByUserId")
                         .HasColumnType("uuid");
 
@@ -1283,7 +1446,27 @@ namespace Infrastructure.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN ('Pending', 'Running')");
 
                     b.HasIndex("EventPlanDraftId");
 
@@ -1450,6 +1633,17 @@ namespace Infrastructure.Data.Migrations
                     b.Navigation("RegistrationSubmission");
                 });
 
+            modelBuilder.Entity("Domain.Entities.GuestCheckIn", b =>
+                {
+                    b.HasOne("Domain.Entities.RegistrationSubmission", "RegistrationSubmission")
+                        .WithOne("CheckIn")
+                        .HasForeignKey("Domain.Entities.GuestCheckIn", "RegistrationSubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RegistrationSubmission");
+                });
+
             modelBuilder.Entity("Domain.Entities.Invitation", b =>
                 {
                     b.HasOne("Domain.Entities.RegistrationSubmission", "RegistrationSubmission")
@@ -1459,6 +1653,30 @@ namespace Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("RegistrationSubmission");
+                });
+
+            modelBuilder.Entity("Domain.Entities.PlanGenerationJob", b =>
+                {
+                    b.HasOne("Domain.Entities.Event", "Event")
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.EventPlanDraft", null)
+                        .WithOne()
+                        .HasForeignKey("Domain.Entities.PlanGenerationJob", "PlanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Entities.User", "RequestedBy")
+                        .WithMany()
+                        .HasForeignKey("RequestedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("RequestedBy");
                 });
 
             modelBuilder.Entity("Domain.Entities.Quotation", b =>
@@ -1525,6 +1743,15 @@ namespace Infrastructure.Data.Migrations
                     b.Navigation("Event");
                 });
 
+            modelBuilder.Entity("Domain.Entities.RegistrationLinkEmailJob", b =>
+                {
+                    b.HasOne("Domain.Entities.Event", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Entities.RegistrationQuestion", b =>
                 {
                     b.HasOne("Domain.Entities.RegistrationForm", "RegistrationForm")
@@ -1539,9 +1766,9 @@ namespace Infrastructure.Data.Migrations
             modelBuilder.Entity("Domain.Entities.RegistrationSubmission", b =>
                 {
                     b.HasOne("Domain.Entities.Guest", "Guest")
-                        .WithMany()
-                        .HasForeignKey("GuestId", "EventId")
-                        .HasPrincipalKey("Id", "EventId")
+                        .WithOne("RegistrationSubmission")
+                        .HasForeignKey("Domain.Entities.RegistrationSubmission", "GuestId", "EventId")
+                        .HasPrincipalKey("Domain.Entities.Guest", "Id", "EventId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1698,6 +1925,11 @@ namespace Infrastructure.Data.Migrations
                     b.Navigation("Conflicts");
                 });
 
+            modelBuilder.Entity("Domain.Entities.Guest", b =>
+                {
+                    b.Navigation("RegistrationSubmission");
+                });
+
             modelBuilder.Entity("Domain.Entities.RegistrationForm", b =>
                 {
                     b.Navigation("Questions");
@@ -1706,6 +1938,8 @@ namespace Infrastructure.Data.Migrations
             modelBuilder.Entity("Domain.Entities.RegistrationSubmission", b =>
                 {
                     b.Navigation("Answers");
+
+                    b.Navigation("CheckIn");
 
                     b.Navigation("Invitation");
                 });

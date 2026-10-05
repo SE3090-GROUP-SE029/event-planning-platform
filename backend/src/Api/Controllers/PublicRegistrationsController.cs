@@ -14,7 +14,8 @@ namespace Api.Controllers;
 [Route("api/public")]
 [ServiceFilter(typeof(RegistrationExceptionFilter))]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class PublicRegistrationsController(RegistrationService service, IRegistrationTokenGenerator tokens, TimeProvider clock) : ControllerBase
+public class PublicRegistrationsController(RegistrationService service, RegistrationRsvpService rsvps,
+    InvitationService invitations, IRegistrationTokenGenerator tokens, TimeProvider clock) : ControllerBase
 {
     [HttpGet("registration-forms/{publicId}")]
     public async Task<IActionResult> GetForm(string publicId, CancellationToken ct)
@@ -44,12 +45,12 @@ public class PublicRegistrationsController(RegistrationService service, IRegistr
     {
         if (!Enum.GetNames<RsvpStatus>().Contains(request.Response) || !Enum.TryParse<RsvpStatus>(request.Response, out var response))
             throw new RegistrationException(400, "invalid_rsvp", "RSVP must be ACCEPTED, DECLINED, or MAYBE.");
-        return Ok(ToResponse(await service.RespondAsync(publicReference, request.Secret, response, ct)));
+        return Ok(ToResponse(await rsvps.RespondAsync(publicReference, request.Secret, response, ct)));
     }
 
     private PublicRegistrationResponse ToResponse(RegistrationSubmission registration, string? secret = null)
     {
-        var token = service.IsActive(registration) ? registration.Invitation!.Token : null;
+        var token = invitations.IsActive(registration) ? registration.Invitation!.Token : null;
         return new PublicRegistrationResponse(registration.PublicReference, registration.Status.ToString(), secret,
             token, token is null ? null : Convert.ToBase64String(tokens.CreateQrPng(token)),
             registration.Invitation?.RsvpStatus.ToString(),

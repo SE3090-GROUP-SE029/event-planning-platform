@@ -17,7 +17,7 @@ public class GuestAiReviewRepository(AppDbContext db, IGuestRegistrationReposito
         => registrations.WithEventLockAsync(eventId, async _ =>
         {
             var registration = await db.RegistrationSubmissions.SingleAsync(r => r.Id == registrationId && r.EventId == eventId, ct);
-            if (registration.Status is not (RegistrationStatus.PENDING_AI or RegistrationStatus.WAITING_LIST))
+            if (registration.Status != RegistrationStatus.PENDING_REVIEW)
                 return await FindAsync(registrationId, ct) ?? throw new RegistrationException(409, "analysis_unavailable", "Only pending registrations can be analyzed.");
             // Serialize retries with worker claims on the review row as well as creation on the event row.
             var rows = await db.GuestAiReviews.FromSqlInterpolated(
@@ -48,18 +48,10 @@ public class GuestAiReviewRepository(AppDbContext db, IGuestRegistrationReposito
     public async Task<GuestAiClaim?> ClaimAsync(DateTimeOffset now, DateTimeOffset leaseExpiresAt, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        // Legacy waiting-list records need a fresh binding decision, including records predating reviews.
-        await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO "GuestAiReviews" ("Id", "RegistrationSubmissionId", "Status", "Reasons", "Flags", "RequestedAt", "Attempts")
-            SELECT gen_random_uuid(), r."Id", 'PENDING', ARRAY[]::text[], ARRAY[]::text[], {now}, 0
-            FROM "RegistrationSubmissions" r WHERE r."Status" = 'WAITING_LIST'
-            AND NOT EXISTS (SELECT 1 FROM "GuestAiReviews" a WHERE a."RegistrationSubmissionId" = r."Id")
-            ON CONFLICT ("RegistrationSubmissionId") DO NOTHING
-            """, ct);
         var rows = await db.GuestAiReviews.FromSqlInterpolated($"""
             SELECT a.* FROM "GuestAiReviews" a
             JOIN "RegistrationSubmissions" r ON r."Id" = a."RegistrationSubmissionId"
-            WHERE r."Status" IN ('PENDING_AI', 'WAITING_LIST') AND
+            WHERE r."Status" = 'PENDING_REVIEW' AND
             (a."Status" = 'PENDING' OR (a."Status" = 'PROCESSING' AND a."LeaseExpiresAt" <= {now})
              OR (a."Status" = 'COMPLETED' AND a."Decision" IS NULL))
             ORDER BY a."RequestedAt", a."Id" LIMIT 1 FOR UPDATE OF a SKIP LOCKED
@@ -135,5 +127,17 @@ public class GuestAiReviewRepository(AppDbContext db, IGuestRegistrationReposito
             .SetProperty(r => r.LeaseExpiresAt, (DateTimeOffset?)null), ct);
         if (updated == 1) logger.LogWarning("AI analysis failed for review {ReviewId}: {FailureCode}", claim.ReviewId, code);
         return updated == 1;
+    }
+
+    public async Task SupersedeAsync(long registrationId, CancellationToken ct)
+    {
+        await db.GuestAiReviews
+            .Where(r => r.RegistrationSubmissionId == registrationId &&
+                (r.Status == AiAnalysisStatus.PENDING || r.Status == AiAnalysisStatus.PROCESSING))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(r => r.Status, AiAnalysisStatus.SUPERSEDED)
+                .SetProperty(r => r.AttemptId, (Guid?)null)
+                .SetProperty(r => r.LeaseExpiresAt, (DateTimeOffset?)null)
+                .SetProperty(r => r.FailureCode, (string?)null), ct);
     }
 }

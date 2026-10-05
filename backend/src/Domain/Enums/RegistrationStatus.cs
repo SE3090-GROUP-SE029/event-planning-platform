@@ -1,3 +1,11 @@
 namespace Domain.Enums;
 
-public enum RegistrationStatus { CONFIRMED, WAITING_LIST, CANCELLED, PENDING_AI, REJECTED }
+public enum RegistrationStatus
+{
+    PENDING_REVIEW,
+    ACCEPTED,
+    REJECTED,
+    CONFIRMED,
+    WAITLISTED,
+    CANCELLED
+}
