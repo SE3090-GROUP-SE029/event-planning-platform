@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import math
+import random
 import socket
 import threading
 import time
@@ -77,6 +78,16 @@ _RETRYABLE_ERRORS = (
     TimeoutError,
     OSError,
 )
+_RETIRED_GEMINI_MODELS = {
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "/gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-preview",
+    "gemini-2.5-flash-preview-05-20",
+    "gemini-1.5-flash",
+}
 _RESPONSE_CACHE_TTL_SECONDS = 900
 _RESPONSE_CACHE_MAX_ENTRIES = 512
 _GEMINI_KEY_COOLDOWN_SECONDS = 10 * 60
@@ -840,6 +851,14 @@ class GeminiClient:
                         model_name,
                         model_index,
                     )
+                if model_name.lower() in _RETIRED_GEMINI_MODELS:
+                    invalid_model_names.add(model_name)
+                    logger.error(
+                        "Skipping retired Gemini model node=%s model=%s reason=retired_model",
+                        node_name,
+                        model_name,
+                    )
+                    continue
                 if self.model is not None:
                     model = self.model
                 else:

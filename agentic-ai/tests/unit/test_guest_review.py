@@ -56,7 +56,7 @@ def test_preserves_model_decisions_for_guest_scenarios(guest, output):
     assert result.decision == output["decision"]
     assert result.reasons == output["reasons"]
     assert result.flags == output["flags"]
-    assert result.model == "gemini-2.5-flash"
+    assert result.model == "gemini-3.8-flash"
     assert result.prompt_version == "guest-filtering-v2"
 
 

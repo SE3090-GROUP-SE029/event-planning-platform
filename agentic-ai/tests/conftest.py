@@ -14,7 +14,7 @@ def isolate_gemini_credentials(
     isolated_gemini_environment = {
         "GEMINI_API_KEY": "",
         "GEMINI_API_KEYS": "",
-        "GEMINI_MODEL": "gemini-2.5-flash",
+        "GEMINI_MODEL": "gemini-3.8-flash",
         "GEMINI_FALLBACK_MODELS": "",
         "GEMINI_TIMEOUT_SECONDS": "15",
         "GEMINI_MAX_RETRIES": "5",

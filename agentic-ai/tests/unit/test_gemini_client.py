@@ -915,22 +915,22 @@ def test_gemini_model_is_loaded_from_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-flash")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-3.8-flash")
     monkeypatch.setenv("GEMINI_API_KEYS", "second-key, third-key")
     monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "gemini-2.5-flash-lite,gemini-2.0-flash")
 
     settings = Settings(_env_file=None)
 
-    assert settings.gemini_model == "gemini-2.5-flash"
+    assert settings.gemini_model == "gemini-3.8-flash"
     assert settings.get_gemini_api_keys() == ("second-key", "third-key")
     assert settings.get_gemini_models() == (
-        "gemini-2.5-flash",
+        "gemini-3.8-flash",
         "gemini-2.5-flash-lite",
         "gemini-2.0-flash",
     )
 
 
-def test_default_gemini_fallback_chain_uses_supported_2_5_models(
+def test_default_gemini_fallback_chain_uses_supported_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
@@ -939,11 +939,11 @@ def test_default_gemini_fallback_chain_uses_supported_2_5_models(
     settings = Settings(_env_file=None)
 
     assert settings.get_gemini_models() == (
-        "gemini-2.5-flash",
+        "gemini-3.8-flash",
         "gemini-2.5-flash-lite",
         "gemini-2.0-flash",
     )
-    assert "gemini-3.8-flash" not in settings.get_gemini_models()
+    assert "gemini-2.5-flash" not in settings.get_gemini_models()
 
 
 def test_primary_model_succeeds_without_fallback(
