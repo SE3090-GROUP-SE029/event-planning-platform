@@ -23,10 +23,16 @@ public class EventServiceTests
         Assert.Equal(ownerId, repository.AddedEvent!.OwnerId);
         Assert.Equal("Annual celebration", repository.AddedEvent.EventName);
         Assert.Equal(EventStatus.DRAFT, repository.AddedEvent.Status);
+        Assert.Equal(new TimeOnly(18, 0), repository.AddedEvent.StartTime);
+        Assert.Equal(new TimeOnly(23, 0), repository.AddedEvent.EndTime);
+        Assert.Equal(TimeSpan.FromHours(5), repository.AddedEvent.EventDuration);
         Assert.Equal(repository.AddedEvent.CreatedAt, repository.AddedEvent.UpdatedAt);
         Assert.Equal(repository.AddedEvent.Id, result.Id);
         Assert.Equal(ownerId, result.OwnerId);
         Assert.Equal("Annual celebration", result.EventName);
+        Assert.Equal(new TimeOnly(18, 0), result.StartTime);
+        Assert.Equal(new TimeOnly(23, 0), result.EndTime);
+        Assert.Equal(TimeSpan.FromHours(5), result.EventDuration);
         Assert.Equal(EventStatus.DRAFT, result.Status);
         Assert.True(repository.SaveChangesCalled);
     }
@@ -169,12 +175,17 @@ public class EventServiceTests
             Budget = 4000,
             PreferredVenue = "Updated Hall",
             PreferredDate = DateTime.UtcNow.AddDays(20),
+            StartTime = new TimeOnly(10, 0),
+            EndTime = new TimeOnly(13, 30),
             Requirements = "Parking",
             Status = EventStatus.CONFIRMED
         });
 
         Assert.Equal(EventType.WEDDING, result.EventType);
         Assert.Equal("Updated event", result.EventName);
+        Assert.Equal(new TimeOnly(10, 0), result.StartTime);
+        Assert.Equal(new TimeOnly(13, 30), result.EndTime);
+        Assert.Equal(TimeSpan.FromHours(3.5), result.EventDuration);
         Assert.Equal(EventStatus.CONFIRMED, result.Status);
         Assert.NotEqual(originalUpdatedAt, result.UpdatedAt);
     }
@@ -204,6 +215,8 @@ public class EventServiceTests
                 Budget = 100,
                 PreferredVenue = "Hall",
                 PreferredDate = DateTime.UtcNow.AddDays(5),
+                StartTime = new TimeOnly(9, 0),
+                EndTime = new TimeOnly(10, 0),
                 Status = (EventStatus)999
             }));
     }
@@ -239,7 +252,9 @@ public class EventServiceTests
         Budget = 2500,
         PreferredVenue = "Conference Hall",
         PreferredDate = DateTime.UtcNow.AddDays(14),
-        EventDuration = TimeSpan.FromHours(3),
+        StartTime = new TimeOnly(18, 0),
+        EndTime = new TimeOnly(23, 0),
+        EventDuration = TimeSpan.FromMinutes(30),
         Requirements = "Projector"
     };
 
@@ -253,6 +268,8 @@ public class EventServiceTests
         Budget = 2500,
         PreferredVenue = "Conference Hall",
         PreferredDate = DateTime.UtcNow.AddDays(14),
+        StartTime = new TimeOnly(18, 0),
+        EndTime = new TimeOnly(21, 0),
         EventDuration = TimeSpan.FromHours(3),
         Status = EventStatus.DRAFT,
         CreatedAt = DateTime.UtcNow,

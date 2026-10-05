@@ -20,6 +20,11 @@ function Detail({ label, value }) {
   );
 }
 
+function formatTimeRange(event) {
+  if (!event.startTime || !event.endTime) return '-';
+  return `${event.startTime} - ${event.endTime}`;
+}
+
 export default function AdminEventDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -73,7 +78,7 @@ export default function AdminEventDetailsPage() {
           disabled
           sx={{ borderRadius: 9999, px: 2.5 }}
         >
-          Upload Guest List
+          Invite Guests
         </Button>
         <Button
           variant="outlined"
@@ -127,6 +132,7 @@ export default function AdminEventDetailsPage() {
               <Grid size={{ xs: 12, sm: 6 }}><Detail label="Guest count" value={event.guestCount} /></Grid>
               <Grid size={{ xs: 12, sm: 6 }}><Detail label="Status" value={enumLabel(event.status)} /></Grid>
               <Grid size={{ xs: 12, sm: 6 }}><Detail label="Preferred venue" value={event.preferredVenue} /></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Detail label="Start / end time" value={formatTimeRange(event)} /></Grid>
               <Grid size={{ xs: 12, sm: 6 }}><Detail label="Event duration" value={event.eventDuration} /></Grid>
               <Grid size={{ xs: 12, sm: 6 }}><Detail label="Preferred date" value={new Date(event.preferredDate).toLocaleString()} /></Grid>
               <Grid size={{ xs: 12, sm: 6 }}><Detail label="Created date" value={new Date(event.createdAt).toLocaleString()} /></Grid>

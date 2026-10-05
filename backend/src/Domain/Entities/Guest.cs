@@ -11,4 +11,5 @@ public class Guest
     public string? PhoneNumber { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public RegistrationSubmission? RegistrationSubmission { get; set; }
 }

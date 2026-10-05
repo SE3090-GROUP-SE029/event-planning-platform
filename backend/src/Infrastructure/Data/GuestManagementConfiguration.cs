@@ -11,7 +11,7 @@ public static class GuestManagementConfiguration
         {
             entity.ToTable("GuestAiReviews", table =>
             {
-                table.HasCheckConstraint("CK_GuestAiReviews_Status", "\"Status\" IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED')");
+                table.HasCheckConstraint("CK_GuestAiReviews_Status", "\"Status\" IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'SUPERSEDED')");
                 table.HasCheckConstraint("CK_GuestAiReviews_Recommendation", "\"Recommendation\" IS NULL OR \"Recommendation\" IN ('ELIGIBLE', 'REVIEW', 'REJECTED')");
                 table.HasCheckConstraint("CK_GuestAiReviews_Decision", "\"Decision\" IS NULL OR \"Decision\" IN ('ACCEPTED', 'REJECTED')");
                 table.HasCheckConstraint("CK_GuestAiReviews_Confidence", "\"Confidence\" IS NULL OR (\"Confidence\" >= 0 AND \"Confidence\" <= 1)");
@@ -61,24 +61,63 @@ public static class GuestManagementConfiguration
             entity.HasOne<Event>().WithMany().HasForeignKey(e => e.EventId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<RegistrationLinkEmailJob>(entity =>
+        {
+            entity.ToTable("RegistrationLinkEmailJobs", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_RegistrationLinkEmailJobs_Status",
+                    "\"Status\" IN ('QUEUED', 'PROCESSING', 'SENT', 'FAILED')");
+                table.HasCheckConstraint(
+                    "CK_RegistrationLinkEmailJobs_AttemptCount",
+                    "\"AttemptCount\" BETWEEN 0 AND 5");
+                table.HasCheckConstraint(
+                    "CK_RegistrationLinkEmailJobs_Lease",
+                    "(\"Status\" = 'PROCESSING' AND \"LockedUntil\" IS NOT NULL) OR " +
+                    "(\"Status\" <> 'PROCESSING' AND \"LockedUntil\" IS NULL)");
+            });
+            entity.HasKey(job => job.Id);
+            entity.HasIndex(job => new { job.Status, job.NextAttemptAt, job.CreatedAt });
+            entity.Property(job => job.EmailAddress).IsRequired().HasMaxLength(254);
+            entity.Property(job => job.FullName).IsRequired().HasMaxLength(200);
+            entity.Property(job => job.EventName).IsRequired().HasMaxLength(200);
+            entity.Property(job => job.RegistrationUrl).IsRequired().HasMaxLength(2048);
+            entity.Property(job => job.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(job => job.LastFailureCode).HasMaxLength(80);
+            entity.HasOne<Event>().WithMany().HasForeignKey(job => job.EventId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<RegistrationSubmission>(entity =>
         {
             entity.ToTable("RegistrationSubmissions", table => table.HasCheckConstraint("CK_RegistrationSubmissions_Status",
-                "\"Status\" IN ('CONFIRMED', 'WAITING_LIST', 'CANCELLED', 'PENDING_AI', 'REJECTED')"));
+                "\"Status\" IN ('PENDING_REVIEW', 'ACCEPTED', 'REJECTED', 'CONFIRMED', 'WAITLISTED', 'CANCELLED')"));
             entity.HasKey(e => e.Id);
             entity.HasAlternateKey(e => new { e.Id, e.RegistrationFormId });
             entity.Property(e => e.RejectionDeliveryStatus).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.ReviewDecision).HasConversion<string>().HasMaxLength(20);
             entity.HasIndex(e => e.GuestId).IsUnique();
             entity.HasIndex(e => e.PublicReference).IsUnique();
             entity.HasIndex(e => new { e.EventId, e.Status, e.RegisteredAt, e.Id });
             entity.Property(e => e.PublicReference).IsRequired().HasMaxLength(43);
             entity.Property(e => e.StatusSecretHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.ProtectedStatusSecret).HasMaxLength(2048);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
-            entity.Property(e => e.CheckedInMethod).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.RegistrationForm).WithMany().HasForeignKey(e => new { e.RegistrationFormId, e.EventId })
                 .HasPrincipalKey(e => new { e.Id, e.EventId }).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.Guest).WithMany().HasForeignKey(e => new { e.GuestId, e.EventId })
-                .HasPrincipalKey(e => new { e.Id, e.EventId }).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(e => e.ReviewSource).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.Guest).WithOne(e => e.RegistrationSubmission)
+                .HasForeignKey<RegistrationSubmission>(e => new { e.GuestId, e.EventId })
+                .HasPrincipalKey<Guest>(e => new { e.Id, e.EventId }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.CheckIn).WithOne(e => e.RegistrationSubmission)
+                .HasForeignKey<GuestCheckIn>(e => e.RegistrationSubmissionId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GuestCheckIn>(entity =>
+        {
+            entity.ToTable("GuestCheckIns");
+            entity.HasKey(e => e.RegistrationSubmissionId);
+            entity.Property(e => e.Method).HasConversion<string>().HasMaxLength(20);
         });
 
         modelBuilder.Entity<RegistrationQuestion>(entity =>

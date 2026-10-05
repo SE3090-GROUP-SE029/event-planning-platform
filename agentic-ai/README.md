@@ -29,11 +29,20 @@ provider endpoint is needed.
 ## Gemini resilience
 
 Each Gemini operation logs its workflow node, active model, one-based API-key
-index, masked key suffix, retry count, and approximate input/output tokens.
-Quota exhaustion advances to the next key, then the next configured model.
-Transient provider/network errors and identified rate limits use bounded
-exponential backoff (1, 2, 4, 8, 16 seconds by default); invalid model and
-credential errors move to the next configured fallback without retry loops.
+index, masked key suffix, approximate input/output tokens, and per-attempt
+timeout. HTTP 429 immediately marks the key `CoolingDown` and rotates without
+retrying it. HTTP 500/502/503/504 receives at most one immediate retry on the
+same key, then the key is marked `Unavailable` and failover continues.
+Timeouts and transport/network errors immediately mark the key `CoolingDown`
+and rotate; authentication or permission failures mark that key `Failed`.
+Temporary health states use the existing ten-minute cooldown. Per-key health
+tracks status, last success/failure, failure count, and cooldown expiry.
+Only `InvalidArgument` is treated as a request-specific provider failure and
+stops key rotation. Existing configured request and operation timeouts are
+preserved; timeout-triggered failover occurs as soon as that timeout expires.
+The Interactions SDK is explicitly configured for one transport attempt; the
+application owns status retries and key rotation. SDK timeouts are passed in
+milliseconds after conversion from the client's seconds.
 Successful structured responses are cached in-process for 15 minutes (up to
 512 entries) by prompt, schema, and configured model set.
 
@@ -73,12 +82,10 @@ present in several nodes because they serve distinct tasks; if input payloads
 grow, trim optional fields before each node or summarize long requirements once
 and reuse the summary.
 
-The default Gemini timeout is 15 seconds per provider attempt. Coordinator
-Gemini nodes also have a total operation deadline that bounds retries, backoff,
-and all key/model fallbacks; by default it is 30 seconds per node (derived from
-the coordinator timeout and `MAX_ITERATIONS`). This keeps the seven sequential
-Gemini calls within the coordinator's 240-second budget with time reserved for
-graph work. Other Gemini client operations retain their existing retry budget.
+Coordinator Gemini nodes have a total operation deadline that bounds all
+key/model failover attempts; by default it is 30 minutes per node (derived from
+the coordinator timeout and `MAX_ITERATIONS`). Other Gemini client operations
+retain the configured provider and operation timeouts.
 The ASP.NET-to-agent and mobile plan requests allow 250 and 260 seconds,
 respectively. Same-event lock waiting is included in the coordinator timeout,
 and cancellation is propagated to an active Gemini request. Override the
@@ -86,17 +93,20 @@ coordinator timeout and maximum iterations, along with the default checkpoint
 path, using settings in `.env.example`.
 
 Example safe fallback logs:
+The timeout values are illustrative and reflect each request's configured
+remaining budget.
 
 ```text
-INFO Calling Gemini node=analyze_requirements model=gemini-primary api_key_index=1 api_key=****a1b2 retry_count=0 input_tokens_estimate=420
-WARNING Gemini quota-related failure node=analyze_requirements model=gemini-primary api_key_index=1 api_key=****a1b2 retry_count=0 category=quota
-INFO Gemini model fallback node=analyze_requirements model=gemini-fallback fallback_attempt=1
-INFO Calling Gemini node=analyze_requirements model=gemini-fallback api_key_index=1 api_key=****a1b2 retry_count=0 input_tokens_estimate=420
+INFO Calling Gemini node=analyze_requirements model=gemini-primary api_key_index=1 api_key=****a1b2 retry_count=0 input_tokens_estimate=420 attempt_timeout_seconds=30.000
+WARNING Retrying Gemini key 1 once after HTTP 503 node=analyze_requirements model=gemini-primary
+WARNING Gemini key 1 failed with 503 node=analyze_requirements model=gemini-primary health_status=Unavailable failure_count=1
+INFO Rotating to Gemini key 2 node=analyze_requirements model=gemini-primary reason=network
+INFO Gemini key 2 succeeded node=analyze_requirements model=gemini-primary
 ```
 
 ```text
-INFO Calling Gemini node=propose_timeline model=gemini-primary api_key_index=1 api_key=****a1b2 retry_count=0 input_tokens_estimate=180
-WARNING Gemini quota-related failure node=propose_timeline model=gemini-primary api_key_index=1 api_key=****a1b2 retry_count=0 category=quota
-INFO Gemini API key fallback node=propose_timeline model=gemini-primary api_key_index=2 api_key=****c3d4 fallback_attempt=1
-INFO Calling Gemini node=propose_timeline model=gemini-primary api_key_index=2 api_key=****c3d4 retry_count=0 input_tokens_estimate=180
+INFO Calling Gemini node=propose_timeline model=gemini-primary api_key_index=1 api_key=****a1b2 retry_count=0 input_tokens_estimate=180 attempt_timeout_seconds=30.000
+WARNING Gemini key 1 failed with timeout node=propose_timeline model=gemini-primary health_status=CoolingDown failure_count=1
+INFO Rotating to Gemini key 2 node=propose_timeline model=gemini-primary reason=network
+INFO Calling Gemini node=propose_timeline model=gemini-primary api_key_index=2 api_key=****c3d4 retry_count=0 input_tokens_estimate=180 attempt_timeout_seconds=30.000
 ```

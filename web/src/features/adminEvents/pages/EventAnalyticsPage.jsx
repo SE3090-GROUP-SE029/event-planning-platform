@@ -134,8 +134,8 @@ export default function EventAnalyticsPage() {
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <MetricCard
-            label="Pending AI Review"
-            value={data.pendingAi}
+            label="Pending Review"
+            value={data.pendingReview}
             variant="aiPlan"
             icon={AutoAwesomeOutlinedIcon}
           />

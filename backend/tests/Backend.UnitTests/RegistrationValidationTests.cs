@@ -3,6 +3,7 @@ using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.ExternalServices;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Backend.UnitTests;
 
@@ -87,6 +88,50 @@ public class RegistrationValidationTests
     }
 
     [Fact]
+    public void ProtectsAndRestoresStatusSecretsWithoutStoringPlaintext()
+    {
+        var protector = new RegistrationSecretProtector(DataProtectionProvider.Create("RegistrationTests"));
+        const string secret = "test-status-secret";
+
+        var protectedSecret = protector.Protect(secret);
+
+        Assert.NotEqual(secret, protectedSecret);
+        Assert.Equal(secret, protector.Unprotect(protectedSecret));
+    }
+
+    [Theory]
+    [InlineData("https://events.example.com", "https://events.example.com/")]
+    public void AcceptsHostedHttpsPublicUrls(string configuredUrl, string expectedUrl)
+        => Assert.Equal(expectedUrl, new GuestRegistrationOptions
+        {
+            PublicWebBaseUrl = configuredUrl
+        }.GetPublicWebBaseUri().AbsoluteUri);
+
+    [Theory]
+    [InlineData("http://localhost:5173", "http://localhost:5173/")]
+    [InlineData("http://127.0.0.1:5173/", "http://127.0.0.1:5173/")]
+    public void AcceptsLoopbackHttpOnlyWhenDevelopmentAllowsIt(
+        string configuredUrl,
+        string expectedUrl)
+        => Assert.Equal(expectedUrl, new GuestRegistrationOptions
+        {
+            PublicWebBaseUrl = configuredUrl,
+            AllowInsecureLocalhost = true
+        }.GetPublicWebBaseUri().AbsoluteUri);
+
+    [Theory]
+    [InlineData("http://localhost:5173")]
+    [InlineData("http://events.example.com")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("https://user:password@events.example.com")]
+    public void RejectsUnsafePublicWebUrls(string configuredUrl)
+        => Assert.Equal("public_web_url_unavailable",
+            Assert.Throws<RegistrationException>(() => new GuestRegistrationOptions
+            {
+                PublicWebBaseUrl = configuredUrl
+            }.GetPublicWebBaseUri()).Code);
+
+    [Fact]
     public async Task MissingSmtpIsUnavailableInsteadOfFalseSuccess()
     {
         var sender = new EmailSender(new SmtpEmailOptions(), NullLogger<EmailSender>.Instance);
@@ -108,7 +153,7 @@ public class RegistrationValidationTests
     [Fact]
     public void ExpiredRevokedAndWaitingInvitationsAreNotValid()
     {
-        var service = new RegistrationService(null!, null!, null!, null!, TimeProvider.System);
+        var service = new InvitationService(null!, null!, null!, null!, null!, TimeProvider.System);
         var registration = new RegistrationSubmission
         {
             Status = RegistrationStatus.CONFIRMED,
@@ -118,7 +163,7 @@ public class RegistrationValidationTests
         registration.Invitation.RevokedAt = DateTimeOffset.UtcNow;
         Assert.False(service.IsActive(registration));
         registration.Invitation.RevokedAt = null;
-        registration.Status = RegistrationStatus.WAITING_LIST;
+        registration.Status = RegistrationStatus.WAITLISTED;
         Assert.False(service.IsActive(registration));
         registration.Status = RegistrationStatus.CONFIRMED;
         registration.Invitation.TokenExpiresAt = DateTimeOffset.UtcNow.AddHours(-1);

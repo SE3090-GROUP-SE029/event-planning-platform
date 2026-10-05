@@ -60,6 +60,94 @@ public sealed class PlanGenerationServiceTests
     }
 
     [Fact]
+    public async Task GeneratePlanAsync_CompletesJobAndSavesPlanForTheSameEvent()
+    {
+        var ownerId = Guid.NewGuid();
+        var eventEntity = CreateEvent(ownerId);
+        var job = new PlanGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            EventId = eventEntity.Id,
+            RequestedById = ownerId,
+            RequestId = "test-request",
+            Status = PlanGenerationJobStatus.Processing,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            StartedAt = DateTime.UtcNow
+        };
+        using var db = CreateDb();
+        db.Events.Add(eventEntity);
+        db.PlanGenerationJobs.Add(job);
+        await db.SaveChangesAsync();
+
+        var planRepository = new EventPlanDraftRepository(db);
+        var service = CreateService(
+            db,
+            eventEntity,
+            ownerId,
+            false,
+            new TestAgenticAiClient(),
+            planRepository);
+
+        var generated = await service.GeneratePlanAsync(
+            eventEntity.Id,
+            ownerId,
+            job.Id);
+
+        db.ChangeTracker.Clear();
+        var persistedJob = await new PlanGenerationJobRepository(db).GetByIdAsync(job.Id);
+        var persistedPlan = await planRepository.GetByIdAsync(generated.Id);
+
+        Assert.NotNull(persistedJob);
+        Assert.Equal(PlanGenerationJobStatus.Succeeded, persistedJob!.Status);
+        Assert.Equal(generated.Id, persistedJob.PlanId);
+        Assert.Equal(eventEntity.Id, persistedPlan!.EventId);
+        Assert.Equal(ownerId, persistedPlan.CreatedById);
+    }
+
+    [Fact]
+    public async Task EnqueueAsync_PersistsQueuedJobForTheEventOwner()
+    {
+        var ownerId = Guid.NewGuid();
+        var eventEntity = CreateEvent(ownerId);
+        using var db = CreateDb();
+        db.Events.Add(eventEntity);
+        await db.SaveChangesAsync();
+
+        var planRepository = new EventPlanDraftRepository(db);
+        var currentUser = new TestCurrentUserService(ownerId, false);
+        var generationService = CreateService(
+            db,
+            eventEntity,
+            ownerId,
+            false,
+            new TestAgenticAiClient(),
+            planRepository);
+        var jobRepository = new PlanGenerationJobRepository(db);
+        var jobService = new PlanGenerationJobService(
+            new TestEventRepository(eventEntity),
+            planRepository,
+            jobRepository,
+            currentUser,
+            generationService,
+            NullLogger<PlanGenerationJobService>.Instance);
+
+        var queued = await jobService.EnqueueAsync(
+            eventEntity.Id,
+            regenerate: false,
+            requestId: "enqueue-request");
+
+        db.ChangeTracker.Clear();
+        var persisted = await jobRepository.GetByIdAsync(queued.Id);
+
+        Assert.NotNull(persisted);
+        Assert.Equal(PlanGenerationJobStatus.Queued, persisted!.Status);
+        Assert.Equal(eventEntity.Id, persisted.EventId);
+        Assert.Equal(ownerId, persisted.RequestedById);
+        Assert.Equal("enqueue-request", persisted.RequestId);
+    }
+
+    [Fact]
     public async Task GeneratePlanAsync_RejectsAdminForAnotherUsersEvent()
     {
         var eventEntity = CreateEvent(Guid.NewGuid());
@@ -199,6 +287,7 @@ public sealed class PlanGenerationServiceTests
             new TestEventRepository(eventEntity),
             planRepository,
             new TestCurrentUserService(userId, isAdmin),
+            new PlanGenerationJobRepository(db),
             aiClient,
             new CoordinatorPlanValidationService(
                 NullLogger<CoordinatorPlanValidationService>.Instance),

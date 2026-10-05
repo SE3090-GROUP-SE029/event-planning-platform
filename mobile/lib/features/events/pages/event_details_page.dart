@@ -9,12 +9,14 @@ import '../../../shared/widgets/pastel_icon_badge.dart';
 import '../../../shared/widgets/pastel_pill_badge.dart';
 import '../../../shared/widgets/pastel_section_header.dart';
 import '../../auth/models/auth_response_model.dart';
-import '../api/event_remote_datasource.dart';
-import '../models/event_model.dart';
 import '../../plans/api/plan_remote_datasource.dart';
+import '../../plans/models/plan_generation_job_model.dart';
 import '../../plans/models/plan_model.dart';
 import '../../guest_management/pages/guest_management_page.dart';
 import '../../guest_management/pages/guest_analytics_page.dart';
+import '../../scheduling/pages/event_schedule_page.dart';
+import '../api/event_remote_datasource.dart';
+import '../models/event_model.dart';
 
 class EventDetailsPage extends StatefulWidget {
   final EventRemoteDataSource? eventApi;
@@ -99,17 +101,69 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     });
     try {
       final plans = await _planApi.listForEvent(auth.accessToken, event.id);
+      if (plans.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _existingPlan = plans.first;
+            _plansLoading = false;
+          });
+        }
+        return;
+      }
+
+      final latestJob =
+          await _planApi.getLatestGeneration(auth.accessToken, event.id);
+      if (latestJob != null &&
+          latestJob.status == PlanGenerationJobStatus.failed) {
+        if (mounted) {
+          setState(() {
+            _plansLoading = false;
+            _generatingPlan = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                latestJob.message ?? 'Plan generation failed. Please retry.',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+      if (latestJob != null) {
+        if (mounted) {
+          setState(() {
+            _plansLoading = false;
+            _generatingPlan = true;
+          });
+        }
+        final plan =
+            await _planApi.waitForGeneration(auth.accessToken, latestJob);
+        if (mounted) {
+          setState(() {
+            _existingPlan = plan;
+            _generatingPlan = false;
+          });
+          await Navigator.pushNamed(context, '/plans/review', arguments: plan.id);
+        }
+        return;
+      }
+
       if (mounted) {
         setState(() {
-          _existingPlan = plans.isEmpty ? null : plans.first;
+          _existingPlan = null;
           _plansLoading = false;
         });
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(() {
-          _planError = 'Could not check for an existing AI plan. Please retry.';
+          _planError = error is PlanGenerationFailedException
+              ? error.message
+              : 'Could not check for an existing AI plan. Please retry.';
           _plansLoading = false;
+          _generatingPlan = false;
         });
       }
     }
@@ -155,6 +209,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   }
 
   String _planGenerationError(Object error) {
+    if (error is PlanGenerationFailedException) return error.message;
     if (error is DioException) {
       final response = error.response;
       final responseData = response?.data;
@@ -167,6 +222,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         }
       }
       if (response?.statusCode == 504 ||
+          response?.statusCode == 408 ||
           error.type == DioExceptionType.receiveTimeout) {
         return 'Plan generation timed out. Please retry.';
       }
@@ -175,6 +231,12 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       }
       if (error.type == DioExceptionType.connectionTimeout) {
         return 'Could not connect to the planning service. Check your connection and retry.';
+      }
+      if (error.type == DioExceptionType.cancel) {
+        return 'The request was interrupted. Plan generation may still be running; reopen this event to check its status.';
+      }
+      if (error.type == DioExceptionType.connectionError) {
+        return 'Network connection lost while checking plan generation. Reopen this event to check its status.';
       }
     }
     return 'We could not generate the AI plan. Please try again.';
@@ -371,10 +433,21 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                               variant: PastelIconVariant.yellow,
                               label: 'Event date',
                               value: event.preferredDate
-                                  .toLocal()
                                   .toString()
                                   .split(' ')
                                   .first,
+                            ),
+                            const Divider(
+                              height: 24,
+                              thickness: 0.8,
+                              color: Color(0x0C000000),
+                              indent: 56,
+                            ),
+                            _buildDetailRow(
+                              icon: Icons.schedule_rounded,
+                              variant: PastelIconVariant.blue,
+                              label: 'Time window',
+                              value: _formatTimeRange(context, event),
                             ),
                             const Divider(
                               height: 24,
@@ -411,12 +484,70 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                               variant: PastelIconVariant.blue,
                               label: 'Created',
                               value: event.createdAt
-                                  .toLocal()
                                   .toString()
                                   .split(' ')
                                   .first,
                             ),
                           ],
+                        ),
+                      ),
+
+                      PastelCard(
+                        padding: const EdgeInsets.all(AppDimens.space20),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              PageRouteBuilder(
+                                transitionDuration:
+                                    const Duration(milliseconds: 280),
+                                reverseTransitionDuration:
+                                    const Duration(milliseconds: 250),
+                                pageBuilder: (_, animation, __) =>
+                                    EventSchedulePage(eventId: event.id),
+                                transitionsBuilder: (
+                                  context,
+                                  animation,
+                                  secondaryAnimation,
+                                  child,
+                                ) {
+                                  final curvedAnimation = CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutCubic,
+                                    reverseCurve: Curves.easeInCubic,
+                                  );
+
+                                  return FadeTransition(
+                                    opacity: curvedAnimation,
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(0.08, 0.0),
+                                        end: Offset.zero,
+                                      ).chain(
+                                        CurveTween(
+                                          curve: Curves.easeOutCubic,
+                                        ),
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            icon: const Icon(Icons.calendar_today_outlined),
+                            label: const Text('View Schedule & Timeline'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.surfacePure,
+                              foregroundColor: AppColors.textPrimary,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: AppDimens.space14,
+                              ),
+                              side: const BorderSide(
+                                color: AppColors.borderSubtle,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
 
@@ -718,5 +849,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
       case EventStatus.cancelled:
         return PastelBadgeStyle.neutral;
     }
+  }
+
+  String _formatTimeRange(BuildContext context, EventModel event) {
+    final start = _timeOfDayFromDuration(event.startTime).format(context);
+    final end = _timeOfDayFromDuration(event.endTime).format(context);
+    return '$start - $end';
+  }
+
+  TimeOfDay _timeOfDayFromDuration(Duration value) {
+    final normalized = value.inMinutes % (24 * 60);
+    return TimeOfDay(hour: normalized ~/ 60, minute: normalized % 60);
   }
 }

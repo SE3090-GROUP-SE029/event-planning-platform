@@ -11,6 +11,11 @@ from src.coordinator_agent.execution import (
     CoordinatorProviderError,
     CoordinatorValidationError,
 )
+from src.gemini_client.exceptions import (
+    GeminiClientError,
+    GeminiQuotaError,
+    GeminiTimeoutError,
+)
 
 
 def _valid_generate_payload() -> dict[str, object]:
@@ -36,6 +41,29 @@ async def _post_generate(payload: dict[str, object]) -> httpx.Response:
         return await client.post("/api/coordinator/generate", json=payload)
 
 
+def _valid_schedule_payload() -> dict[str, object]:
+    return {
+        "eventId": str(uuid4()),
+        "eventTitle": "Gala",
+        "eventDescription": "Vegetarian catering",
+        "eventType": "CORPORATE",
+        "eventDate": "2027-06-15",
+        "eventStartTime": "18:00:00",
+        "eventEndTime": "22:00:00",
+        "vendorServiceContext": [{"serviceType": "Catering"}],
+        "guestCount": 100,
+    }
+
+
+async def _post_schedule_generate(gemini_client: object) -> httpx.Response:
+    app = FastAPI()
+    app.state.gemini_client = gemini_client
+    app.include_router(routes.schedule_router)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        return await client.post("/api/schedules/generate", json=_valid_schedule_payload())
+
+
 def _request_status(
     monkeypatch: pytest.MonkeyPatch, failure: Exception
 ) -> httpx.Response:
@@ -53,9 +81,11 @@ def test_coordinator_route_accepts_backend_event_contract(
     payload = _valid_generate_payload()
     payload["eventId"] = event_id
     calls: list[tuple[str, dict[str, object]]] = []
+    timeouts: list[object] = []
 
     async def execute(event_id_arg: str, event: dict[str, object], **_kwargs: object) -> object:
         calls.append((event_id_arg, event))
+        timeouts.append(_kwargs.get("timeout_seconds"))
         return {
             "service_categories": ["Catering"],
             "target_vendor_types": ["Caterer"],
@@ -96,6 +126,7 @@ def test_coordinator_route_accepts_backend_event_contract(
     assert len(response.json()["proposed_timeline"]) == 3
     assert len(calls) == 1
     assert calls[0][0] == event_id
+    assert timeouts == [routes.AGENTIC_AI_REQUEST_TIMEOUT_SECONDS]
     assert set(calls[0][1]) == {
         "name",
         "type",
@@ -215,6 +246,24 @@ def test_coordinator_route_exposes_quota_category_and_retry_after(
     assert "internal provider details" not in response.text
 
 
+def test_coordinator_route_reports_all_gemini_keys_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    failure = CoordinatorProviderError(
+        "internal provider details",
+        code="all_gemini_keys_exhausted",
+        status_code=503,
+        retry_after=600,
+    )
+
+    response = _request_status(monkeypatch, failure)
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "600"
+    assert response.json()["detail"]["error"] == "all_gemini_keys_exhausted"
+    assert response.json()["detail"]["available_keys"] == 0
+
+
 def test_coordinator_route_returns_unprocessable_entity_for_invalid_plan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -226,3 +275,85 @@ def test_coordinator_route_returns_unprocessable_entity_for_invalid_plan(
     assert response.json()["detail"] == (
         "The generated plan did not pass validation. Please try again."
     )
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        GeminiQuotaError("internal quota details"),
+        GeminiClientError("internal mixed fallback details"),
+    ],
+)
+def test_schedule_route_returns_safe_unavailable_for_provider_failure(
+    failure: GeminiClientError,
+) -> None:
+    class FailingGeminiClient:
+        async def generate_with_prompt(self, *_args: object, **_kwargs: object) -> object:
+            raise failure
+
+    response = asyncio.run(_post_schedule_generate(FailingGeminiClient()))
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "AI schedule generation is temporarily unavailable. Please try again later."
+    }
+    assert str(failure) not in response.text
+    assert "Traceback" not in response.text
+
+
+def test_schedule_route_returns_gateway_timeout_for_provider_timeout() -> None:
+    class TimedOutGeminiClient:
+        async def generate_with_prompt(self, *_args: object, **_kwargs: object) -> object:
+            raise GeminiTimeoutError("provider timed out")
+
+    response = asyncio.run(_post_schedule_generate(TimedOutGeminiClient()))
+
+    assert response.status_code == 504
+    assert response.json()["detail"] == {
+        "code": "provider_timeout",
+        "message": routes.SCHEDULE_GENERATION_TIMEOUT_MESSAGE,
+    }
+    assert "provider timed out" not in response.text
+
+
+def test_schedule_route_cancels_generation_at_configured_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(routes, "SCHEDULE_GENERATION_TIMEOUT_SECONDS", 0.01)
+
+    class SlowGeminiClient:
+        async def generate_with_prompt(self, *_args: object, **_kwargs: object) -> object:
+            await asyncio.sleep(1)
+            return {"activities": []}
+
+    response = asyncio.run(_post_schedule_generate(SlowGeminiClient()))
+
+    assert response.status_code == 504
+    assert response.json()["detail"]["message"] == (
+        routes.SCHEDULE_GENERATION_TIMEOUT_MESSAGE
+    )
+
+
+def test_schedule_route_configures_gemini_timeout_to_30_minutes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured_timeouts: list[float] = []
+
+    class StubAgent:
+        def __init__(self, _client: object) -> None:
+            pass
+
+        async def run(self, _state: object) -> dict[str, object]:
+            return {"activities": [], "conflicts": []}
+
+    def make_gemini_client(*, timeout: float) -> object:
+        configured_timeouts.append(timeout)
+        return object()
+
+    monkeypatch.setattr(routes, "GeminiClient", make_gemini_client)
+    monkeypatch.setattr(routes, "SchedulingAgent", StubAgent)
+
+    response = asyncio.run(_post_schedule_generate(None))
+
+    assert response.status_code == 200
+    assert configured_timeouts == [1800.0]

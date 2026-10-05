@@ -12,7 +12,10 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from src.agents.adk_schema import AdkSchemaError
-from src.coordinator_agent.config import get_settings
+from src.coordinator_agent.config import (
+    AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
+    get_settings,
+)
 from src.models.guest_review_models import GuestDecision, GuestReviewRequest, GuestReviewResponse
 
 logger = logging.getLogger(__name__)
@@ -37,7 +40,7 @@ class ReviewSettings:
     model: str = "gemini-3.8-flash"
     api_keys: tuple[str, ...] = ()
     fallback_models: tuple[str, ...] = ()
-    timeout_seconds: float = 110
+    timeout_seconds: float = float(AGENTIC_AI_REQUEST_TIMEOUT_SECONDS)
 
     @classmethod
     def from_environment(cls) -> "ReviewSettings":
@@ -48,7 +51,15 @@ class ReviewSettings:
                 model=configured_models[0],
                 api_keys=app_settings.get_gemini_api_keys(),
                 fallback_models=configured_models[1:],
-                timeout_seconds=float(os.getenv("GUEST_AI_TIMEOUT_SECONDS", "110")),
+                timeout_seconds=max(
+                    float(
+                        os.getenv(
+                            "GUEST_AI_TIMEOUT_SECONDS",
+                            str(AGENTIC_AI_REQUEST_TIMEOUT_SECONDS),
+                        )
+                    ),
+                    AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
+                ),
             )
             settings.validate()
             return settings
@@ -61,7 +72,7 @@ class ReviewSettings:
 
     def validate(self) -> None:
         if (
-            not 0 < self.timeout_seconds <= 300
+            not 0 < self.timeout_seconds <= AGENTIC_AI_REQUEST_TIMEOUT_SECONDS
             or any(
                 not model.startswith("gemini-") or any(char.isspace() for char in model)
                 for model in self.models

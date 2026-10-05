@@ -3,6 +3,8 @@ import { Box, CircularProgress } from '@mui/material';
 import ProtectedRoute from '../shared/components/ProtectedRoute';
 
 const LandingPage = lazy(() => import('../features/landing/pages/LandingPage'));
+const PublicGuestRegistrationPage = lazy(() => import('../features/guestRegistration/pages/PublicGuestRegistrationPage'));
+const PublicRegistrationStatusPage = lazy(() => import('../features/guestRegistration/pages/PublicRegistrationStatusPage'));
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'));
 const DashboardPage = lazy(() => import('../features/dashboard/pages/DashboardPage'));
 const AdminEventManagementPage = lazy(() => import('../features/adminEvents/pages/AdminEventManagementPage'));
@@ -13,6 +15,8 @@ const GuestCheckInPage = lazy(() => import('../features/adminEvents/pages/GuestC
 const EventAnalyticsPage = lazy(() => import('../features/adminEvents/pages/EventAnalyticsPage'));
 const AdminPlanDashboardPage = lazy(() => import('../features/adminPlans/pages/AdminPlanDashboardPage'));
 const AdminPlanDetailsPage = lazy(() => import('../features/adminPlans/pages/AdminPlanDetailsPage'));
+const AdminScheduleListPage = lazy(() => import('../features/adminSchedules/pages/AdminScheduleListPage'));
+const AdminScheduleDetailsPage = lazy(() => import('../features/adminSchedules/pages/AdminScheduleDetailsPage'));
 const AdminAnalyticsPage = lazy(() => import('../features/dashboard/pages/AdminAnalyticsPage'));
 const AdminUsersPage = lazy(() => import('../features/dashboard/pages/AdminUsersPage'));
 const AdminVendorsPage = lazy(() => import('../features/dashboard/pages/AdminVendorsPage'));
@@ -44,6 +48,14 @@ function AdminPage({ page: Page }) {
 
 export function LandingRoute() {
   return <SuspendedPage><LandingPage /></SuspendedPage>;
+}
+
+export function PublicGuestRegistrationRoute() {
+  return <SuspendedPage><PublicGuestRegistrationPage /></SuspendedPage>;
+}
+
+export function PublicRegistrationStatusRoute() {
+  return <SuspendedPage><PublicRegistrationStatusPage /></SuspendedPage>;
 }
 
 export function LoginRoute() {
@@ -96,6 +108,14 @@ export function AdminPlansRoute() {
 
 export function AdminPlanDetailsRoute() {
   return <AdminPage page={AdminPlanDetailsPage} />;
+}
+
+export function AdminSchedulesRoute() {
+  return <AdminPage page={AdminScheduleListPage} />;
+}
+
+export function AdminScheduleDetailsRoute() {
+  return <AdminPage page={AdminScheduleDetailsPage} />;
 }
 
 export function AdminSystemRoute() {

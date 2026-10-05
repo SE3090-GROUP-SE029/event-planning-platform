@@ -496,12 +496,14 @@ class _GuestRegistrationDetailPageState
   String _statusLabel(RegistrationStatus status) {
     switch (status) {
       case RegistrationStatus.confirmed:
+        return 'CONFIRMED';
+      case RegistrationStatus.pendingReview:
+        return 'PENDING REVIEW';
+      case RegistrationStatus.accepted:
         return 'ACCEPTED';
-      case RegistrationStatus.pendingAi:
-        return 'PENDING AI';
       case RegistrationStatus.rejected:
         return 'REJECTED';
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.waitlisted:
         return 'WAITLISTED';
       case RegistrationStatus.cancelled:
         return 'CANCELLED';
@@ -514,11 +516,13 @@ class _GuestRegistrationDetailPageState
     switch (status) {
       case RegistrationStatus.confirmed:
         return PastelBadgeStyle.green;
-      case RegistrationStatus.pendingAi:
+      case RegistrationStatus.pendingReview:
         return PastelBadgeStyle.yellow;
+      case RegistrationStatus.accepted:
+        return PastelBadgeStyle.blue;
       case RegistrationStatus.rejected:
         return PastelBadgeStyle.pink;
-      case RegistrationStatus.waitingList:
+      case RegistrationStatus.waitlisted:
         return PastelBadgeStyle.blue;
       default:
         return PastelBadgeStyle.neutral;

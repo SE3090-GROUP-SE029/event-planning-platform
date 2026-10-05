@@ -16,6 +16,7 @@ import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { tokens } from '../../theme/tokens';
@@ -27,6 +28,7 @@ const adminItems = [
   { id: 'vendors', label: 'Vendors', path: '/admin/vendors', icon: StorefrontOutlinedIcon },
   { id: 'events', label: 'Events', path: '/admin/events', icon: EventAvailableIcon },
   { id: 'plans', label: 'AI Plans', path: '/admin/plans', icon: AutoAwesomeOutlinedIcon },
+  { id: 'schedules', label: 'Schedules', path: '/admin/schedules', icon: CalendarMonthOutlinedIcon },
   { id: 'system', label: 'Monitoring', path: '/admin/system', icon: DnsOutlinedIcon },
 ];
 

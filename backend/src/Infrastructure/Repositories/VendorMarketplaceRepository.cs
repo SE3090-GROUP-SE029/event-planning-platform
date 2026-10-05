@@ -39,38 +39,33 @@ public class VendorMarketplaceRepository : IVendorMarketplaceRepository
             vendors = vendors.Where(v => v.Category == categoryFilter.Value);
         }
 
-        var projected = vendors.Select(v => new
-        {
-            Vendor = v,
-            StartingPrice = _db.VendorOfferings
-                .Where(o => o.VendorId == v.Id && o.Price != null)
-                .Min(o => (decimal?)o.Price),
-            StartingPricingType = _db.VendorOfferings
-                .Where(o => o.VendorId == v.Id && o.Price != null)
-                .OrderBy(o => o.Price)
-                .Select(o => (PricingType?)o.PricingType)
-                .FirstOrDefault()
-        });
-
         var descending = string.Equals(query.SortOrder, "desc", StringComparison.OrdinalIgnoreCase);
-        projected = query.SortBy?.ToLowerInvariant() switch
+        vendors = query.SortBy?.ToLowerInvariant() switch
         {
             "category" => descending
-                ? projected.OrderByDescending(x => x.Vendor.Category).ThenBy(x => x.Vendor.BusinessName)
-                : projected.OrderBy(x => x.Vendor.Category).ThenBy(x => x.Vendor.BusinessName),
+                ? vendors.OrderByDescending(v => v.Category).ThenBy(v => v.BusinessName)
+                : vendors.OrderBy(v => v.Category).ThenBy(v => v.BusinessName),
             "createdat" => descending
-                ? projected.OrderByDescending(x => x.Vendor.CreatedAt)
-                : projected.OrderBy(x => x.Vendor.CreatedAt),
+                ? vendors.OrderByDescending(v => v.CreatedAt).ThenBy(v => v.BusinessName)
+                : vendors.OrderBy(v => v.CreatedAt).ThenBy(v => v.BusinessName),
             "startingprice" => descending
-                ? projected.OrderByDescending(x => x.StartingPrice ?? decimal.MinValue)
-                : projected.OrderBy(x => x.StartingPrice ?? decimal.MaxValue),
+                ? vendors
+                    .OrderByDescending(v => _db.VendorOfferings
+                        .Where(o => o.VendorId == v.Id && o.Price != null)
+                        .Min(o => (decimal?)o.Price) ?? decimal.MinValue)
+                    .ThenBy(v => v.BusinessName)
+                : vendors
+                    .OrderBy(v => _db.VendorOfferings
+                        .Where(o => o.VendorId == v.Id && o.Price != null)
+                        .Min(o => (decimal?)o.Price) ?? decimal.MaxValue)
+                    .ThenBy(v => v.BusinessName),
             _ => descending
-                ? projected.OrderByDescending(x => x.Vendor.BusinessName)
-                : projected.OrderBy(x => x.Vendor.BusinessName)
+                ? vendors.OrderByDescending(v => v.BusinessName)
+                : vendors.OrderBy(v => v.BusinessName)
         };
 
-        var totalCount = await projected.CountAsync();
-        var pageItems = await projected
+        var totalCount = await vendors.CountAsync();
+        var pageVendors = await vendors
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync();
@@ -92,7 +87,7 @@ public class VendorMarketplaceRepository : IVendorMarketplaceRepository
                 query.Page,
                 query.PageSize);
         }
-        else if (pageItems.Count == 0)
+        else if (pageVendors.Count == 0)
         {
             _logger.LogInformation(
                 "Vendor marketplace page is empty although matches exist. " +
@@ -102,21 +97,46 @@ public class VendorMarketplaceRepository : IVendorMarketplaceRepository
                 query.PageSize);
         }
 
-        var items = pageItems.Select(x => new MarketplaceVendorListItemResponse
+        if (pageVendors.Count == 0)
         {
-            Id = x.Vendor.Id,
-            BusinessName = x.Vendor.BusinessName,
-            Category = x.Vendor.Category.ToString(),
-            ShortDescription = Truncate(x.Vendor.Description, 160),
-            Address = x.Vendor.Address,
-            ProfileImageUrl = x.Vendor.ProfileImageUrl,
-            StartingPrice = x.StartingPrice,
-            StartingPricingType = x.StartingPricingType?.ToString()
+            return ([], totalCount);
+        }
+
+        var vendorIds = pageVendors.Select(v => v.Id).ToList();
+        var offeringRows = await _db.VendorOfferings
+            .AsNoTracking()
+            .Where(o => vendorIds.Contains(o.VendorId) && o.Price != null)
+            .OrderBy(o => o.Price)
+            .Select(o => new
+            {
+                o.VendorId,
+                o.Price,
+                o.PricingType
+            })
+            .ToListAsync();
+        var lowestOfferings = offeringRows
+            .GroupBy(o => o.VendorId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var items = pageVendors.Select(v =>
+        {
+            lowestOfferings.TryGetValue(v.Id, out var offering);
+            return new MarketplaceVendorListItemResponse
+            {
+                Id = v.Id,
+                BusinessName = v.BusinessName,
+                Category = v.Category.ToString(),
+                ShortDescription = Truncate(v.Description, 160),
+                Address = v.Address,
+                ProfileImageUrl = v.ProfileImageUrl,
+                StartingPrice = offering?.Price,
+                StartingPricingType = offering?.PricingType?.ToString()
+            };
         }).ToList();
 
         var aggregates = await _db.VendorRatings
             .AsNoTracking()
-            .Where(r => items.Select(i => i.Id).Contains(r.VendorId))
+            .Where(r => vendorIds.Contains(r.VendorId))
             .GroupBy(r => r.VendorId)
             .Select(g => new
             {

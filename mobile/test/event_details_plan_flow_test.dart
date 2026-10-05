@@ -6,6 +6,7 @@ import 'package:mobile/features/events/api/event_remote_datasource.dart';
 import 'package:mobile/features/events/models/event_model.dart';
 import 'package:mobile/features/events/pages/event_details_page.dart';
 import 'package:mobile/features/plans/api/plan_remote_datasource.dart';
+import 'package:mobile/features/plans/models/plan_generation_job_model.dart';
 import 'package:mobile/features/plans/models/plan_model.dart';
 
 void main() {
@@ -57,6 +58,34 @@ void main() {
 
     expect(planApi.generateCallCount, 0);
     expect(find.text('Plan review: ${existingPlan.id}'), findsOneWidget);
+  });
+
+  testWidgets('resumes a persisted generation job when reopening an event',
+      (tester) async {
+    final event = _event();
+    final plan = _plan();
+    final planApi = _TestPlanRemoteDataSource(
+      generatedPlan: plan,
+      latestGeneration: const PlanGenerationJob(
+        jobId: 'job-1',
+        eventId: 'event-1',
+        status: PlanGenerationJobStatus.processing,
+        planId: null,
+        message: null,
+      ),
+    );
+
+    await tester.pumpWidget(_app(
+      event,
+      _TestEventRemoteDataSource(event),
+      planApi,
+    ));
+    await tester.tap(find.text('Open event'));
+    await tester.pumpAndSettle();
+
+    expect(planApi.generateCallCount, 0);
+    expect(planApi.resumeCallCount, 1);
+    expect(find.text('Plan review: ${plan.id}'), findsOneWidget);
   });
 
   testWidgets('shows a retry message when plan generation fails',
@@ -195,6 +224,8 @@ EventModel _event() => EventModel(
       budget: 1000,
       preferredVenue: 'Community Hall',
       preferredDate: DateTime.utc(2027, 1, 1),
+      startTime: const Duration(hours: 18),
+      endTime: const Duration(hours: 23),
       eventDuration: const Duration(hours: 1),
       requirements: null,
       status: EventStatus.draft,
@@ -238,17 +269,36 @@ class _TestPlanRemoteDataSource extends PlanRemoteDataSource {
   final List<EventPlan> existingPlans;
   final EventPlan? generatedPlan;
   final Object? generateError;
+  final PlanGenerationJob? latestGeneration;
   int generateCallCount = 0;
+  int resumeCallCount = 0;
 
   _TestPlanRemoteDataSource({
     this.existingPlans = const [],
     this.generatedPlan,
     this.generateError,
+    this.latestGeneration,
   }) : super(dio: Dio());
 
   @override
   Future<List<EventPlan>> listForEvent(String token, String eventId) async =>
       existingPlans;
+
+  @override
+  Future<PlanGenerationJob?> getLatestGeneration(
+    String token,
+    String eventId,
+  ) async =>
+      latestGeneration;
+
+  @override
+  Future<EventPlan> waitForGeneration(
+    String token,
+    PlanGenerationJob job,
+  ) async {
+    resumeCallCount++;
+    return generatedPlan!;
+  }
 
   @override
   Future<EventPlan> generate(String token, String eventId) async {

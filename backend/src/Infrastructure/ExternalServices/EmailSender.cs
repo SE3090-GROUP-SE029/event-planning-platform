@@ -6,22 +6,31 @@ using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.ExternalServices;
 
-public class EmailSender(SmtpEmailOptions options, ILogger<EmailSender> logger) : IInvitationEmailSender
+public class EmailSender(SmtpEmailOptions options, ILogger<EmailSender> logger) :
+    IInvitationEmailSender, IRegistrationOutcomeEmailSender, IRegistrationLinkEmailSender
 {
     public Task<EmailDeliveryResult> SendAsync(InvitationEmail invitation, CancellationToken cancellationToken)
         => SendMessageAsync(invitation.EmailAddress, "Your event invitation",
             $"Hello {invitation.FullName},\n\nYour place at {invitation.EventName} is confirmed.\n" +
             $"Starts: {invitation.StartsAt:O}\nLocation: {invitation.Location ?? "Not specified"}\n\n" +
-            $"Invitation token: {invitation.Token}\nYour QR code is attached. Keep this invitation private.",
-            invitation.QrPng, cancellationToken);
+            $"Invitation token: {invitation.Token}\nYour QR code is attached. Keep this invitation private." +
+            (invitation.StatusUrl is null ? string.Empty : $"\n\nCheck your registration or submit your RSVP:\n{invitation.StatusUrl}"),
+            invitation.QrPng, cancellationToken, requiresTls: true);
 
     public Task<EmailDeliveryResult> SendRejectionAsync(RejectionEmail rejection, CancellationToken cancellationToken)
         => SendMessageAsync(rejection.EmailAddress, "Your event registration",
             $"Hello {rejection.FullName},\n\nThank you for your interest in {rejection.EventName}. " +
             "We are unable to accept your registration for this event.\n\nThank you for your understanding.", null, cancellationToken);
 
+    public Task<EmailDeliveryResult> SendRegistrationLinkAsync(RegistrationLinkEmail invitation,
+        CancellationToken cancellationToken)
+        => SendMessageAsync(invitation.EmailAddress, $"Register for {invitation.EventName}",
+            $"Hello {invitation.FullName},\n\nYou are invited to register for {invitation.EventName}.\n" +
+            $"Complete your registration here:\n{invitation.RegistrationUrl}\n\n" +
+            "Your registration is not complete until you submit the form.", null, cancellationToken);
+
     private async Task<EmailDeliveryResult> SendMessageAsync(string recipient, string subject, string body,
-        byte[]? qrPng, CancellationToken cancellationToken)
+        byte[]? qrPng, CancellationToken cancellationToken, bool requiresTls = false)
     {
         if (string.IsNullOrWhiteSpace(options.Host) || !MailAddress.TryCreate(options.FromAddress, out var from) ||
             options.Port is < 1 or > 65535 || options.TimeoutSeconds is < 1 or > 60)
@@ -29,10 +38,10 @@ public class EmailSender(SmtpEmailOptions options, ILogger<EmailSender> logger) 
             logger.LogWarning("Invitation delivery is pending because SMTP configuration is unavailable or invalid.");
             return EmailDeliveryResult.UNAVAILABLE;
         }
-        // Never transmit SMTP credentials without transport encryption.
-        if (!options.EnableSsl && !string.IsNullOrWhiteSpace(options.UserName))
+        // Never transmit SMTP or invitation credentials without transport encryption.
+        if (!options.EnableSsl && (requiresTls || !string.IsNullOrWhiteSpace(options.UserName)))
         {
-            logger.LogWarning("Invitation delivery is pending because authenticated SMTP requires TLS.");
+            logger.LogWarning("Email delivery is pending because credential-bearing or authenticated SMTP requires TLS.");
             return EmailDeliveryResult.UNAVAILABLE;
         }
         using var message = new MailMessage

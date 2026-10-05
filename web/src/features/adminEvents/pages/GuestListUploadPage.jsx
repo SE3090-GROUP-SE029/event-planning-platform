@@ -96,7 +96,7 @@ export default function GuestListUploadPage() {
     <AppLayout
       activeTab="events"
       title="Guest List Upload"
-      subtitle="Import guests from a CSV file"
+      subtitle="Invite guests to register using a CSV, PDF, or DOCX list"
     >
       <Button
         startIcon={<ArrowBackOutlinedIcon />}
@@ -108,11 +108,11 @@ export default function GuestListUploadPage() {
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: "-0.04em", mb: 0.5 }}>
-          Upload Guest List
+          Invite Guests
         </Typography>
         <Typography color="text.secondary">
-          Upload a CSV, PDF, or DOCX file to register multiple guests at once. Each valid guest enters
-          the same AI review → capacity → invitation pipeline as public registrations.
+          Upload a CSV, PDF, or DOCX file to email each valid guest a link to the public registration form.
+          Guests enter AI review and capacity allocation only after submitting that form.
         </Typography>
       </Box>
 
@@ -199,7 +199,7 @@ export default function GuestListUploadPage() {
           startIcon={mutation.isPending ? <CircularProgress size={18} color="inherit" /> : <FileUploadOutlinedIcon />}
           sx={{ borderRadius: 9999, px: 3, bgcolor: tokens.colors.obsidian, "&:hover": { bgcolor: tokens.colors.obsidianHover } }}
         >
-          {mutation.isPending ? "Uploading…" : "Upload Guest List"}
+          {mutation.isPending ? "Sending invitations…" : "Send Registration Links"}
         </Button>
         {selectedFile && (
           <Button
@@ -221,7 +221,7 @@ export default function GuestListUploadPage() {
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} flexWrap="wrap" gap={2} sx={{ mb: 3 }}>
             <StatBox label="Total Rows" value={result.totalRows} variant="default" />
-            <StatBox label="Registered" value={result.successfulRows} variant="task" />
+            <StatBox label="Links Sent" value={result.successfulRows} variant="task" />
             <StatBox label="Already Registered" value={result.alreadyRegisteredRows} variant="analytics" />
             <StatBox label="In-File Duplicates" value={result.duplicateRows} variant="aiPlan" />
             <StatBox label="Failed" value={result.failedRows} variant="vendor" />
@@ -233,7 +233,7 @@ export default function GuestListUploadPage() {
               severity="success"
               sx={{ mb: 2, borderRadius: 3 }}
             >
-              {result.successfulRows} guest{result.successfulRows !== 1 ? "s" : ""} registered successfully and queued for AI review.
+              Registration links were emailed to {result.successfulRows} guest{result.successfulRows !== 1 ? "s" : ""}.
             </Alert>
           )}
 

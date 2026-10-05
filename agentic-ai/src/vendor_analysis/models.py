@@ -138,4 +138,6 @@ class VendorRecommendationResponse(BaseModel):
 
     @classmethod
     def get_json_schema_for_gemini(cls) -> dict[str, Any]:
-        return cls.model_json_schema()
+        from src.gemini_client.schema import pydantic_to_gemini_json_schema
+
+        return pydantic_to_gemini_json_schema(cls)

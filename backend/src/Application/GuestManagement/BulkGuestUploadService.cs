@@ -1,30 +1,27 @@
 using Domain.Entities;
 using Domain.Enums;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace Application.GuestManagement;
 
 /// <summary>
-/// Processes a planner-uploaded CSV guest list and feeds each valid guest into the
-/// same registration pipeline used by the public self-registration form.
+/// Processes a planner-uploaded guest list and emails each valid guest the public
+/// registration link. Guests enter the registration pipeline only after submission.
 ///
-/// Entry point for the new upload path:
-///   Planner CSV upload -> BulkGuestUploadService -> Guest + RegistrationSubmission (PENDING_AI)
-///                                                 -> GuestAiReviewWorker (existing)
-///                                                 -> capacity / waitlist (existing)
-///                                                 -> invitation / RSVP / QR (existing)
-///
-/// The public self-registration path is NOT modified.
+/// Public form submissions are handled by RegistrationService.
 /// </summary>
 public class BulkGuestUploadService(
     IGuestRegistrationRepository repository,
-    IRegistrationTokenGenerator tokens,
-    TimeProvider clock)
+    GuestRegistrationOptions guestOptions,
+    TimeProvider clock,
+    ILogger<BulkGuestUploadService> logger)
 {
     private const int MaxRows = 1000;
 
     /// <summary>
-    /// Parses csvContent, validates each row, and creates Guest + RegistrationSubmission
-    /// records for every valid, non-duplicate guest with status PENDING_AI.
+    /// Parses and validates the upload, persists guests and durable email jobs in one
+    /// transaction, and returns without waiting for SMTP delivery.
     /// </summary>
     public async Task<BulkGuestUploadResult> ProcessAsync(
         Guid eventId,
@@ -33,13 +30,39 @@ public class BulkGuestUploadService(
         string extension,
         CancellationToken ct)
     {
-        var (parsedRows, parseErrors) = extension switch
+        var processStarted = Stopwatch.GetTimestamp();
+        var normalizedExtension = extension.ToLowerInvariant();
+        var parseStarted = Stopwatch.GetTimestamp();
+        logger.LogInformation(
+            "Guest list parsing started. EventId={EventId}, Extension={Extension}",
+            eventId,
+            normalizedExtension);
+        var (parsedRows, parseErrors) = normalizedExtension switch
         {
-            ".pdf" => GuestDocumentParser.ParsePdf(fileStream),
-            ".docx" => GuestDocumentParser.ParseDocx(fileStream),
-            _ => GuestCsvParser.Parse(new StreamReader(fileStream).ReadToEnd())
+            ".pdf" => GuestDocumentParser.ParsePdf(fileStream, logger),
+            ".docx" => GuestDocumentParser.ParseDocx(fileStream, logger),
+            ".csv" => GuestCsvParser.Parse(new StreamReader(fileStream).ReadToEnd()),
+            _ => throw new RegistrationException(400, "invalid_file_type",
+                "Only CSV, PDF, and DOCX files are supported.")
         };
+        var parseElapsed = Stopwatch.GetElapsedTime(parseStarted);
+        logger.LogInformation(
+            "Guest list file parsed and guest extraction completed. EventId={EventId}, ExtractedRows={ExtractedRows}, InvalidRows={InvalidRows}, ElapsedMs={ElapsedMs}",
+            eventId,
+            parsedRows.Count,
+            parseErrors.Count,
+            parseElapsed.TotalMilliseconds);
+        var initialParseErrorCount = parseErrors.Count;
+        if (initialParseErrorCount > 0)
+        {
+            logger.LogWarning(
+                "Guest list parser reported file or row errors. EventId={EventId}, ErrorCount={ErrorCount}, FirstError={FirstError}",
+                eventId,
+                initialParseErrorCount,
+                parseErrors[0].Message);
+        }
 
+        var duplicateStarted = Stopwatch.GetTimestamp();
         var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var duplicateRows = new List<GuestUploadRowError>();
         var candidateRows = new List<(GuestUploadRow Row, GuestDetails Details)>();
@@ -67,37 +90,51 @@ public class BulkGuestUploadService(
 
             candidateRows.Add((row, details));
         }
+        logger.LogInformation(
+            "Guest list row validation completed. EventId={EventId}, GuestCount={GuestCount}, DuplicateCount={DuplicateCount}, InvalidRowCount={InvalidRowCount}, ElapsedMs={ElapsedMs}",
+            eventId,
+            candidateRows.Count,
+            duplicateRows.Count,
+            parseErrors.Count,
+            Stopwatch.GetElapsedTime(duplicateStarted).TotalMilliseconds);
 
-        var successCount = 0;
-        var alreadyRegisteredCount = 0;
-        var dbErrors = new List<GuestUploadRowError>();
-
-        foreach (var (row, details) in candidateRows)
+        var dbStarted = Stopwatch.GetTimestamp();
+        var queueResult = await repository.WithEventLockAsync(eventId, async eventDetails =>
         {
-            if (ct.IsCancellationRequested) break;
+            RegistrationAccess.RequireOwner(eventDetails, plannerId);
 
-            bool alreadyExists;
-            try
+            var form = await repository.FindFormAsync(eventId, ct)
+                ?? throw new RegistrationException(409, "form_required",
+                    "The event must have a registration form before inviting guests.");
+            if (form.Status != RegistrationFormStatus.PUBLISHED || form.PublicId is null)
+                throw new RegistrationException(409, "form_not_published",
+                    "The registration form must be published before inviting guests.");
+
+            var normalizedEmails = candidateRows
+                .Select(candidate => candidate.Details.EmailAddress.ToUpperInvariant())
+                .ToArray();
+            var registeredEmails = await repository.RegisteredEmailsAsync(eventId, normalizedEmails, ct);
+            var existingGuests = await repository.FindGuestsByEmailsAsync(eventId, normalizedEmails, ct);
+            var guestsByEmail = existingGuests.ToDictionary(guest => guest.NormalizedEmail, StringComparer.Ordinal);
+            var now = clock.GetUtcNow();
+            var newGuests = new List<Guest>();
+            var emailJobs = new List<RegistrationLinkEmailJob>();
+            var alreadyRegisteredCount = 0;
+            var linkCreationStarted = Stopwatch.GetTimestamp();
+            var registrationUrl = RegistrationUrl(form.PublicId);
+
+            foreach (var (row, details) in candidateRows)
             {
-                alreadyExists = await repository.WithEventLockAsync(eventId, async eventDetails =>
+                var normalizedEmail = details.EmailAddress.ToUpperInvariant();
+                if (registeredEmails.Contains(normalizedEmail))
                 {
-                    RequireOwner(eventDetails, plannerId);
+                    alreadyRegisteredCount++;
+                    continue;
+                }
 
-                    var form = await repository.FindFormAsync(eventId, ct)
-                        ?? throw new RegistrationException(409, "form_required",
-                            "The event must have a registration form before uploading guests.");
-
-                    if (form.Status != RegistrationFormStatus.PUBLISHED)
-                        throw new RegistrationException(409, "form_not_published",
-                            "The registration form must be published before uploading guests.");
-
-                    var normalizedEmail = details.EmailAddress.ToUpperInvariant();
-                    if (await repository.EmailExistsAsync(eventId, normalizedEmail, ct))
-                        return true;
-
-                    var now = clock.GetUtcNow();
-                    var secret = tokens.Generate();
-                    var guest = new Guest
+                if (!guestsByEmail.TryGetValue(normalizedEmail, out var guest))
+                {
+                    guest = new Guest
                     {
                         EventId = eventId,
                         FullName = details.FullName,
@@ -106,75 +143,90 @@ public class BulkGuestUploadService(
                         Organisation = details.Organisation,
                         PhoneNumber = details.PhoneNumber,
                         CreatedAt = now,
-                        UpdatedAt = now,
+                        UpdatedAt = now
                     };
-                    var submission = new RegistrationSubmission
-                    {
-                        EventId = eventId,
-                        RegistrationFormId = form.Id,
-                        RegistrationForm = form,
-                        GuestId = guest.Id,
-                        Guest = guest,
-                        PublicReference = await UniqueTokenAsync(ct),
-                        StatusSecretHash = tokens.Hash(secret),
-                        RegisteredAt = now,
-                        UpdatedAt = now,
-                        Status = RegistrationStatus.PENDING_AI,
-                        Answers = [],
-                    };
-                    repository.AddRegistration(submission);
-                    return false;
-                }, ct);
-            }
-            catch (RegistrationException ex) when (ex.Code is "form_required" or "form_not_published" or "not_found")
-            {
-                throw;
-            }
-            catch (RegistrationException ex)
-            {
-                dbErrors.Add(new GuestUploadRowError(row.RowNumber, "emailAddress", ex.Message));
-                continue;
+                    newGuests.Add(guest);
+                    guestsByEmail.Add(normalizedEmail, guest);
+                }
+                else
+                {
+                    guest.FullName = details.FullName;
+                    guest.EmailAddress = details.EmailAddress;
+                    guest.Organisation = details.Organisation;
+                    guest.PhoneNumber = details.PhoneNumber;
+                    guest.UpdatedAt = now;
+                }
+
+                emailJobs.Add(new RegistrationLinkEmailJob
+                {
+                    EventId = eventId,
+                    EmailAddress = details.EmailAddress,
+                    FullName = details.FullName,
+                    EventName = eventDetails.EventName,
+                    RegistrationUrl = registrationUrl,
+                    CreatedAt = now,
+                    NextAttemptAt = now
+                });
             }
 
-            if (alreadyExists)
-                alreadyRegisteredCount++;
-            else
-                successCount++;
-        }
+            logger.LogInformation(
+                "Guest registration links created. EventId={EventId}, LinkCount={LinkCount}, ElapsedMs={ElapsedMs}",
+                eventId,
+                emailJobs.Count,
+                Stopwatch.GetElapsedTime(linkCreationStarted).TotalMilliseconds);
+            logger.LogInformation(
+                "Guest database insert started. EventId={EventId}, NewGuests={NewGuests}, UpdatedGuests={UpdatedGuests}, EmailJobs={EmailJobs}",
+                eventId,
+                newGuests.Count,
+                emailJobs.Count - newGuests.Count,
+                emailJobs.Count);
+            repository.AddGuests(newGuests);
+            repository.AddRegistrationLinkEmailJobs(emailJobs);
+            return (
+                UploadedGuests: emailJobs.Count,
+                AlreadyRegistered: alreadyRegisteredCount,
+                QueuedEmails: emailJobs.Count);
+        }, ct);
+        logger.LogInformation(
+            "Guest database inserts and email queue committed. EventId={EventId}, UploadedGuests={UploadedGuests}, QueuedEmails={QueuedEmails}, ElapsedMs={ElapsedMs}",
+            eventId,
+            queueResult.UploadedGuests,
+            queueResult.QueuedEmails,
+            Stopwatch.GetElapsedTime(dbStarted).TotalMilliseconds);
+        logger.LogInformation(
+            "Guest duplicate detection completed. EventId={EventId}, InFileDuplicates={InFileDuplicates}, AlreadyRegistered={AlreadyRegistered}, TotalDuplicates={TotalDuplicates}",
+            eventId,
+            duplicateRows.Count,
+            queueResult.AlreadyRegistered,
+            duplicateRows.Count + queueResult.AlreadyRegistered);
 
         var allErrors = parseErrors
             .Concat(duplicateRows)
-            .Concat(dbErrors)
             .OrderBy(e => e.RowNumber)
             .ToList();
 
-        var totalRows = parsedRows.Count + parseErrors.Count + duplicateRows.Count;
+        var totalRows = parsedRows.Count + initialParseErrorCount;
+        logger.LogInformation(
+            "Guest list upload processing completed. EventId={EventId}, TotalElapsedMs={ElapsedMs}",
+            eventId,
+            Stopwatch.GetElapsedTime(processStarted).TotalMilliseconds);
 
         return new BulkGuestUploadResult(
             TotalRows: totalRows,
-            SuccessfulRows: successCount,
-            FailedRows: parseErrors.Count + dbErrors.Count,
+            SuccessfulRows: queueResult.QueuedEmails,
+            FailedRows: parseErrors.Count,
             DuplicateRows: duplicateRows.Count,
-            AlreadyRegisteredRows: alreadyRegisteredCount,
-            Errors: allErrors);
+            AlreadyRegisteredRows: queueResult.AlreadyRegistered,
+            Errors: allErrors,
+            UploadedGuests: queueResult.UploadedGuests,
+            InvalidRows: parseErrors.Count,
+            DeliveryFailedRows: 0,
+            QueuedEmails: queueResult.QueuedEmails);
     }
 
-    private async Task<string> UniqueTokenAsync(CancellationToken ct)
-    {
-        for (var attempt = 0; attempt < 5; attempt++)
-        {
-            var token = tokens.Generate();
-            if (!await repository.TokenExistsAsync(token, ct)) return token;
-        }
-        throw new RegistrationException(503, "token_generation_failed",
-            "Unable to create a unique registration reference. Please retry.");
-    }
-
-    private static void RequireOwner(Event eventDetails, string plannerId)
-    {
-        if (string.IsNullOrWhiteSpace(plannerId) || eventDetails.OwnerId.ToString() != plannerId)
-            throw new RegistrationException(404, "not_found", "Registration resource not found.");
-    }
+    private string RegistrationUrl(string publicId)
+        => new Uri(guestOptions.GetPublicWebBaseUri(),
+            $"guest/register/{Uri.EscapeDataString(publicId)}").AbsoluteUri;
 
     private static string DeriveField(string errorCode) => errorCode switch
     {

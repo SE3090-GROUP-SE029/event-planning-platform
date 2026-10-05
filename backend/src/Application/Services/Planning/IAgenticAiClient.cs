@@ -8,4 +8,10 @@ public interface IAgenticAiClient
     Task<CoordinatorPlanResponse> GeneratePlanAsync(
         Event eventEntity,
         CancellationToken cancellationToken = default);
+
+    Task<CoordinatorPlanResponse> GeneratePlanAsync(
+        Event eventEntity,
+        string? requestId,
+        CancellationToken cancellationToken = default) =>
+        GeneratePlanAsync(eventEntity, cancellationToken);
 }

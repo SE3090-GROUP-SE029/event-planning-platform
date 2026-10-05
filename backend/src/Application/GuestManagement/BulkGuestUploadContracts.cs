@@ -18,4 +18,11 @@ public record BulkGuestUploadResult(
     int FailedRows,
     int DuplicateRows,
     int AlreadyRegisteredRows,
-    IReadOnlyList<GuestUploadRowError> Errors);
+    IReadOnlyList<GuestUploadRowError> Errors,
+    int UploadedGuests,
+    int InvalidRows,
+    int DeliveryFailedRows,
+    int QueuedEmails)
+{
+    public int Duplicates => DuplicateRows + AlreadyRegisteredRows;
+}

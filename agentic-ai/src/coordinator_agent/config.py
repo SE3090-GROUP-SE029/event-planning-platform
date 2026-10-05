@@ -7,10 +7,20 @@ from urllib.parse import urlsplit
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+AGENTIC_AI_REQUEST_TIMEOUT_SECONDS = 30 * 60
+
 _DEVELOPMENT_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 )
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_FALLBACK_MODELS = "gemini-2.5-flash-lite,gemini-2.0-flash"
+RETIRED_GEMINI_MODELS = {
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-preview",
+    "gemini-2.5-flash-preview-05-20",
+    "gemini-1.5-flash",
+}
 
 
 def _parse_cors_origins(value: str) -> tuple[str, ...]:
@@ -54,11 +64,16 @@ class Settings(BaseSettings):
         default="http://localhost:5207", validation_alias="BACKEND_API_URL"
     )
     gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-3.8-flash", validation_alias="GEMINI_MODEL")
+    gemini_model: str = Field(default=DEFAULT_GEMINI_MODEL, validation_alias="GEMINI_MODEL")
     gemini_api_keys: str = Field(default="", validation_alias="GEMINI_API_KEYS")
-    gemini_fallback_models: str = Field(default="", validation_alias="GEMINI_FALLBACK_MODELS")
+    gemini_fallback_models: str = Field(
+        default=DEFAULT_GEMINI_FALLBACK_MODELS,
+        validation_alias="GEMINI_FALLBACK_MODELS",
+    )
     gemini_timeout_seconds: float = Field(
-        default=15.0, gt=0, validation_alias="GEMINI_TIMEOUT_SECONDS"
+        default=float(AGENTIC_AI_REQUEST_TIMEOUT_SECONDS),
+        gt=0,
+        validation_alias="GEMINI_TIMEOUT_SECONDS",
     )
     gemini_max_retries: int = Field(default=5, ge=0, le=5, validation_alias="GEMINI_MAX_RETRIES")
     gemini_retry_delay_seconds: float = Field(
@@ -68,7 +83,9 @@ class Settings(BaseSettings):
         default=16.0, gt=0, validation_alias="GEMINI_RETRY_MAX_DELAY_SECONDS"
     )
     coordinator_timeout_seconds: int = Field(
-        default=240, gt=0, validation_alias="COORDINATOR_TIMEOUT_SECONDS"
+        default=AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
+        gt=0,
+        validation_alias="COORDINATOR_TIMEOUT_SECONDS",
     )
     coordinator_checkpoint_db_path: str = Field(
         default=".data/coordinator-checkpoints.sqlite",
@@ -147,18 +164,28 @@ class Settings(BaseSettings):
     def validate_gemini_model_name(cls, value: str) -> str:
         model_name = value.strip()
         if not model_name.startswith("gemini-") or any(character.isspace() for character in model_name):
-            raise ValueError("GEMINI_MODEL must be a Gemini model ID, such as gemini-2.5-flash")
+            raise ValueError("GEMINI_MODEL must be a Gemini model ID, such as gemini-3.8-flash")
+        if model_name.lower() in RETIRED_GEMINI_MODELS:
+            raise ValueError(
+                "GEMINI_MODEL must not use a retired Gemini model; use a supported model such as gemini-3.8-flash"
+            )
         return model_name
 
     @field_validator("gemini_fallback_models")
     @classmethod
     def validate_fallback_model_names(cls, value: str) -> str:
         models = [model.strip() for model in value.split(",") if model.strip()]
-        if any(
-            not model.startswith("gemini-") or any(character.isspace() for character in model)
+        invalid = [
+            model
             for model in models
-        ):
-            raise ValueError("GEMINI_FALLBACK_MODELS must contain Gemini model IDs")
+            if not model.startswith("gemini-")
+            or any(character.isspace() for character in model)
+            or model.lower() in RETIRED_GEMINI_MODELS
+        ]
+        if invalid:
+            raise ValueError(
+                "GEMINI_FALLBACK_MODELS must contain Gemini model IDs and cannot include retired models"
+            )
         return ",".join(models)
 
     def get_gemini_api_keys(self) -> tuple[str, ...]:
@@ -173,7 +200,17 @@ class Settings(BaseSettings):
 
         configured = [self.gemini_model]
         configured.extend(self.gemini_fallback_models.split(","))
-        return tuple(dict.fromkeys(model.strip() for model in configured if model.strip()))
+        models = tuple(
+            dict.fromkeys(model.strip() for model in configured if model.strip())
+        )
+        retired = tuple(model for model in models if model.lower() in RETIRED_GEMINI_MODELS)
+        if retired:
+            raise ValueError(
+                "Retired Gemini model(s) are not allowed: "
+                + ", ".join(retired)
+                + ". Use a supported model such as gemini-3.8-flash."
+            )
+        return models
 
 
 @lru_cache

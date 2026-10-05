@@ -13,6 +13,7 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
         {
             tableBuilder.HasCheckConstraint("CK_Events_GuestCount_Positive", "\"GuestCount\" > 0");
             tableBuilder.HasCheckConstraint("CK_Events_Budget_NonNegative", "\"Budget\" >= 0");
+            tableBuilder.HasCheckConstraint("CK_Events_TimeWindow", "\"EndTime\" > \"StartTime\"");
         });
 
         builder.HasKey(e => e.Id);
@@ -24,6 +25,8 @@ public class EventConfiguration : IEntityTypeConfiguration<Event>
         builder.Property(e => e.Budget).IsRequired().HasPrecision(18, 2);
         builder.Property(e => e.PreferredVenue).HasMaxLength(500);
         builder.Property(e => e.PreferredDate).IsRequired();
+        builder.Property(e => e.StartTime).IsRequired().HasColumnType("time without time zone");
+        builder.Property(e => e.EndTime).IsRequired().HasColumnType("time without time zone");
         builder.Property(e => e.EventDuration).IsRequired();
         builder.Property(e => e.Requirements).HasMaxLength(4000);
         builder.Property(e => e.Status).IsRequired().HasDefaultValue(EventStatus.DRAFT);

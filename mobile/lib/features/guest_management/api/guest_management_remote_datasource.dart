@@ -18,6 +18,8 @@ import '../models/registration_form_model.dart';
 ///   POST /api/public/registrations/{publicReference}/status
 ///   POST /api/public/registrations/{publicReference}/rsvp
 class GuestManagementRemoteDataSource {
+  static const Duration _uploadTimeout = Duration(seconds: 60);
+
   final Dio _dio;
 
   GuestManagementRemoteDataSource({Dio? dio}) : _dio = dio ?? DioClient().dio;
@@ -82,8 +84,8 @@ class GuestManagementRemoteDataSource {
   // PLANNER — Guest List Upload
   // ──────────────────────────────────────────
 
-  /// Upload a CSV/PDF/DOCX file for bulk guest import.
-  /// Returns structured result with rows processed, duplicates, errors.
+  /// Upload a CSV/PDF/DOCX file and email registration links to valid guest rows.
+  /// Returns queued-email counts, duplicates, and row errors.
   Future<BulkUploadResult> uploadGuestList(
       String eventId, List<int> fileBytes, String fileName,
       {ProgressCallback? onSendProgress}) async {
@@ -124,7 +126,12 @@ class GuestManagementRemoteDataSource {
       endpoint,
       onSendProgress: onSendProgress,
       data: formData,
-      options: Options(contentType: Headers.multipartFormDataContentType),
+      options: Options(
+        contentType: Headers.multipartFormDataContentType,
+        connectTimeout: _uploadTimeout,
+        receiveTimeout: _uploadTimeout,
+        sendTimeout: _uploadTimeout,
+      ),
     );
     if (kDebugMode) {
       debugPrint(

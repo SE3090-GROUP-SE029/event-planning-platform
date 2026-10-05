@@ -2,7 +2,7 @@ namespace Application.Dtos.Events;
 
 public sealed record EventAnalyticsDto(
     int TotalRegistrations,
-    int PendingAi,
+    int PendingReview,
     int Accepted,
     int Rejected,
     int Waitlisted,

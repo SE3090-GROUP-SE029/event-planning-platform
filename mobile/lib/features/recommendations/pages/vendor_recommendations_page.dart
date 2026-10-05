@@ -26,15 +26,23 @@ class VendorRecommendationsPage extends ConsumerStatefulWidget {
 class _VendorRecommendationsPageState
     extends ConsumerState<VendorRecommendationsPage> {
   final _api = VendorRecommendationRemoteDataSource();
+  final CancelToken _pollCancelToken = CancelToken();
   VendorRecommendationRun? _run;
   bool _loading = true;
   bool _generating = false;
+  bool _pollingConnectionLost = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitial());
+  }
+
+  @override
+  void dispose() {
+    _pollCancelToken.cancel('Vendor recommendation page disposed.');
+    super.dispose();
   }
 
   Future<void> _loadInitial() async {
@@ -53,13 +61,37 @@ class _VendorRecommendationsPageState
     });
 
     try {
-      final latest = await _api.getLatest(session.accessToken, widget.eventId);
+      final latest = await _api.getLatest(
+        session.accessToken,
+        widget.eventId,
+        cancelToken: _pollCancelToken,
+        onRetry: _markPollingConnectionLost,
+      );
       if (!mounted) return;
       if (latest != null) {
         setState(() {
           _run = latest;
-          _loading = false;
+          _loading = latest.isPending || latest.isRunning;
+          _generating = latest.isPending || latest.isRunning;
+          _error = latest.isFailed ? latest.failureMessage : null;
         });
+        if (latest.isPending || latest.isRunning) {
+          final completed = await _api.waitForRun(
+            session.accessToken,
+            widget.eventId,
+            latest,
+            cancelToken: _pollCancelToken,
+            onProgress: _updateProgress,
+            onRetry: _markPollingConnectionLost,
+          );
+          if (!mounted) return;
+          setState(() {
+            _run = completed;
+            _loading = false;
+            _generating = false;
+            _pollingConnectionLost = false;
+          });
+        }
         return;
       }
       await _generate(session);
@@ -78,7 +110,10 @@ class _VendorRecommendationsPageState
     }
   }
 
-  Future<void> _generate(AuthResponseModel session) async {
+  Future<void> _generate(
+    AuthResponseModel session, {
+    bool forceRefresh = false,
+  }) async {
     setState(() {
       _generating = true;
       _error = null;
@@ -88,18 +123,32 @@ class _VendorRecommendationsPageState
         session.accessToken,
         widget.eventId,
         planId: widget.planId,
+        forceRefresh: forceRefresh,
+        statusCancelToken: _pollCancelToken,
+        onProgress: _updateProgress,
+        onRetry: _markPollingConnectionLost,
       );
       if (!mounted) return;
       setState(() {
         _run = run;
         _loading = false;
         _generating = false;
+        _pollingConnectionLost = false;
+      });
+    } on VendorRecommendationFailedException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _generating = false;
+        _pollingConnectionLost = false;
+        _error = error.message;
       });
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _generating = false;
+        _pollingConnectionLost = false;
         _error = _messageFor(error);
       });
     } catch (_) {
@@ -107,9 +156,37 @@ class _VendorRecommendationsPageState
       setState(() {
         _loading = false;
         _generating = false;
+        _pollingConnectionLost = false;
         _error = 'Vendor recommendation failed. Please try again.';
       });
     }
+  }
+
+  void _updateProgress(VendorRecommendationRun run) {
+    if (!mounted) return;
+    setState(() {
+      _run = run;
+      _pollingConnectionLost = false;
+    });
+  }
+
+  void _markPollingConnectionLost() {
+    if (!mounted) return;
+    setState(() => _pollingConnectionLost = true);
+  }
+
+  String get _progressLabel {
+    if (_pollingConnectionLost) {
+      return 'Connection interrupted. Reconnecting and checking progress...';
+    }
+    return switch (_run?.stage) {
+      'Finding candidate vendors' => 'Finding candidate vendors...',
+      'Analyzing services' => 'Analyzing services...',
+      'Ranking vendors' => 'Ranking vendors...',
+      'Generating recommendations' => 'Generating recommendations...',
+      'Almost complete' => 'Almost complete...',
+      _ => 'Preparing recommendations...',
+    };
   }
 
   String _messageFor(DioException error) {
@@ -142,7 +219,7 @@ class _VendorRecommendationsPageState
               tooltip: 'Refresh recommendations',
               onPressed: _generating || _loading
                   ? null
-                  : () => _generate(session),
+                  : () => _generate(session, forceRefresh: true),
               icon: const Icon(Icons.refresh),
             ),
         ],
@@ -153,7 +230,16 @@ class _VendorRecommendationsPageState
 
   Widget _buildBody(AuthResponseModel? session) {
     if (_loading || _generating && _run == null) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(_progressLabel, textAlign: TextAlign.center),
+          ],
+        ),
+      );
     }
 
     if (_run == null) {
@@ -163,8 +249,14 @@ class _VendorRecommendationsPageState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error ?? 'No recommendations yet.', textAlign: TextAlign.center),
+              Text(
+                _error ??
+                    (_generating ? _progressLabel : 'No recommendations yet.'),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
+              if (_generating) const LinearProgressIndicator(),
+              if (_generating) const SizedBox(height: 16),
               if (session != null)
                 FilledButton(
                   onPressed: _generating ? null : () => _generate(session),
@@ -178,7 +270,9 @@ class _VendorRecommendationsPageState
 
     final run = _run!;
     return RefreshIndicator(
-      onRefresh: session == null ? () async {} : () => _generate(session),
+      onRefresh: session == null
+          ? () async {}
+          : () => _generate(session, forceRefresh: true),
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -211,6 +305,7 @@ class _VendorRecommendationsPageState
           ],
           if (_generating) ...[
             const SizedBox(height: 12),
+            Text(_progressLabel),
             const LinearProgressIndicator(),
           ],
           const SizedBox(height: 12),

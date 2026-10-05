@@ -14,4 +14,12 @@ public interface IVendorRecommendationService
         Guid eventId,
         Guid userId,
         CancellationToken cancellationToken = default);
+
+    Task<VendorRecommendationRunResponse?> GetRunAsync(
+        Guid eventId,
+        Guid runId,
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ProcessNextAsync(CancellationToken cancellationToken = default);
 }

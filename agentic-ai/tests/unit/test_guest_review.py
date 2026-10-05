@@ -121,7 +121,7 @@ def test_review_settings_use_shared_gemini_configuration(monkeypatch):
     assert settings.model == "gemini-primary"
     assert settings.fallback_models == ("gemini-fallback",)
     assert settings.api_keys == ("primary-test-key", "secondary-test-key")
-    assert settings.timeout_seconds == 25
+    assert settings.timeout_seconds == 1800
 
 
 @pytest.mark.parametrize("model", ["invalid-model", "gemini model"])

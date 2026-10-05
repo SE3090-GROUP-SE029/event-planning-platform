@@ -34,8 +34,10 @@ public class EventService : IEventService
             GuestCount = request.GuestCount,
             Budget = request.Budget,
             PreferredVenue = request.PreferredVenue.Trim(),
-            PreferredDate = request.PreferredDate,
-            EventDuration = request.EventDuration,
+            PreferredDate = NormalizeEventDate(ResolveEventDate(request)),
+            StartTime = request.StartTime!.Value,
+            EndTime = request.EndTime!.Value,
+            EventDuration = CalculateDuration(request.StartTime.Value, request.EndTime.Value),
             Requirements = string.IsNullOrWhiteSpace(request.Requirements)
                 ? null
                 : request.Requirements.Trim(),
@@ -96,7 +98,10 @@ public class EventService : IEventService
             GuestCount = request.GuestCount,
             Budget = request.Budget,
             PreferredVenue = request.PreferredVenue,
+            EventDate = request.EventDate,
             PreferredDate = request.PreferredDate,
+            StartTime = request.StartTime,
+            EndTime = request.EndTime,
             EventDuration = eventEntity.EventDuration,
             Requirements = request.Requirements
         };
@@ -114,7 +119,10 @@ public class EventService : IEventService
         eventEntity.GuestCount = request.GuestCount;
         eventEntity.Budget = request.Budget;
         eventEntity.PreferredVenue = request.PreferredVenue.Trim();
-        eventEntity.PreferredDate = request.PreferredDate;
+        eventEntity.PreferredDate = NormalizeEventDate(ResolveEventDate(request));
+        eventEntity.StartTime = request.StartTime!.Value;
+        eventEntity.EndTime = request.EndTime!.Value;
+        eventEntity.EventDuration = CalculateDuration(eventEntity.StartTime, eventEntity.EndTime);
         eventEntity.Requirements = string.IsNullOrWhiteSpace(request.Requirements) ? null : request.Requirements.Trim();
         eventEntity.Status = request.Status;
         eventEntity.UpdatedAt = DateTime.UtcNow;
@@ -175,11 +183,26 @@ public class EventService : IEventService
         GuestCount = eventEntity.GuestCount,
         Budget = eventEntity.Budget,
         PreferredVenue = eventEntity.PreferredVenue!,
+        EventDate = eventEntity.PreferredDate.Date,
         PreferredDate = eventEntity.PreferredDate,
+        StartTime = eventEntity.StartTime,
+        EndTime = eventEntity.EndTime,
         EventDuration = eventEntity.EventDuration,
         Requirements = eventEntity.Requirements,
         Status = eventEntity.Status,
         CreatedAt = eventEntity.CreatedAt,
         UpdatedAt = eventEntity.UpdatedAt
     };
+
+    private static DateTime ResolveEventDate(CreateEventRequest request) =>
+        request.EventDate ?? request.PreferredDate;
+
+    private static DateTime ResolveEventDate(UpdateEventRequest request) =>
+        request.EventDate ?? request.PreferredDate;
+
+    private static DateTime NormalizeEventDate(DateTime eventDate) =>
+        DateTime.SpecifyKind(eventDate, DateTimeKind.Utc);
+
+    private static TimeSpan CalculateDuration(TimeOnly startTime, TimeOnly endTime) =>
+        endTime.ToTimeSpan() - startTime.ToTimeSpan();
 }

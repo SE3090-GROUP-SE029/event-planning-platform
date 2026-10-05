@@ -35,6 +35,8 @@ public class EventTests
         Assert.Equal("Events", entityType!.GetTableName());
         Assert.False(entityType.FindProperty(nameof(Event.EventType))!.IsNullable);
         Assert.False(entityType.FindProperty(nameof(Event.PreferredDate))!.IsNullable);
+        Assert.False(entityType.FindProperty(nameof(Event.StartTime))!.IsNullable);
+        Assert.False(entityType.FindProperty(nameof(Event.EndTime))!.IsNullable);
         Assert.False(entityType.FindProperty(nameof(Event.Status))!.IsNullable);
         Assert.Equal(EventStatus.DRAFT, entityType.FindProperty(nameof(Event.Status))!.GetDefaultValue());
     }
@@ -52,6 +54,9 @@ public class EventTests
         Assert.Equal(
             "\"Budget\" >= 0",
             constraints.Single(c => c.Name == "CK_Events_Budget_NonNegative").Sql);
+        Assert.Equal(
+            "\"EndTime\" > \"StartTime\"",
+            constraints.Single(c => c.Name == "CK_Events_TimeWindow").Sql);
     }
 
     private static AppDbContext CreateDb()

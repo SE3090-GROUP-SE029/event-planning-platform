@@ -10,6 +10,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Coordinator Agent API", version="0.1.0")
     app.include_router(router)
+    app.include_router(schedule_router)
     return app
 
 

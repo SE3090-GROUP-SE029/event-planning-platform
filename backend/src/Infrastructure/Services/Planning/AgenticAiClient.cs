@@ -15,6 +15,12 @@ public sealed class AgenticAiClient(
 {
     public async Task<CoordinatorPlanResponse> GeneratePlanAsync(
         Event eventEntity,
+        CancellationToken cancellationToken = default) =>
+        await GeneratePlanAsync(eventEntity, null, cancellationToken);
+
+    public async Task<CoordinatorPlanResponse> GeneratePlanAsync(
+        Event eventEntity,
+        string? requestId,
         CancellationToken cancellationToken = default)
     {
         var client = httpClientFactory.CreateClient("AgenticAI");
@@ -33,16 +39,21 @@ public sealed class AgenticAiClient(
             }
         };
 
-        using var response = await client.PostAsJsonAsync(
-            options.Value.GeneratePath,
-            request,
-            cancellationToken);
+        using var message = new HttpRequestMessage(HttpMethod.Post, options.Value.GeneratePath)
+        {
+            Content = JsonContent.Create(request)
+        };
+        if (!string.IsNullOrWhiteSpace(requestId))
+            message.Headers.TryAddWithoutValidation("X-Request-ID", requestId);
+
+        using var response = await client.SendAsync(message, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning(
-                "Agentic AI returned HTTP {StatusCode} for event {EventId}",
+                "Agentic AI returned HTTP {StatusCode} for event {EventId}, request {RequestId}",
                 (int)response.StatusCode,
-                eventEntity.Id);
+                eventEntity.Id,
+                requestId);
             response.EnsureSuccessStatusCode();
         }
 

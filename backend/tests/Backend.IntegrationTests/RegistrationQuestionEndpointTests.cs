@@ -82,7 +82,7 @@ public class RegistrationQuestionEndpointTests(RegistrationHostFixture fixture) 
             new { fullName = "Guest", emailAddress = "guest@example.com", answers = new[] { new { questionId, answer = injection } } });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var receipt = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("PENDING_AI", receipt.GetProperty("status").GetString());
+        Assert.Equal("PENDING_REVIEW", receipt.GetProperty("status").GetString());
         await fixture.DrainAiAsync();
         var context = fixture.Ai.Contexts.Last();
         var answer = Assert.Single(context.Questions!);

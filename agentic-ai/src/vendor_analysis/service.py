@@ -10,10 +10,12 @@ from uuid import UUID
 from src.gemini_client.exceptions import (
     GeminiClientError,
     GeminiInvalidCredentialsError,
+    GeminiInvalidRequestError,
     GeminiInvalidModelError,
     GeminiNetworkError,
     GeminiQuotaError,
     GeminiRateLimitError,
+    GeminiSchemaError,
     GeminiTimeoutError,
 )
 
@@ -44,6 +46,10 @@ class VendorAnalysisProviderError(VendorAnalysisError):
         self.code = code
         self.status_code = status_code
         self.retry_after = retry_after
+
+
+class VendorAnalysisConfigurationError(VendorAnalysisError):
+    """The service could not construct a request accepted by Gemini."""
 
 
 class VendorAnalysisValidationError(VendorAnalysisError):
@@ -116,13 +122,24 @@ async def execute_vendor_analysis(
             VendorRecommendationResponse,
             node_name="vendor_analysis_recommend",
         )
+    except (GeminiSchemaError, GeminiInvalidRequestError) as exc:
+        logger.error(
+            "Gemini rejected vendor-analysis structured output configuration: %s",
+            exc,
+        )
+        raise VendorAnalysisConfigurationError(
+            "The vendor-analysis service generated an invalid Gemini structured-output request."
+        ) from exc
     except GeminiTimeoutError as exc:
         raise VendorAnalysisProviderError(
             str(exc), code="provider_timeout", status_code=504
         ) from exc
     except GeminiQuotaError as exc:
         raise VendorAnalysisProviderError(
-            str(exc), code="quota_exhausted", status_code=503
+            str(exc),
+            code=exc.error_code,
+            status_code=503,
+            retry_after=exc.retry_after,
         ) from exc
     except GeminiRateLimitError as exc:
         raise VendorAnalysisProviderError(

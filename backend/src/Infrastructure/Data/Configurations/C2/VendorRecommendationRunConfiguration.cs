@@ -15,10 +15,17 @@ public class VendorRecommendationRunConfiguration : IEntityTypeConfiguration<Ven
         builder.Property(r => r.RequestedByUserId).IsRequired();
         builder.Property(r => r.CandidateCount).IsRequired();
         builder.Property(r => r.CreatedAt).IsRequired();
+        builder.Property(r => r.UpdatedAt).IsRequired();
+        builder.Property(r => r.Status).HasMaxLength(16).IsRequired();
+        builder.Property(r => r.Stage).HasMaxLength(64).IsRequired();
+        builder.Property(r => r.FailureMessage).HasMaxLength(1000);
         builder.Property(r => r.SourceNote).HasMaxLength(500);
 
         builder.HasIndex(r => new { r.EventId, r.CreatedAt });
         builder.HasIndex(r => r.EventPlanDraftId);
+        builder.HasIndex(r => r.EventId)
+            .IsUnique()
+            .HasFilter("\"Status\" IN ('Pending', 'Running')");
 
         builder.HasOne(r => r.Event)
             .WithMany()

@@ -1,4 +1,3 @@
-using System.Net;
 using System.Security.Claims;
 using Application.Dtos.Common;
 using Application.Dtos.Vendors;
@@ -13,7 +12,8 @@ namespace Api.Controllers;
 [Route("api")]
 [Authorize(Policy = "EventPlannerOnly")]
 public sealed class VendorRecommendationsController(
-    IVendorRecommendationService recommendationService) : ControllerBase
+    IVendorRecommendationService recommendationService,
+    ILogger<VendorRecommendationsController> logger) : ControllerBase
 {
     [HttpPost("events/{eventId:guid}/vendor-recommendations")]
     public async Task<ActionResult<ApiResponse<VendorRecommendationRunResponse>>> Generate(
@@ -29,11 +29,23 @@ public sealed class VendorRecommendationsController(
                 userId,
                 request,
                 cancellationToken);
-            return Ok(ApiResponse<VendorRecommendationRunResponse>.Ok(
+            logger.LogInformation(
+                "Vendor recommendation request accepted event {EventId}, run {RunId}, request {RequestId}, status {Status}",
+                eventId,
+                result.Id,
+                HttpContext.TraceIdentifier,
+                result.Status);
+            var response = ApiResponse<VendorRecommendationRunResponse>.Ok(
                 result,
-                result.FromCache
-                    ? "Returned the last saved recommendations because the AI service is unavailable."
-                    : "Vendor recommendations generated."));
+                result.Status == Domain.Entities.VendorRecommendationRun.CompletedStatus
+                    ? "Returned the latest completed recommendations."
+                : "Vendor recommendation generation queued.");
+            return result.Status == Domain.Entities.VendorRecommendationRun.CompletedStatus
+                ? Ok(response)
+                : AcceptedAtAction(
+                nameof(GetRun),
+                new { eventId, runId = result.Id },
+                response);
         }
         catch (KeyNotFoundException ex)
         {
@@ -46,28 +58,6 @@ public sealed class VendorRecommendationsController(
         catch (InvalidOperationException ex)
         {
             return BadRequest(ApiResponse<VendorRecommendationRunResponse>.Error(ex.Message));
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return StatusCode(
-                StatusCodes.Status504GatewayTimeout,
-                ApiResponse<VendorRecommendationRunResponse>.Error(
-                    "Vendor recommendation timed out. Please try again.",
-                    504));
-        }
-        catch (HttpRequestException ex)
-        {
-            var statusCode = ex.StatusCode switch
-            {
-                HttpStatusCode.BadGateway => StatusCodes.Status502BadGateway,
-                HttpStatusCode.GatewayTimeout => StatusCodes.Status504GatewayTimeout,
-                _ => StatusCodes.Status503ServiceUnavailable
-            };
-            return StatusCode(
-                statusCode,
-                ApiResponse<VendorRecommendationRunResponse>.Error(
-                    "The AI recommendation service is temporarily unavailable. Please try again.",
-                    statusCode));
         }
     }
 
@@ -82,15 +72,80 @@ public sealed class VendorRecommendationsController(
             var result = await recommendationService.GetLatestAsync(eventId, userId, cancellationToken);
             if (result is null)
             {
+                logger.LogWarning(
+                    "Vendor recommendation retrieval failed event {EventId}, request {RequestId}: no run found",
+                    eventId,
+                    HttpContext.TraceIdentifier);
                 return NotFound(ApiResponse<VendorRecommendationRunResponse>.Error(
                     "No vendor recommendations found for this event.",
                     404));
             }
 
+            logger.LogInformation(
+                "Vendor recommendation retrieval succeeded event {EventId}, run {RunId}, request {RequestId}, status {Status}",
+                eventId,
+                result.Id,
+                HttpContext.TraceIdentifier,
+                result.Status);
             return Ok(ApiResponse<VendorRecommendationRunResponse>.Ok(result));
         }
         catch (KeyNotFoundException ex)
         {
+            logger.LogWarning(
+                ex,
+                "Vendor recommendation retrieval failed event {EventId}, request {RequestId}",
+                eventId,
+                HttpContext.TraceIdentifier);
+            return NotFound(ApiResponse<VendorRecommendationRunResponse>.Error(ex.Message, 404));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    [HttpGet("events/{eventId:guid}/vendor-recommendations/{runId:guid}")]
+    public async Task<ActionResult<ApiResponse<VendorRecommendationRunResponse>>> GetRun(
+        Guid eventId,
+        Guid runId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var userId = RequireUserId();
+            var result = await recommendationService.GetRunAsync(
+                eventId,
+                runId,
+                userId,
+                cancellationToken);
+            if (result is null)
+            {
+                logger.LogWarning(
+                    "Vendor recommendation retrieval failed event {EventId}, run {RunId}, request {RequestId}: run not found",
+                    eventId,
+                    runId,
+                    HttpContext.TraceIdentifier);
+                return NotFound(ApiResponse<VendorRecommendationRunResponse>.Error(
+                    "Vendor recommendation run not found.",
+                    404));
+            }
+
+            logger.LogInformation(
+                "Vendor recommendation retrieval succeeded event {EventId}, run {RunId}, request {RequestId}, status {Status}",
+                eventId,
+                runId,
+                HttpContext.TraceIdentifier,
+                result.Status);
+            return Ok(ApiResponse<VendorRecommendationRunResponse>.Ok(result));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Vendor recommendation retrieval failed event {EventId}, run {RunId}, request {RequestId}",
+                eventId,
+                runId,
+                HttpContext.TraceIdentifier);
             return NotFound(ApiResponse<VendorRecommendationRunResponse>.Error(ex.Message, 404));
         }
         catch (UnauthorizedAccessException)

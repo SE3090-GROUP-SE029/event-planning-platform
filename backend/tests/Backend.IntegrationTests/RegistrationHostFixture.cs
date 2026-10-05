@@ -70,23 +70,30 @@ public class RegistrationHostFixture : IAsyncLifetime
         // Keep test-host settings independent of developer-specific appsettings files.
         builder.Configuration.Sources.Clear();
         builder.Configuration.AddEnvironmentVariables();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["GuestRegistration:PublicWebBaseUrl"] = "https://event.example.test/"
+        });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole();
         builder.Logging.SetMinimumLevel(LogLevel.Error);
         builder.Services.AddControllers().AddApplicationPart(typeof(RegistrationFormsController).Assembly);
-        builder.Services.AddGuestManagement(builder.Configuration);
+        builder.Services.AddGuestManagement(builder.Configuration, builder.Environment);
         builder.Services.AddScoped<ITestService, TestService>();
         builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(
             ConnectionString,
             npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", schemaName)));
         builder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(Clock));
         builder.Services.Replace(ServiceDescriptor.Singleton<IInvitationEmailSender>(Email));
+        builder.Services.Replace(ServiceDescriptor.Singleton<IRegistrationOutcomeEmailSender>(Email));
+        builder.Services.Replace(ServiceDescriptor.Singleton<IRegistrationLinkEmailSender>(Email));
         // Drive durable work explicitly in tests; no test calls Python or Ollama.
         builder.Services.Replace(ServiceDescriptor.Singleton(new AiClientOptions { Enabled = false }));
         builder.Services.Replace(ServiceDescriptor.Singleton<IGuestAiClient>(Ai));
         builder.Services.Replace(ServiceDescriptor.Singleton<IRegistrationQuestionClient>(Ai));
         app = builder.Build();
+        app.UseMiddleware<Api.GuestManagement.GuestUploadTimingMiddleware>();
         // This middleware exists only in the test assembly. Production never trusts this header.
         app.Use(async (context, next) =>
         {
@@ -123,7 +130,9 @@ public class RegistrationHostFixture : IAsyncLifetime
             OwnerId = GuestOwnerGuid(owner), EventName = "Guest Management Integration Event",
             EventType = EventType.CORPORATE, GuestCount = 1, Budget = 1000,
             Requirements = "Test description", PreferredVenue = "Colombo",
-            PreferredDate = Now.AddDays(10).UtcDateTime, EventDuration = TimeSpan.FromHours(3),
+            PreferredDate = Now.AddDays(10).UtcDateTime,
+            StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(12, 0),
+            EventDuration = TimeSpan.FromHours(3),
             CreatedAt = Now.UtcDateTime, UpdatedAt = Now.UtcDateTime
         };
         await using var db = CreateDb();
@@ -138,6 +147,13 @@ public class RegistrationHostFixture : IAsyncLifetime
         return await action(scope.ServiceProvider.GetRequiredService<RegistrationService>());
     }
 
+    public async Task<T> WithEmailDeliveryServiceAsync<T>(
+        Func<RegistrationLinkEmailDeliveryService, Task<T>> action)
+    {
+        using var scope = app!.Services.CreateScope();
+        return await action(scope.ServiceProvider.GetRequiredService<RegistrationLinkEmailDeliveryService>());
+    }
+
     public async Task<T> WithAiServiceAsync<T>(Func<GuestAiReviewService, Task<T>> action)
     {
         using var scope = app!.Services.CreateScope();
@@ -150,18 +166,49 @@ public class RegistrationHostFixture : IAsyncLifetime
         return await action(scope.ServiceProvider.GetRequiredService<IGuestAiReviewRepository>());
     }
 
+    public async Task<T> WithAllocationAsync<T>(Func<SeatAllocationService, Task<T>> action)
+    {
+        using var scope = app!.Services.CreateScope();
+        return await action(scope.ServiceProvider.GetRequiredService<SeatAllocationService>());
+    }
+
+    public async Task<T> WithInvitationServiceAsync<T>(Func<InvitationService, Task<T>> action)
+    {
+        using var scope = app!.Services.CreateScope();
+        return await action(scope.ServiceProvider.GetRequiredService<InvitationService>());
+    }
+
+    public async Task<T> WithReviewServiceAsync<T>(Func<RegistrationReviewService, Task<T>> action)
+    {
+        using var scope = app!.Services.CreateScope();
+        return await action(scope.ServiceProvider.GetRequiredService<RegistrationReviewService>());
+    }
+
+    public async Task<T> WithRsvpServiceAsync<T>(Func<RegistrationRsvpService, Task<T>> action)
+    {
+        using var scope = app!.Services.CreateScope();
+        return await action(scope.ServiceProvider.GetRequiredService<RegistrationRsvpService>());
+    }
+
     public async Task DrainAiAsync()
     {
         for (var i = 0; i < 1000; i++)
-            if (!await WithAiServiceAsync(s => s.ProcessNextAsync(TimeSpan.FromMinutes(3), CancellationToken.None))) return;
+        {
+            var processedAi = await WithAiServiceAsync(s => s.ProcessNextAsync(TimeSpan.FromMinutes(3), CancellationToken.None));
+            var processedAllocation = await WithAllocationAsync(s => s.ProcessNextAsync(CancellationToken.None));
+            var processedInvitation = await WithInvitationServiceAsync(s => s.ProcessNextGenerationAsync(CancellationToken.None));
+            var processedDelivery = await WithInvitationServiceAsync(s => s.ProcessPendingDeliveryAsync(CancellationToken.None));
+            var processedRejection = await WithReviewServiceAsync(s => s.ProcessPendingRejectionEmailAsync(CancellationToken.None));
+            if (!processedAi && !processedAllocation && !processedInvitation && !processedDelivery && !processedRejection) return;
+        }
         throw new InvalidOperationException("Unexpected AI or delivery backlog");
     }
 
     public async Task ApplyDecisionAsync(GuestAiClaim claim, GuestAiDecision decision)
     {
         using var scope = app!.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<RegistrationService>().ApplyDecisionAsync(claim, decision,
-            scope.ServiceProvider.GetRequiredService<IGuestAiReviewRepository>(), CancellationToken.None);
+        await scope.ServiceProvider.GetRequiredService<RegistrationReviewService>()
+            .ApplyAiDecisionAsync(claim, decision, CancellationToken.None);
     }
 
     public async Task<RegistrationSubmission> AcceptAsync(RegistrationReceipt receipt)
@@ -184,12 +231,14 @@ public class TestClock : TimeProvider
     public override DateTimeOffset GetUtcNow() => UtcNow;
 }
 
-public class RecordingEmailSender : IInvitationEmailSender
+public class RecordingEmailSender : IInvitationEmailSender, IRegistrationOutcomeEmailSender, IRegistrationLinkEmailSender
 {
     public ConcurrentQueue<RejectionEmail> Rejections { get; } = new();
     public ConcurrentQueue<InvitationEmail> Messages { get; } = new();
+    public ConcurrentQueue<RegistrationLinkEmail> RegistrationLinks { get; } = new();
     public EmailDeliveryResult Result { get; set; } = EmailDeliveryResult.SENT;
     public bool ThrowOnSend { get; set; }
+    public TimeSpan RegistrationLinkDelay { get; set; }
     public Task<EmailDeliveryResult> SendAsync(InvitationEmail invitation, CancellationToken cancellationToken)
     {
         Messages.Enqueue(invitation);
@@ -201,6 +250,14 @@ public class RecordingEmailSender : IInvitationEmailSender
         Rejections.Enqueue(rejection);
         if (ThrowOnSend) throw new InvalidOperationException("Test transport failure");
         return Task.FromResult(Result);
+    }
+    public async Task<EmailDeliveryResult> SendRegistrationLinkAsync(RegistrationLinkEmail invitation, CancellationToken cancellationToken)
+    {
+        if (RegistrationLinkDelay > TimeSpan.Zero)
+            await Task.Delay(RegistrationLinkDelay, cancellationToken);
+        RegistrationLinks.Enqueue(invitation);
+        if (ThrowOnSend) throw new InvalidOperationException("Test transport failure");
+        return Result;
     }
 }
 

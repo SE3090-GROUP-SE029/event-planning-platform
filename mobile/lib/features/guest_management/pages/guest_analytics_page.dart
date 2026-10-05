@@ -216,8 +216,8 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
           children: [
             Expanded(
               child: _MetricCard(
-                label: 'Pending AI',
-                value: '${analytics.pendingAi}',
+                label: 'Pending review',
+                value: '${analytics.pendingReview}',
                 icon: Icons.psychology_outlined,
                 variant: PastelIconVariant.yellow,
                 color: AppColors.pastelYellowLight,
@@ -226,9 +226,9 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
             const SizedBox(width: AppDimens.space10),
             Expanded(
               child: _MetricCard(
-                label: 'Waitlisted',
-                value: '${analytics.waitlisted}',
-                icon: Icons.pending_outlined,
+                label: 'Accepted',
+                value: '${analytics.accepted}',
+                icon: Icons.task_alt_rounded,
                 variant: PastelIconVariant.blue,
                 color: AppColors.pastelBlueLight,
               ),
@@ -240,6 +240,16 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
           children: [
             Expanded(
               child: _MetricCard(
+                label: 'Waitlisted',
+                value: '${analytics.waitlisted}',
+                icon: Icons.pending_outlined,
+                variant: PastelIconVariant.blue,
+                color: AppColors.pastelBlueLight,
+              ),
+            ),
+            const SizedBox(width: AppDimens.space10),
+            Expanded(
+              child: _MetricCard(
                 label: 'Rejected',
                 value: '${analytics.rejected}',
                 icon: Icons.cancel_outlined,
@@ -247,7 +257,11 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
                 color: AppColors.errorBg,
               ),
             ),
-            const SizedBox(width: AppDimens.space10),
+          ],
+        ),
+        const SizedBox(height: AppDimens.space10),
+        Row(
+          children: [
             Expanded(
               child: _MetricCard(
                 label: 'Cancelled',
@@ -257,6 +271,8 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
                 color: AppColors.surfaceMuted,
               ),
             ),
+            const SizedBox(width: AppDimens.space10),
+            const Expanded(child: SizedBox()),
           ],
         ),
 
@@ -441,7 +457,12 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
   }
 
   _AnalyticsData _compute(List<PlannerRegistrationModel> guests) {
-    int confirmed = 0, pendingAi = 0, waitlisted = 0, rejected = 0, cancelled = 0;
+    int confirmed = 0,
+        pendingReview = 0,
+        accepted = 0,
+        waitlisted = 0,
+        rejected = 0,
+        cancelled = 0;
     int rsvpAccepted = 0, rsvpDeclined = 0, rsvpMaybe = 0, rsvpPending = 0;
     int checkedIn = 0, notCheckedIn = 0;
 
@@ -470,10 +491,13 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
             notCheckedIn++;
           }
           break;
-        case RegistrationStatus.pendingAi:
-          pendingAi++;
+        case RegistrationStatus.pendingReview:
+          pendingReview++;
           break;
-        case RegistrationStatus.waitingList:
+        case RegistrationStatus.accepted:
+          accepted++;
+          break;
+        case RegistrationStatus.waitlisted:
           waitlisted++;
           break;
         case RegistrationStatus.rejected:
@@ -490,7 +514,8 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
     return _AnalyticsData(
       total: guests.length,
       confirmed: confirmed,
-      pendingAi: pendingAi,
+      pendingReview: pendingReview,
+      accepted: accepted,
       waitlisted: waitlisted,
       rejected: rejected,
       cancelled: cancelled,
@@ -507,7 +532,8 @@ class _GuestAnalyticsPageState extends State<GuestAnalyticsPage> {
 class _AnalyticsData {
   final int total;
   final int confirmed;
-  final int pendingAi;
+  final int pendingReview;
+  final int accepted;
   final int waitlisted;
   final int rejected;
   final int cancelled;
@@ -521,7 +547,8 @@ class _AnalyticsData {
   const _AnalyticsData({
     required this.total,
     required this.confirmed,
-    required this.pendingAi,
+    required this.pendingReview,
+    required this.accepted,
     required this.waitlisted,
     required this.rejected,
     required this.cancelled,

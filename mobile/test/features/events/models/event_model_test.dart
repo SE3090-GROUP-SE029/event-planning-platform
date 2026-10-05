@@ -12,6 +12,8 @@ void main() {
       budget: 100,
       preferredVenue: 'Hall',
       preferredDate: DateTime(2027, 1, 5, 10),
+      startTime: const Duration(hours: 10),
+      endTime: const Duration(hours: 11),
       eventDuration: const Duration(hours: 1),
       requirements: null,
       status: EventStatus.draft,

@@ -18,10 +18,10 @@ from src.models.message_models import (
     PingRequest,
 )
 from src.services.backend_client import BackendClient
-from src.api.routes import router as coordinator_router
+from src.api.routes import router as coordinator_router, schedule_router
 from src.vendor_analysis.routes import router as vendor_analysis_router
 from src.coordinator_agent.config import configure_logging, get_settings
-from src.gemini_client.client import configure_gemini
+from src.gemini_client.client import configure_gemini, gemini_key_pool_diagnostics
 from src.gemini_client.exceptions import GeminiConfigurationError
 from src.models.guest_review_models import GuestReviewRequest, GuestReviewResponse
 from src.services.guest_review_service import AnalysisError, GuestReviewService, get_guest_review_service
@@ -82,12 +82,18 @@ async def lifespan(app: FastAPI):
         )
         app.state.coordinator_checkpointer = checkpointer
         backend_client = BackendClient()
+        key_pool_health = gemini_key_pool_diagnostics(settings.get_gemini_api_keys())
         logger.info(
             "AI Service started with model=%s fallback_models=%d "
-            "configured_api_keys=%d expired_checkpoints_removed=%d",
+            "configured_api_keys=%d available_api_keys=%d "
+            "key_selection=round_robin project_count=%s "
+            "project_count_note=not_inferable_from_api_keys "
+            "expired_checkpoints_removed=%d",
             settings.gemini_model,
             len(settings.get_gemini_models()) - 1,
-            len(settings.get_gemini_api_keys()),
+            key_pool_health["loaded_keys"],
+            key_pool_health["available_keys"],
+            key_pool_health["project_count"],
             expired_count,
         )
         try:
@@ -113,6 +119,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(coordinator_router)
+app.include_router(schedule_router)
 app.include_router(vendor_analysis_router)
 
 # ============================================================================
@@ -138,8 +145,6 @@ def _require_development_diagnostics(request: Request) -> None:
 async def analyze_guest(request: Request, context: GuestReviewRequest,
                         service: GuestReviewService = Depends(get_guest_review_service)):
     # Planner retrieval is exclusively through the protected ASP.NET API.
-    if request.client is None or request.client.host not in {"127.0.0.1", "::1"}:
-        raise HTTPException(status_code=403, detail="Local backend access required")
     return await service.analyze(context)
 
 @app.get("/health", tags=["Health"])
@@ -155,8 +160,6 @@ async def health_check():
 @app.post("/api/registration-questions/suggest", response_model=QuestionSuggestions, tags=["Internal Registration Questions"])
 async def suggest_questions(request: Request, context: QuestionSuggestionRequest,
                             service: RegistrationQuestionService = Depends(get_registration_question_service)):
-    if request.client is None or request.client.host not in {"127.0.0.1", "::1"}:
-        raise HTTPException(status_code=403, detail="Local backend access required")
     return await service.suggest(context)
 
 @app.post("/api/test/ping", response_model=PingResponse, tags=["Test"])

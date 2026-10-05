@@ -6,9 +6,40 @@ namespace Application.Common.Interfaces;
 public interface IVendorRecommendationRepository
 {
     Task AddRunAsync(VendorRecommendationRun run, CancellationToken cancellationToken = default);
+    Task<bool> TryAddRunAsync(
+        VendorRecommendationRun run,
+        CancellationToken cancellationToken = default);
 
     Task<VendorRecommendationRun?> GetLatestForEventAsync(
         Guid eventId,
+        CancellationToken cancellationToken = default);
+    Task<VendorRecommendationRun?> GetActiveForEventAsync(
+        Guid eventId,
+        CancellationToken cancellationToken = default);
+    Task<VendorRecommendationRun?> GetByIdAsync(
+        Guid runId,
+        CancellationToken cancellationToken = default);
+    Task<VendorRecommendationRun?> GetNextRunnableAsync(
+        DateTime staleRunningBefore,
+        CancellationToken cancellationToken = default);
+    Task<bool> TryClaimAsync(
+        Guid runId,
+        DateTime now,
+        DateTime staleRunningBefore,
+        CancellationToken cancellationToken = default);
+    Task<bool> UpdateProgressAsync(
+        Guid runId,
+        string stage,
+        int? candidateCount,
+        DateTime updatedAt,
+        CancellationToken cancellationToken = default);
+    Task<bool> MarkFailedIfRunningAsync(
+        Guid runId,
+        string failureMessage,
+        DateTime completedAt,
+        CancellationToken cancellationToken = default);
+    Task AddItemsAsync(
+        IEnumerable<VendorRecommendationItem> items,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Vendor>> ListApprovedByCategoriesAsync(

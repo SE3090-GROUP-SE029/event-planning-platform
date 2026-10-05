@@ -6,12 +6,13 @@
 //   - BulkGuestUploadResult / GuestUploadRowError
 
 /// Registration status values returned by the backend.
-/// Backend enum: CONFIRMED, WAITING_LIST, CANCELLED, PENDING_AI, REJECTED
+/// Backend enum: PENDING_REVIEW, ACCEPTED, REJECTED, CONFIRMED, WAITLISTED, CANCELLED
 enum RegistrationStatus {
   confirmed,
-  waitingList,
+  accepted,
+  waitlisted,
   cancelled,
-  pendingAi,
+  pendingReview,
   rejected,
   unknown,
 }
@@ -31,12 +32,14 @@ RegistrationStatus _parseRegistrationStatus(String? value) {
   switch (value?.toUpperCase()) {
     case 'CONFIRMED':
       return RegistrationStatus.confirmed;
-    case 'WAITING_LIST':
-      return RegistrationStatus.waitingList;
+    case 'ACCEPTED':
+      return RegistrationStatus.accepted;
+    case 'WAITLISTED':
+      return RegistrationStatus.waitlisted;
     case 'CANCELLED':
       return RegistrationStatus.cancelled;
-    case 'PENDING_AI':
-      return RegistrationStatus.pendingAi;
+    case 'PENDING_REVIEW':
+      return RegistrationStatus.pendingReview;
     case 'REJECTED':
       return RegistrationStatus.rejected;
     default:
@@ -251,6 +254,10 @@ class BulkUploadResult {
   final int failedRows;
   final int duplicateRows;
   final int alreadyRegisteredRows;
+  final int uploadedGuests;
+  final int queuedEmails;
+  final int invalidRows;
+  final int deliveryFailedRows;
   final List<GuestUploadRowError> errors;
 
   const BulkUploadResult({
@@ -259,22 +266,38 @@ class BulkUploadResult {
     required this.failedRows,
     required this.duplicateRows,
     required this.alreadyRegisteredRows,
+    this.uploadedGuests = 0,
+    this.queuedEmails = 0,
+    this.invalidRows = 0,
+    this.deliveryFailedRows = 0,
     required this.errors,
   });
 
-  factory BulkUploadResult.fromJson(Map<String, dynamic> json) =>
-      BulkUploadResult(
+  factory BulkUploadResult.fromJson(Map<String, dynamic> json) {
+    final duplicateRows = (json['duplicateRows'] as num?)?.toInt() ?? 0;
+    final alreadyRegisteredRows =
+        (json['alreadyRegisteredRows'] as num?)?.toInt() ?? 0;
+    return BulkUploadResult(
         totalRows: (json['totalRows'] as num?)?.toInt() ?? 0,
         successfulRows: (json['successfulRows'] as num?)?.toInt() ?? 0,
         failedRows: (json['failedRows'] as num?)?.toInt() ?? 0,
-        duplicateRows: (json['duplicateRows'] as num?)?.toInt() ?? 0,
-        alreadyRegisteredRows:
-            (json['alreadyRegisteredRows'] as num?)?.toInt() ?? 0,
+        duplicateRows:
+            (json['duplicates'] as num?)?.toInt() ??
+                duplicateRows + alreadyRegisteredRows,
+        alreadyRegisteredRows: alreadyRegisteredRows,
+        uploadedGuests: (json['uploadedGuests'] as num?)?.toInt() ?? 0,
+        queuedEmails: (json['queuedEmails'] as num?)?.toInt() ??
+            (json['successfulRows'] as num?)?.toInt() ??
+            0,
+        invalidRows: (json['invalidRows'] as num?)?.toInt() ?? 0,
+        deliveryFailedRows:
+            (json['deliveryFailedRows'] as num?)?.toInt() ?? 0,
         errors: (json['errors'] as List<dynamic>? ?? [])
             .map((e) =>
                 GuestUploadRowError.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+  }
 }
 
 /// Check-in result returned by the backend.

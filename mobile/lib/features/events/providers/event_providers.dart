@@ -83,6 +83,8 @@ EventModel emptyEvent() => EventModel(
       budget: 0,
       preferredVenue: '',
       preferredDate: DateTime.now().add(const Duration(days: 1)),
+      startTime: const Duration(hours: 18),
+      endTime: const Duration(hours: 23),
       eventDuration: const Duration(hours: 1),
       requirements: null,
       status: EventStatus.draft,

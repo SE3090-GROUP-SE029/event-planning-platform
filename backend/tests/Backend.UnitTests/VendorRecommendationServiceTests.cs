@@ -197,11 +197,13 @@ public class VendorRecommendationServiceTests
         public VendorAnalysisRecommendResponse? Response { get; set; }
         public Exception? Exception { get; set; }
         public VendorAnalysisRecommendRequest? LastRequest { get; private set; }
+        public int Calls { get; private set; }
 
         public Task<VendorAnalysisRecommendResponse> RecommendAsync(
             VendorAnalysisRecommendRequest request,
             CancellationToken cancellationToken = default)
         {
+            Calls++;
             LastRequest = request;
             if (Exception is not null)
                 throw Exception;
@@ -322,7 +324,24 @@ public class VendorRecommendationServiceTests
     }
 
     [Fact]
-    public async Task GenerateAsync_DropsUnknownAiVendorIds_AndPersistsValidOnes()
+    public async Task GenerateAsync_ReusesActiveRun_ForDuplicateRequests()
+    {
+        using var db = CreateDb();
+        var seeded = await SeedApprovedPlanAsync(db);
+        var ai = new FakeAiClient();
+        var service = CreateService(db, ai);
+
+        var first = await service.GenerateAsync(seeded.Evt.Id, seeded.Evt.OwnerId, null);
+        var duplicate = await service.GenerateAsync(seeded.Evt.Id, seeded.Evt.OwnerId, null);
+
+        Assert.Equal(first.Id, duplicate.Id);
+        Assert.Equal(VendorRecommendationRun.PendingStatus, duplicate.Status);
+        Assert.Equal(1, await db.VendorRecommendationRuns.CountAsync());
+        Assert.Equal(0, ai.Calls);
+    }
+
+    [Fact]
+    public async Task ProcessNextAsync_DropsUnknownAiVendorIds_AndPersistsValidOnes()
     {
         using var db = CreateDb();
         var seeded = await SeedApprovedPlanAsync(db);
@@ -350,8 +369,18 @@ public class VendorRecommendationServiceTests
         };
         var service = CreateService(db, ai);
 
-        var result = await service.GenerateAsync(seeded.Evt.Id, seeded.Evt.OwnerId, null);
+        var queued = await service.GenerateAsync(seeded.Evt.Id, seeded.Evt.OwnerId, null);
+        Assert.Equal(VendorRecommendationRun.PendingStatus, queued.Status);
+        Assert.Empty(queued.Items);
+        Assert.Equal(0, ai.Calls);
 
+        Assert.True(await service.ProcessNextAsync());
+        var result = await service.GetLatestAsync(seeded.Evt.Id, seeded.Evt.OwnerId);
+
+        Assert.NotNull(result);
+        Assert.True(
+            result!.Status == VendorRecommendationRun.CompletedStatus,
+            $"Expected Completed, got {result.Status}: {result.FailureMessage}");
         Assert.Single(result.Items);
         Assert.Equal(seeded.Vendor.Id, result.Items[0].VendorId);
         Assert.Equal(88, result.Items[0].Score);
@@ -361,7 +390,7 @@ public class VendorRecommendationServiceTests
     }
 
     [Fact]
-    public async Task GenerateAsync_ReturnsCachedRun_WhenAiUnavailable()
+    public async Task GenerateAsync_ReusesCompletedRun_AndRecordsRefreshFailure()
     {
         using var db = CreateDb();
         var seeded = await SeedApprovedPlanAsync(db);
@@ -382,14 +411,30 @@ public class VendorRecommendationServiceTests
             }
         };
         var service = CreateService(db, ai);
-        await service.GenerateAsync(seeded.Evt.Id, seeded.Evt.OwnerId, null);
+        var queued = await service.GenerateAsync(seeded.Evt.Id, seeded.Evt.OwnerId, null);
+        await service.ProcessNextAsync();
 
         ai.Exception = new HttpRequestException("down", null, System.Net.HttpStatusCode.ServiceUnavailable);
         var cached = await service.GenerateAsync(seeded.Evt.Id, seeded.Evt.OwnerId, null);
+        Assert.Equal(queued.Id, cached.Id);
+        Assert.Equal(VendorRecommendationRun.CompletedStatus, cached.Status);
+        Assert.Equal(1, ai.Calls);
 
-        Assert.True(cached.FromCache);
-        Assert.Contains("last saved", cached.SourceNote, StringComparison.OrdinalIgnoreCase);
-        Assert.Single(cached.Items);
+        var refresh = await service.GenerateAsync(
+            seeded.Evt.Id,
+            seeded.Evt.OwnerId,
+            new GenerateVendorRecommendationsRequest { ForceRefresh = true });
+        Assert.Equal(VendorRecommendationRun.PendingStatus, refresh.Status);
+        Assert.True(await service.ProcessNextAsync());
+
+        var failed = await service.GetRunAsync(
+            seeded.Evt.Id,
+            refresh.Id,
+            seeded.Evt.OwnerId);
+        Assert.NotNull(failed);
+        Assert.Equal(VendorRecommendationRun.FailedStatus, failed!.Status);
+        Assert.Contains("down", failed.FailureMessage);
+        Assert.Equal(2, ai.Calls);
     }
 
     [Fact]
@@ -414,9 +459,13 @@ public class VendorRecommendationServiceTests
         };
         var service = CreateService(db, ai);
         await service.GenerateAsync(seeded.Evt.Id, seeded.Evt.OwnerId, null);
+        await service.ProcessNextAsync();
 
         var latest = await service.GetLatestAsync(seeded.Evt.Id, seeded.Evt.OwnerId);
         Assert.NotNull(latest);
+        Assert.True(
+            latest!.Status == VendorRecommendationRun.CompletedStatus,
+            $"Expected Completed, got {latest.Status}: {latest.FailureMessage}");
         Assert.Single(latest!.Items);
     }
 }

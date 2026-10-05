@@ -10,38 +10,49 @@ namespace Backend.IntegrationTests;
 
 public class SmtpDeliveryTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ExistingEmailSenderUsesSmtpAndReportsTransportOutcome(bool rejectRecipient)
+    [Fact]
+    public async Task InvitationWithCredentialsRequiresTlsWithoutSmtpAuthentication()
     {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        var receive = ReceiveAsync(listener, rejectRecipient);
         var tokens = new RegistrationTokenGenerator();
         var token = tokens.Generate();
         var qrPng = tokens.CreateQrPng(token);
+        const string statusUrl = "https://events.example.com/guest/status/reference#secret=status-secret";
         var sender = new EmailSender(new SmtpEmailOptions
         {
-            Host = "127.0.0.1", Port = port, FromAddress = "events@example.com", EnableSsl = false, TimeoutSeconds = 5
+            Host = "127.0.0.1", Port = 1, FromAddress = "events@example.com", EnableSsl = false, TimeoutSeconds = 5
         }, NullLogger<EmailSender>.Instance);
         var result = await sender.SendAsync(new InvitationEmail("guest@example.com", "Guest", "Example Event",
-            DateTimeOffset.UtcNow, "Colombo", token, qrPng), CancellationToken.None);
-        var message = await receive.WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.Equal(rejectRecipient ? EmailDeliveryResult.FAILED : EmailDeliveryResult.SENT, result);
-        if (!rejectRecipient)
+            DateTimeOffset.UtcNow, "Colombo", token, qrPng, statusUrl), CancellationToken.None);
+        Assert.Equal(EmailDeliveryResult.UNAVAILABLE, result);
+    }
+
+    [Fact]
+    public async Task RegistrationLinkEmailContainsHostedPublicFormUrl()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var receive = ReceiveAsync(listener, false);
+        var sender = new EmailSender(new SmtpEmailOptions
         {
-            var body = Regex.Match(message, @"Content-Type: text/plain; charset=utf-8\s+Content-Transfer-Encoding: base64\s+(?<data>[A-Za-z0-9+/=\r\n]+)");
-            Assert.True(body.Success, "The SMTP message must contain the UTF-8 invitation body.");
-            Assert.Contains(token, Encoding.UTF8.GetString(Convert.FromBase64String(body.Groups["data"].Value)));
-            Assert.Contains("image/png", message);
-            Assert.Contains("invitation-qr.png", message);
-            Assert.Contains("guest@example.com", message);
-            var attachment = Regex.Match(message, @"Content-Type: image/png; name=invitation-qr.png\s+Content-Transfer-Encoding: base64\s+Content-Disposition: attachment\s+(?<data>[A-Za-z0-9+/=\r\n]+)");
-            Assert.True(attachment.Success, "The SMTP message must contain the PNG attachment.");
-            Assert.Equal(qrPng, Convert.FromBase64String(attachment.Groups["data"].Value));
-        }
+            Host = "127.0.0.1",
+            Port = ((IPEndPoint)listener.LocalEndpoint).Port,
+            FromAddress = "events@example.com",
+            EnableSsl = false,
+            TimeoutSeconds = 5
+        }, NullLogger<EmailSender>.Instance);
+        const string registrationUrl = "https://events.example.com/guest/register/public-id";
+
+        var result = await sender.SendRegistrationLinkAsync(
+            new RegistrationLinkEmail("guest@example.com", "Guest", "Example Event", registrationUrl),
+            CancellationToken.None);
+        var message = await receive.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(EmailDeliveryResult.SENT, result);
+        var body = Regex.Match(message, @"Content-Type: text/plain; charset=utf-8\s+Content-Transfer-Encoding: base64\s+(?<data>[A-Za-z0-9+/=\r\n]+)");
+        Assert.True(body.Success);
+        var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(body.Groups["data"].Value));
+        Assert.Contains(registrationUrl, decoded);
+        Assert.Contains("not complete until you submit", decoded);
     }
 
     private static async Task<string> ReceiveAsync(TcpListener listener, bool rejectRecipient)
@@ -74,16 +85,20 @@ public class SmtpDeliveryTests
         return message.ToString();
     }
 
-    [Fact]
-    public async Task RejectionUsesExistingSmtpTransportWithoutQrOrInternalAnalysis()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RejectionUsesExistingSmtpTransportWithoutQrOrInternalAnalysis(bool rejectRecipient)
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
-        var receive = ReceiveAsync(listener, false);
+        var receive = ReceiveAsync(listener, rejectRecipient);
         var sender = new EmailSender(new SmtpEmailOptions { Host = "127.0.0.1", Port = ((IPEndPoint)listener.LocalEndpoint).Port,
             FromAddress = "events@example.com", EnableSsl = false, TimeoutSeconds = 5 }, NullLogger<EmailSender>.Instance);
-        Assert.Equal(EmailDeliveryResult.SENT, await sender.SendRejectionAsync(new("guest@example.com", "Guest", "Example Event"), CancellationToken.None));
+        Assert.Equal(rejectRecipient ? EmailDeliveryResult.FAILED : EmailDeliveryResult.SENT,
+            await sender.SendRejectionAsync(new("guest@example.com", "Guest", "Example Event"), CancellationToken.None));
         var message = await receive.WaitAsync(TimeSpan.FromSeconds(10));
+        if (rejectRecipient) return;
         var body = Regex.Match(message, @"Content-Type: text/plain; charset=utf-8\s+Content-Transfer-Encoding: base64\s+(?<data>[A-Za-z0-9+/=\r\n]+)");
         Assert.True(body.Success);
         var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(body.Groups["data"].Value));

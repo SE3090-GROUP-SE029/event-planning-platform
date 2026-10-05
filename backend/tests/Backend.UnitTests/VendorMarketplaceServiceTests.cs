@@ -146,6 +146,23 @@ public class VendorMarketplaceServiceTests
     }
 
     [Fact]
+    public async Task ListAsync_ReturnsEmptyItems_WhenPageIsBeyondResults()
+    {
+        using var db = CreateDb();
+        await SeedVendorAsync(db, "A Vendor", BusinessCategory.VENUE, VendorStatus.APPROVED);
+        var service = CreateService(db);
+
+        var result = await service.ListAsync(new VendorMarketplaceQuery
+        {
+            Page = 2,
+            PageSize = 10
+        });
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
     public async Task ListAsync_IncludesStartingPrice_WithoutPrivateFields()
     {
         using var db = CreateDb();

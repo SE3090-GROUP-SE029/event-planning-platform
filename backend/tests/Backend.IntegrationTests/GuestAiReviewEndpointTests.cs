@@ -15,12 +15,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
     private static GuestAiDecision Decision(AiDecision recommendation = AiDecision.ACCEPTED)
         => new(recommendation, 0.85, ["Evidence-based test recommendation."], recommendation == AiDecision.ACCEPTED ? [] : ["MANUAL_VERIFICATION"], "gemini-3.8-flash", "guest-filtering-v2");
 
-    private async Task DrainAsync()
-    {
-        for (var i = 0; i < 100; i++)
-            if (!await fixture.WithAiServiceAsync(s => s.ProcessNextAsync(Lease, Ct))) return;
-        throw new InvalidOperationException("Unexpected review backlog in test");
-    }
+    private Task DrainAsync() => fixture.DrainAiAsync();
 
     private async Task<(Event Event, string PublicId)> PrepareAsync(int seats = 1)
     {
@@ -71,7 +66,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         Assert.True(response.Headers.CacheControl!.NoStore);
         await using var db = fixture.CreateDb();
         Assert.Equal(RegistrationStatus.CONFIRMED, (await db.RegistrationSubmissions.FindAsync(first.Registration.Id))!.Status);
-        Assert.Equal(recommendation == AiDecision.ACCEPTED ? RegistrationStatus.WAITING_LIST : RegistrationStatus.REJECTED,
+        Assert.Equal(recommendation == AiDecision.ACCEPTED ?         RegistrationStatus.WAITLISTED : RegistrationStatus.REJECTED,
             (await db.RegistrationSubmissions.FindAsync(second.Registration.Id))!.Status);
         if (recommendation == AiDecision.REJECTED)
             Assert.Contains(fixture.Email.Rejections, e => e.EmailAddress == second.Registration.Guest.EmailAddress);
@@ -98,7 +93,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         Assert.Equal(code, failed.FailureCode);
         Assert.Null(failed.Decision);
         Assert.Null(failed.Confidence);
-        Assert.Equal(RegistrationStatus.PENDING_AI, registration.Status);
+        Assert.Equal(        RegistrationStatus.PENDING_REVIEW, registration.Status);
         Assert.False(await db.Invitations.AnyAsync(i => i.RegistrationSubmissionId == registration.Id));
         fixture.Ai.Failure = null;
         using var retried = await SendAsync(Path(eventDetails.Id, registration.Id, true), true);
@@ -224,7 +219,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         {
             await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
             var second = await SubmitAsync(publicId, 2).WaitAsync(TimeSpan.FromSeconds(10));
-            Assert.Equal(RegistrationStatus.PENDING_AI, second.Registration.Status);
+            Assert.Equal(            RegistrationStatus.PENDING_REVIEW, second.Registration.Status);
         }
         finally { release.TrySetResult(); await analysis; fixture.Ai.BeforeReturn = null; }
     }
@@ -318,15 +313,15 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         Assert.Equal(InvitationDeliveryStatus.FAILED, current.RejectionDeliveryStatus);
         Assert.Null(current.Invitation);
         fixture.Email.ThrowOnSend = false;
-        var retried = await fixture.WithServiceAsync(s => s.RetryRejectionAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, current.Id, Ct));
+        var retried = await fixture.WithReviewServiceAsync(s => s.RetryRejectionAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, current.Id, Ct));
         Assert.Equal(InvitationDeliveryStatus.SENT, retried.RejectionDeliveryStatus);
         Assert.Equal(2, retried.RejectionDeliveryAttempts);
-        var repeated = await fixture.WithServiceAsync(s => s.RetryRejectionAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, current.Id, Ct));
+        var repeated = await fixture.WithReviewServiceAsync(s => s.RetryRejectionAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, current.Id, Ct));
         Assert.Equal(2, repeated.RejectionDeliveryAttempts);
         await using var db = fixture.CreateDb();
         Assert.Equal(1, (await db.GuestAiReviews.SingleAsync(r => r.RegistrationSubmissionId == current.Id)).Attempts);
         Assert.False(await db.Invitations.AnyAsync(i => i.RegistrationSubmissionId == current.Id));
-        var error = await Assert.ThrowsAsync<RegistrationException>(() => fixture.WithServiceAsync(s => s.RespondAsync(
+        var error = await Assert.ThrowsAsync<RegistrationException>(() => fixture.WithRsvpServiceAsync(s => s.RespondAsync(
             receipt.Registration.PublicReference, receipt.StatusSecret, RsvpStatus.ACCEPTED, Ct)));
         Assert.Equal(409, error.StatusCode);
     }
@@ -372,6 +367,68 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
     }
 
     [Fact]
+    public async Task ManualReviewSupersedesAiAndDefersInvitationUntilSeatAllocation()
+    {
+        var (eventDetails, publicId) = await PrepareAsync();
+        var receipt = await SubmitAsync(publicId);
+        var now = fixture.Clock.GetUtcNow();
+        var claim = (await fixture.WithAiRepositoryAsync(r => r.ClaimAsync(now, now.Add(Lease), Ct)))!;
+
+        using var request = new HttpRequestMessage(HttpMethod.Post,
+            $"/api/events/{eventDetails.Id}/registration-form/registrations/{receipt.Registration.Id}/review")
+        {
+            Content = JsonContent.Create(new { decision = "ACCEPTED" })
+        };
+        request.Headers.Add("X-Test-Identity", RegistrationHostFixture.PlannerId);
+        request.Headers.Add("X-Test-Role", "EVENT_PLANNER");
+        using var response = await fixture.Client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var reviewed = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("ACCEPTED", reviewed.GetProperty("status").GetString());
+        Assert.Equal("ACCEPTED", reviewed.GetProperty("reviewDecision").GetString());
+        Assert.Equal("MANUAL", reviewed.GetProperty("reviewSource").GetString());
+
+        await fixture.ApplyDecisionAsync(claim, Decision(AiDecision.REJECTED));
+        await using (var db = fixture.CreateDb())
+        {
+            var row = await db.RegistrationSubmissions.SingleAsync(r => r.Id == receipt.Registration.Id);
+            Assert.Equal(RegistrationStatus.ACCEPTED, row.Status);
+            Assert.Equal(ReviewSource.MANUAL, row.ReviewSource);
+            Assert.Equal(AiAnalysisStatus.SUPERSEDED,
+                (await db.GuestAiReviews.SingleAsync(r => r.RegistrationSubmissionId == row.Id)).Status);
+            Assert.False(await db.Invitations.AnyAsync(i => i.RegistrationSubmissionId == row.Id));
+        }
+
+        await fixture.WithAllocationAsync(s => s.AllocateAsync(eventDetails.Id, Ct));
+        var confirmed = await fixture.WithServiceAsync(s =>
+            s.GetRegistrationAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, receipt.Registration.Id, Ct));
+        Assert.Equal(RegistrationStatus.CONFIRMED, confirmed.Status);
+        Assert.Null(confirmed.Invitation);
+
+        Assert.True(await fixture.WithInvitationServiceAsync(s => s.ProcessNextGenerationAsync(Ct)));
+        confirmed = await fixture.WithServiceAsync(s =>
+            s.GetRegistrationAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, receipt.Registration.Id, Ct));
+        Assert.NotNull(confirmed.Invitation);
+    }
+
+    [Fact]
+    public async Task GuestCannotDeclineBeforeReceivingAConfirmedInvitation()
+    {
+        var (_, publicId) = await PrepareAsync();
+        var receipt = await SubmitAsync(publicId);
+        using var response = await fixture.Client.PostAsJsonAsync(
+            $"/api/public/registrations/{receipt.Registration.PublicReference}/rsvp",
+            new { secret = receipt.StatusSecret, response = "DECLINED" });
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        await using var db = fixture.CreateDb();
+        var registration = await db.RegistrationSubmissions.SingleAsync(r => r.Id == receipt.Registration.Id);
+        Assert.Equal(RegistrationStatus.PENDING_REVIEW, registration.Status);
+        Assert.Null(registration.CancelledAt);
+        Assert.False(await db.Invitations.AnyAsync(i => i.RegistrationSubmissionId == registration.Id));
+    }
+
+    [Fact]
     public async Task RejectedAndPendingGuestsAreNeverPromotedAheadOfAcceptedWaiters()
     {
         var (eventDetails, publicId) = await PrepareAsync();
@@ -387,7 +444,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         await fixture.WithServiceAsync(s => s.CancelAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, confirmed.Registration.Id, Ct));
         await using var db = fixture.CreateDb();
         Assert.Equal(RegistrationStatus.REJECTED, (await db.RegistrationSubmissions.FindAsync(rejected.Registration.Id))!.Status);
-        Assert.Equal(RegistrationStatus.PENDING_AI, (await db.RegistrationSubmissions.FindAsync(pending.Registration.Id))!.Status);
+        Assert.Equal(        RegistrationStatus.PENDING_REVIEW, (await db.RegistrationSubmissions.FindAsync(pending.Registration.Id))!.Status);
         Assert.Equal(RegistrationStatus.CONFIRMED, (await db.RegistrationSubmissions.FindAsync(waiter.Registration.Id))!.Status);
     }
 
@@ -401,7 +458,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         await using (var db = fixture.CreateDb())
         {
             var row = await db.RegistrationSubmissions.FindAsync(legacy.Registration.Id);
-            row!.Status = RegistrationStatus.WAITING_LIST;
+            row!.Status =             RegistrationStatus.WAITLISTED;
             var review = await db.GuestAiReviews.SingleAsync(r => r.RegistrationSubmissionId == row.Id);
             review.Status = AiAnalysisStatus.COMPLETED;
             review.Recommendation = AiRecommendation.ELIGIBLE;
@@ -414,7 +471,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         }
         await fixture.WithServiceAsync(s => s.SetSeatLimitAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, 2, Ct));
         var before = await fixture.WithServiceAsync(s => s.GetRegistrationAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, legacy.Registration.Id, Ct));
-        Assert.Equal(RegistrationStatus.WAITING_LIST, before.Status);
+        Assert.Equal(        RegistrationStatus.WAITLISTED, before.Status);
         fixture.Ai.Decision = Decision(AiDecision.REJECTED);
         await DrainAsync();
         var oldConfirmed = await fixture.WithServiceAsync(s => s.GetRegistrationAsync(eventDetails.Id, RegistrationHostFixture.PlannerId, confirmed.Registration.Id, Ct));
@@ -436,7 +493,7 @@ public class GuestAiReviewEndpointTests(RegistrationHostFixture fixture) : IClas
         await DrainAsync();
         await using var db = fixture.CreateDb();
         Assert.Equal(2, await db.RegistrationSubmissions.CountAsync(r => r.EventId == eventDetails.Id && r.Status == RegistrationStatus.CONFIRMED));
-        Assert.Equal(6, await db.RegistrationSubmissions.CountAsync(r => r.EventId == eventDetails.Id && r.Status == RegistrationStatus.WAITING_LIST));
+        Assert.Equal(6, await db.RegistrationSubmissions.CountAsync(r => r.EventId == eventDetails.Id && r.Status ==         RegistrationStatus.WAITLISTED));
         Assert.Equal(2, await db.Invitations.CountAsync(i => i.RegistrationSubmission.EventId == eventDetails.Id));
     }
 }

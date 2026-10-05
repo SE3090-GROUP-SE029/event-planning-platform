@@ -6,6 +6,8 @@ import {
   AdminEventsRoute,
   AdminPlanDetailsRoute,
   AdminPlansRoute,
+  AdminScheduleDetailsRoute,
+  AdminSchedulesRoute,
   AdminSystemRoute,
   AdminUsersRoute,
   AdminVendorsRoute,
@@ -15,6 +17,8 @@ import {
   EventAnalyticsRoute,
   LandingRoute,
   LoginRoute,
+  PublicGuestRegistrationRoute,
+  PublicRegistrationStatusRoute,
 } from './routeElements';
 
 export const router = createBrowserRouter([
@@ -29,6 +33,14 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     element: <Navigate to="/" replace />,
+  },
+  {
+    path: '/guest/register/:publicId',
+    element: <PublicGuestRegistrationRoute />,
+  },
+  {
+    path: '/guest/status/:publicReference',
+    element: <PublicRegistrationStatusRoute />,
   },
   {
     path: '/admin/dashboard',
@@ -77,6 +89,14 @@ export const router = createBrowserRouter([
   {
     path: '/admin/plans/:id',
     element: <AdminPlanDetailsRoute />,
+  },
+  {
+    path: '/admin/schedules',
+    element: <AdminSchedulesRoute />,
+  },
+  {
+    path: '/admin/schedules/:id',
+    element: <AdminScheduleDetailsRoute />,
   },
   {
     path: '/admin/system',

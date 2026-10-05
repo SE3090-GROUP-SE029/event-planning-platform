@@ -26,6 +26,11 @@ public record GuestAiDecision(AiDecision Decision, double Confidence, string[] R
         => !string.IsNullOrWhiteSpace(value) && value.Length <= maximum && !value.Any(char.IsControl);
 }
 
+public static class GuestAiReviewVersions
+{
+    public const string CurrentPromptVersion = "guest-filtering-v2";
+}
+
 public record GuestAiClaim(Guid ReviewId, long RegistrationSubmissionId, Guid AttemptId);
 
 public interface IGuestAiClient
@@ -41,6 +46,7 @@ public interface IGuestAiReviewRepository
     Task<GuestAiContext> ContextAsync(long registrationId, CancellationToken ct);
     Task<bool> CompleteAsync(GuestAiClaim claim, GuestAiDecision decision, DateTimeOffset now, CancellationToken ct);
     Task<bool> FailAsync(GuestAiClaim claim, string code, CancellationToken ct);
+    Task SupersedeAsync(long registrationId, CancellationToken ct);
 }
 
 // Only stable, non-sensitive codes cross the service boundary or enter logs.

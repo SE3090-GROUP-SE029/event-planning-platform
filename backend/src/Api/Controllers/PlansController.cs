@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Net;
 using Application.Common.Exceptions;
 using Application.Common.Interfaces;
 using Application.Dtos.Common;
@@ -17,7 +16,8 @@ namespace Api.Controllers;
 [Route("api")]
 [Authorize]
 public sealed class PlansController(
-    IPlanGenerationService generationService,
+    IPlanGenerationJobService generationJobService,
+    IPlanGenerationJobRepository generationJobRepository,
     IPlanDecisionService decisionService,
     IEventPlanDraftRepository planRepository,
     IEventRepository eventRepository,
@@ -25,7 +25,7 @@ public sealed class PlansController(
 {
     [HttpPost("events/{eventId:guid}/plans/generate")]
     [Authorize(Policy = "EventPlannerOnly")]
-    public async Task<ActionResult<ApiResponse<EventPlanDraft>>> Generate(
+    public async Task<ActionResult<ApiResponse<PlanGenerationJobResponse>>> Generate(
         Guid eventId,
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] GeneratePlanRequest? request,
         CancellationToken cancellationToken)
@@ -33,46 +33,91 @@ public sealed class PlansController(
         if (request is not null)
         {
             if (request.EventId != eventId)
-                return BadRequest(ApiResponse<EventPlanDraft>.Error("EventId does not match route."));
+                return BadRequest(ApiResponse<PlanGenerationJobResponse>.Error("EventId does not match route."));
             var validationErrors = request.GetValidationErrors()
                 .Select(error => error.ErrorMessage)
                 .Where(message => !string.IsNullOrWhiteSpace(message));
             var error = string.Join("; ", validationErrors);
             if (!string.IsNullOrEmpty(error))
-                return BadRequest(ApiResponse<EventPlanDraft>.Error(error));
+                return BadRequest(ApiResponse<PlanGenerationJobResponse>.Error(error));
         }
 
         try
         {
-            var plan = await generationService.GeneratePlanAsync(
+            var job = await generationJobService.EnqueueAsync(
                 eventId,
-                cancellationToken,
-                request?.Regenerate ?? false);
-            return Accepted(ApiResponse<EventPlanDraft>.Ok(plan, "Plan generation completed."));
+                request?.Regenerate ?? false,
+                HttpContext.TraceIdentifier,
+                cancellationToken);
+            return AcceptedAtAction(
+                nameof(GetGenerationJob),
+                new { eventId, jobId = job.Id },
+                ApiResponse<PlanGenerationJobResponse>.Ok(
+                    PlanGenerationJobResponse.From(job),
+                    "Plan generation queued."));
         }
-        catch (KeyNotFoundException ex) { return NotFound(ApiResponse<EventPlanDraft>.Error(ex.Message, 404)); }
+        catch (KeyNotFoundException ex) { return NotFound(ApiResponse<PlanGenerationJobResponse>.Error(ex.Message, 404)); }
         catch (UnauthorizedAccessException) { return Forbid(); }
-        catch (InvalidOperationException ex) { return BadRequest(ApiResponse<EventPlanDraft>.Error(ex.Message)); }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (InvalidOperationException ex) { return BadRequest(ApiResponse<PlanGenerationJobResponse>.Error(ex.Message)); }
+    }
+
+    [HttpGet("events/{eventId:guid}/plans/generation/latest")]
+    public async Task<ActionResult<ApiResponse<PlanGenerationJobResponse?>>> GetLatestGeneration(
+        Guid eventId,
+        CancellationToken cancellationToken)
+    {
+        var eventEntity = await eventRepository.GetByIdAsync(eventId);
+        if (eventEntity is null)
+            return NotFound(new { message = "Event not found." });
+        if (!User.IsInRole("ADMIN") && !IsCurrentUser(eventEntity.OwnerId))
+            return Forbid();
+
+        var job = await generationJobRepository.GetLatestForEventAsync(eventId, cancellationToken);
+        logger.LogInformation(
+            "Plan generation status retrieved for event {EventId}, generation job {GenerationJobId}, request {RequestId}",
+            eventId,
+            job?.Id,
+            HttpContext.TraceIdentifier);
+        return Ok(ApiResponse<PlanGenerationJobResponse?>.Ok(
+            job is null ? null : PlanGenerationJobResponse.From(job)));
+    }
+
+    [HttpGet("events/{eventId:guid}/plans/generation/{jobId:guid}")]
+    public async Task<ActionResult<ApiResponse<PlanGenerationJobResponse>>> GetGenerationJob(
+        Guid eventId,
+        Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        var eventEntity = await eventRepository.GetByIdAsync(eventId);
+        if (eventEntity is null)
         {
-            return StatusCode(
-                StatusCodes.Status504GatewayTimeout,
-                ApiResponse<EventPlanDraft>.Error("Plan generation timed out. Please try again.", 504));
+            logger.LogWarning(
+                "Plan generation status retrieval failed for missing event {EventId}, request {RequestId}",
+                eventId,
+                HttpContext.TraceIdentifier);
+            return NotFound(new { message = "Event not found." });
         }
-        catch (HttpRequestException ex)
+        if (!User.IsInRole("ADMIN") && !IsCurrentUser(eventEntity.OwnerId))
+            return Forbid();
+
+        var job = await generationJobRepository.GetByIdAsync(jobId, cancellationToken);
+        if (job is null || job.EventId != eventId)
         {
-            var statusCode = ex.StatusCode switch
-            {
-                HttpStatusCode.BadGateway => StatusCodes.Status502BadGateway,
-                HttpStatusCode.GatewayTimeout => StatusCodes.Status504GatewayTimeout,
-                _ => StatusCodes.Status503ServiceUnavailable
-            };
-            return StatusCode(
-                statusCode,
-                ApiResponse<EventPlanDraft>.Error(
-                    "The AI planning service is temporarily unavailable. Please try again.",
-                    statusCode));
+            logger.LogWarning(
+                "Plan generation status retrieval failed for event {EventId}, generation job {GenerationJobId}, request {RequestId}",
+                eventId,
+                jobId,
+                HttpContext.TraceIdentifier);
+            return NotFound(ApiResponse<PlanGenerationJobResponse>.Error("Plan generation job not found.", 404));
         }
+
+        logger.LogInformation(
+            "Plan generation status retrieved for event {EventId}, generation job {GenerationJobId}, request {RequestId}, status {Status}",
+            eventId,
+            jobId,
+            job.RequestId,
+            job.Status);
+        return Ok(ApiResponse<PlanGenerationJobResponse>.Ok(PlanGenerationJobResponse.From(job)));
     }
 
     [HttpGet("events/{eventId:guid}/plans")]
@@ -91,6 +136,11 @@ public sealed class PlansController(
         try
         {
             var plans = await planRepository.ListAsync(eventId, status, version, cancellationToken);
+            logger.LogInformation(
+                "Plan retrieval succeeded for event {EventId}, request {RequestId}, plan count {PlanCount}",
+                eventId,
+                HttpContext.TraceIdentifier,
+                plans.Count);
             return Ok(ApiListResponse<EventPlanDraft>.Ok(
                 plans,
                 new ApiPagination { Page = 1, PageSize = plans.Count, Total = plans.Count, HasNextPage = false }));
@@ -99,9 +149,10 @@ public sealed class PlansController(
         {
             logger.LogError(
                 ex,
-                "Could not read persisted {DataType} JSON for event {EventId}. Raw JSON: {RawJson}",
-                ex.DataType,
+                "Plan retrieval failed for event {EventId}, request {RequestId}; persisted {DataType} JSON is invalid. Raw JSON: {RawJson}",
                 eventId,
+                HttpContext.TraceIdentifier,
+                ex.DataType,
                 ex.RawJson);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,
@@ -122,16 +173,29 @@ public sealed class PlansController(
                 ?? throw new KeyNotFoundException("Plan not found.");
             if (!User.IsInRole("ADMIN") && !IsCurrentUser(plan.Event.OwnerId))
                 return Forbid();
+            logger.LogInformation(
+                "Plan retrieval succeeded for event {EventId}, plan {PlanId}, request {RequestId}",
+                plan.EventId,
+                planId,
+                HttpContext.TraceIdentifier);
             return Ok(ApiResponse<EventPlanDraft>.Ok(plan));
         }
-        catch (KeyNotFoundException ex) { return NotFound(ApiResponse<EventPlanDraft>.Error(ex.Message, 404)); }
+        catch (KeyNotFoundException ex)
+        {
+            logger.LogWarning(
+                "Plan retrieval failed for plan {PlanId}, request {RequestId}: not found",
+                planId,
+                HttpContext.TraceIdentifier);
+            return NotFound(ApiResponse<EventPlanDraft>.Error(ex.Message, 404));
+        }
         catch (PersistedJsonDeserializationException ex)
         {
             logger.LogError(
                 ex,
-                "Could not read persisted {DataType} JSON for plan {PlanId}. Raw JSON: {RawJson}",
-                ex.DataType,
+                "Plan retrieval failed for plan {PlanId}, request {RequestId}; persisted {DataType} JSON is invalid. Raw JSON: {RawJson}",
                 planId,
+                HttpContext.TraceIdentifier,
+                ex.DataType,
                 ex.RawJson);
             return StatusCode(
                 StatusCodes.Status500InternalServerError,

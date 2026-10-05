@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import apiClient from "../../../shared/api/apiClient";
 
 /**
@@ -24,13 +24,8 @@ export async function uploadGuestList(eventId, file) {
  * immediately sees the newly created registrations.
  */
 export function useUploadGuestList(eventId) {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (file) => uploadGuestList(eventId, file),
-    onSuccess: () => {
-      // Invalidate the planner registration list so new guests appear.
-      queryClient.invalidateQueries({ queryKey: ["planner-registrations", eventId] });
-    },
   });
 }
 
@@ -53,4 +48,12 @@ export function useEventGuests(params) {
     queryFn: () => fetchEventGuests(params),
     enabled: !!params.eventId,
   });
+}
+
+export async function reviewGuestRegistration(eventId, registrationId, decision) {
+  const response = await apiClient.post(
+    `/api/events/${eventId}/registration-form/registrations/${registrationId}/review`,
+    { decision }
+  );
+  return response.data;
 }

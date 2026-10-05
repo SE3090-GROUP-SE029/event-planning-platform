@@ -4,8 +4,9 @@ using Domain.Enums;
 namespace Application.GuestManagement;
 
 public class RegistrationService(IGuestRegistrationRepository repository,
-    IRegistrationTokenGenerator tokens, IRegistrationEligibilityPolicy eligibility,
-    IInvitationEmailSender emailSender, TimeProvider clock)
+    IRegistrationTokenGenerator tokens, TimeProvider clock,
+    IRegistrationSecretProtector secretProtector,
+    SeatAllocationService allocation)
 {
     public Task<RegistrationForm> CreateFormAsync(Guid eventId, string plannerId, FormSettings settings, CancellationToken ct)
     {
@@ -75,7 +76,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
     public async Task<RegistrationForm> UpdateFormAsync(Guid eventId, string plannerId, FormSettings settings, CancellationToken ct)
     {
         settings = RegistrationValidator.Validate(settings);
-        var result = await repository.WithEventLockAsync(eventId, async eventDetails =>
+        var form = await repository.WithEventLockAsync(eventId, async eventDetails =>
         {
             RequireOwner(eventDetails, plannerId);
             var form = await RequireFormAsync(eventId, ct);
@@ -84,26 +85,26 @@ public class RegistrationService(IGuestRegistrationRepository repository,
             form.ClosesAt = settings.ClosesAt;
             form.SeatLimit = settings.SeatLimit;
             form.UpdatedAt = clock.GetUtcNow();
-            return (Form: form, Promoted: await PromoteAsync(form, eventDetails, ct));
+            return form;
         }, ct);
-        await DeliverAsync(eventId, result.Promoted, ct);
-        return result.Form;
+        await allocation.AllocateAsync(eventId, ct);
+        return form;
     }
 
     public async Task<RegistrationForm> SetSeatLimitAsync(Guid eventId, string plannerId, int seatLimit, CancellationToken ct)
     {
         RegistrationValidator.ValidateSeatLimit(seatLimit);
-        var result = await repository.WithEventLockAsync(eventId, async eventDetails =>
+        var form = await repository.WithEventLockAsync(eventId, async eventDetails =>
         {
             RequireOwner(eventDetails, plannerId);
             var form = await RequireFormAsync(eventId, ct);
             await RequireCapacityAsync(eventId, seatLimit, ct);
             form.SeatLimit = seatLimit;
             form.UpdatedAt = clock.GetUtcNow();
-            return (Form: form, Promoted: await PromoteAsync(form, eventDetails, ct));
+            return form;
         }, ct);
-        await DeliverAsync(eventId, result.Promoted, ct);
-        return result.Form;
+        await allocation.AllocateAsync(eventId, ct);
+        return form;
     }
 
     public Task<RegistrationForm> PublishAsync(Guid eventId, string plannerId, CancellationToken ct)
@@ -146,20 +147,34 @@ public class RegistrationService(IGuestRegistrationRepository repository,
             if (now >= form.ClosesAt || now >= new DateTimeOffset(eventDetails.PreferredDate + eventDetails.EventDuration, TimeSpan.Zero))
                 throw Error(409, "registration_closed", "Registration has closed.");
             var normalizedEmail = details.EmailAddress.ToUpperInvariant();
-            if (await repository.EmailExistsAsync(eventDetails.Id, normalizedEmail, ct))
+            if (await repository.RegistrationExistsAsync(eventDetails.Id, normalizedEmail, ct))
                 throw Error(409, "duplicate_registration", "This email is already registered for this event.");
-            var guest = new Guest
+            var guest = await repository.FindGuestByEmailAsync(eventDetails.Id, normalizedEmail, ct);
+            if (guest is null)
             {
-                EventId = eventDetails.Id, FullName = details.FullName, EmailAddress = details.EmailAddress,
-                NormalizedEmail = normalizedEmail, Organisation = details.Organisation, PhoneNumber = details.PhoneNumber,
-                CreatedAt = now, UpdatedAt = now
-            };
+                guest = new Guest
+                {
+                    EventId = eventDetails.Id, FullName = details.FullName, EmailAddress = details.EmailAddress,
+                    NormalizedEmail = normalizedEmail, Organisation = details.Organisation, PhoneNumber = details.PhoneNumber,
+                    CreatedAt = now, UpdatedAt = now
+                };
+                repository.AddGuest(guest);
+            }
+            else
+            {
+                guest.FullName = details.FullName;
+                guest.EmailAddress = details.EmailAddress;
+                guest.Organisation = details.Organisation;
+                guest.PhoneNumber = details.PhoneNumber;
+                guest.UpdatedAt = now;
+            }
             var submission = new RegistrationSubmission
             {
                 EventId = eventDetails.Id, RegistrationFormId = form.Id, RegistrationForm = form,
                 GuestId = guest.Id, Guest = guest, PublicReference = await UniqueTokenAsync(ct),
-                StatusSecretHash = tokens.Hash(secret), RegisteredAt = now, UpdatedAt = now,
-                Status = RegistrationStatus.PENDING_AI,
+                StatusSecretHash = tokens.Hash(secret), ProtectedStatusSecret = secretProtector.Protect(secret),
+                RegisteredAt = now, UpdatedAt = now,
+                Status = RegistrationStatus.PENDING_REVIEW,
                 Answers = validatedAnswers.Select(a => new RegistrationAnswer { RegistrationQuestionId = a.QuestionId,
                     RegistrationFormId = form.Id, Answer = a.Answer }).ToList()
             };
@@ -169,72 +184,6 @@ public class RegistrationService(IGuestRegistrationRepository repository,
         }, ct);
         return new RegistrationReceipt(result, secret);
     }
-
-    public async Task ApplyDecisionAsync(GuestAiClaim claim, GuestAiDecision decision,
-        IGuestAiReviewRepository reviews, CancellationToken ct)
-    {
-        var lookup = await repository.FindRegistrationAsync(claim.RegistrationSubmissionId, ct) ?? throw NotFound();
-        var promoted = await repository.WithEventLockAsync(lookup.EventId, async eventDetails =>
-        {
-            var registration = await RequireRegistrationAsync(eventDetails.Id, lookup.Id, ct);
-            if (!await reviews.CompleteAsync(claim, decision, clock.GetUtcNow(), ct)) return new List<long>();
-            // An in-flight result never changes a cancellation or a legacy confirmed invitation.
-            if (registration.Status is not (RegistrationStatus.PENDING_AI or RegistrationStatus.WAITING_LIST)) return new List<long>();
-            registration.UpdatedAt = clock.GetUtcNow();
-            if (decision.Decision == AiDecision.REJECTED)
-            {
-                registration.Status = RegistrationStatus.REJECTED;
-                registration.RejectionDeliveryStatus = InvitationDeliveryStatus.PENDING;
-                return new List<long>();
-            }
-            registration.Status = RegistrationStatus.WAITING_LIST;
-            await repository.SaveAsync(ct);
-            return await PromoteAsync(await RequireFormAsync(eventDetails.Id, ct), eventDetails, ct);
-        }, ct);
-        await DeliverAsync(lookup.EventId, promoted, ct);
-        await DeliverRejectionAsync(lookup.EventId, lookup.Id, ct);
-    }
-
-    public async Task<bool> ProcessPendingDeliveryAsync(CancellationToken ct)
-    {
-        var pending = await repository.PendingDeliveryAsync(clock.GetUtcNow().AddMinutes(-1), ct);
-        if (pending is null) return false;
-        await DeliverAsync(pending.Value.EventId, [pending.Value.Id], ct);
-        await DeliverRejectionAsync(pending.Value.EventId, pending.Value.Id, ct);
-        return true;
-    }
-
-    public async Task<RegistrationSubmission> RetryRejectionAsync(Guid eventId, string plannerId, long id, CancellationToken ct)
-    {
-        var registration = await GetRegistrationAsync(eventId, plannerId, id, ct);
-        if (registration.Status != RegistrationStatus.REJECTED)
-            throw Error(409, "rejection_unavailable", "Only a rejected registration can receive a rejection email.");
-        await DeliverRejectionAsync(eventId, id, ct, retry: true);
-        return await GetRegistrationAsync(eventId, plannerId, id, ct);
-    }
-
-    private Task<bool> DeliverRejectionAsync(Guid eventId, long id, CancellationToken ct, bool retry = false)
-        => repository.WithEventLockAsync(eventId, async eventDetails =>
-        {
-            var registration = await RequireRegistrationAsync(eventId, id, ct);
-            if (registration.Status != RegistrationStatus.REJECTED || registration.RejectionDeliveryStatus == InvitationDeliveryStatus.SENT ||
-                (!retry && (registration.RejectionDeliveryStatus == InvitationDeliveryStatus.FAILED ||
-                    registration.RejectionLastAttemptAt > clock.GetUtcNow().AddMinutes(-1)))) return false;
-            registration.RejectionLastAttemptAt = clock.GetUtcNow();
-            registration.RejectionDeliveryAttempts++;
-            EmailDeliveryResult delivery;
-            try { delivery = await emailSender.SendRejectionAsync(new RejectionEmail(registration.Guest.EmailAddress,
-                registration.Guest.FullName, eventDetails.EventName), ct); }
-            catch (Exception) when (!ct.IsCancellationRequested) { delivery = EmailDeliveryResult.FAILED; }
-            registration.RejectionDeliveryStatus = delivery switch
-            {
-                EmailDeliveryResult.SENT => InvitationDeliveryStatus.SENT,
-                EmailDeliveryResult.UNAVAILABLE => InvitationDeliveryStatus.PENDING,
-                _ => InvitationDeliveryStatus.FAILED
-            };
-            if (delivery == EmailDeliveryResult.SENT) registration.RejectionSentAt = clock.GetUtcNow();
-            return true;
-        }, ct);
 
     public Task<RegistrationPage> ListAsync(Guid eventId, string plannerId, int page, int pageSize, CancellationToken ct, RegistrationStatus? status = null, RsvpStatus? rsvpStatus = null, bool? isWaitlisted = null, bool? checkedIn = null)
     {
@@ -256,188 +205,19 @@ public class RegistrationService(IGuestRegistrationRepository repository,
         }, ct);
 
     public async Task<RegistrationSubmission> GetPublicStatusAsync(string reference, string secret, CancellationToken ct)
-    {
-        RegistrationValidator.ValidatePublicCredential(reference);
-        RegistrationValidator.ValidatePublicCredential(secret);
-        var registration = await repository.FindPublicRegistrationAsync(reference, ct);
-        if (registration is null || !tokens.Matches(secret, registration.StatusSecretHash)) throw NotFound();
-        return registration;
-    }
+        => await RegistrationAccess.GetPublicRegistrationAsync(repository, tokens, reference, secret, ct);
 
     public async Task<RegistrationSubmission> CancelAsync(Guid eventId, string plannerId, long id, CancellationToken ct)
     {
-        var result = await repository.WithEventLockAsync(eventId, async eventDetails =>
+        var registration = await repository.WithEventLockAsync(eventId, async eventDetails =>
         {
             RequireOwner(eventDetails, plannerId);
             var registration = await RequireRegistrationAsync(eventId, id, ct);
-            Cancel(registration);
-            await repository.SaveAsync(ct);
-            return (Registration: registration, Promoted: await PromoteAsync(await RequireFormAsync(eventId, ct), eventDetails, ct));
-        }, ct);
-        await DeliverAsync(eventId, result.Promoted, ct);
-        return result.Registration;
-    }
-
-    public async Task<RegistrationSubmission> RespondAsync(string reference, string secret, RsvpStatus response, CancellationToken ct)
-    {
-        if (response is not (RsvpStatus.ACCEPTED or RsvpStatus.DECLINED or RsvpStatus.MAYBE))
-            throw Error(400, "invalid_rsvp", "RSVP must be ACCEPTED, DECLINED, or MAYBE.");
-        var lookup = await GetPublicStatusAsync(reference, secret, ct);
-        var result = await repository.WithEventLockAsync(lookup.EventId, async eventDetails =>
-        {
-            var registration = await GetPublicStatusAsync(reference, secret, ct);
-            if (response == RsvpStatus.DECLINED)
-            {
-                Cancel(registration);
-                await repository.SaveAsync(ct);
-                return (Registration: registration, Promoted: await PromoteAsync(await RequireFormAsync(lookup.EventId, ct), eventDetails, ct));
-            }
-            if (!IsActive(registration))
-                throw Error(409, "invitation_unavailable", "Only an active confirmed invitation can accept an RSVP.");
-            registration.Invitation!.RsvpStatus = response;
-            registration.Invitation.RsvpedAt = registration.UpdatedAt = clock.GetUtcNow();
-            return (Registration: registration, Promoted: new List<long>());
-        }, ct);
-        await DeliverAsync(lookup.EventId, result.Promoted, ct);
-        return result.Registration;
-    }
-
-    public async Task<RegistrationSubmission> RetryInvitationAsync(Guid eventId, string plannerId, long id, CancellationToken ct)
-    {
-        var registration = await GetRegistrationAsync(eventId, plannerId, id, ct);
-        if (!IsActive(registration)) throw Error(409, "invitation_unavailable", "No active confirmed invitation exists.");
-        await DeliverAsync(eventId, [id], ct);
-        return await GetRegistrationAsync(eventId, plannerId, id, ct);
-    }
-
-    public Task<bool> ValidateInvitationAsync(Guid eventId, string plannerId, string token, CancellationToken ct)
-        => repository.WithEventLockAsync(eventId, async eventDetails =>
-        {
-            RequireOwner(eventDetails, plannerId);
-            RegistrationValidator.ValidatePublicCredential(token);
-            var invitation = await repository.FindInvitationByTokenAsync(token, ct);
-            return invitation is not null && invitation.RegistrationSubmission.EventId == eventId && IsActive(invitation.RegistrationSubmission);
-        }, ct);
-        
-    public Task<RegistrationSubmission> CheckInGuestAsync(Guid eventId, string plannerId, string token, CancellationToken ct)
-        => repository.WithEventLockAsync(eventId, async eventDetails =>
-        {
-            RequireOwner(eventDetails, plannerId);
-            RegistrationValidator.ValidatePublicCredential(token);
-            var invitation = await repository.FindInvitationByTokenAsync(token, ct);
-            if (invitation is null)
-                throw Error(400, "invalid_qr", "Invalid QR code. Invitation not found.");
-            
-            var registration = invitation.RegistrationSubmission;
-            
-            if (registration.EventId != eventId)
-                throw Error(400, "wrong_event", "This invitation is for a different event.");
-                
-            if (registration.Status == RegistrationStatus.CANCELLED || invitation.RevokedAt != null)
-                throw Error(400, "cancelled_invitation", "This invitation has been cancelled.");
-                
-            if (registration.Status == RegistrationStatus.REJECTED)
-                throw Error(400, "rejected_guest", "This guest's registration was rejected.");
-                
-            if (registration.Status == RegistrationStatus.WAITING_LIST || registration.Status == RegistrationStatus.PENDING_AI)
-                throw Error(400, "waitlisted_guest", "This guest is waitlisted or pending review.");
-                
-            if (clock.GetUtcNow() > invitation.TokenExpiresAt)
-                throw Error(400, "expired_qr", "This QR code has expired.");
-                
-            if (!IsActive(registration))
-                throw Error(400, "invalid_qr", "This invitation is no longer active.");
-
-            if (registration.CheckedInAt != null)
-                throw Error(400, "already_checked_in", "Guest has already checked in.");
-
-            registration.CheckedInAt = clock.GetUtcNow();
-            registration.CheckedInMethod = CheckedInMethod.QR_CODE;
-            
+            RegistrationTransitions.Cancel(registration, clock);
             return registration;
         }, ct);
-
-    public bool IsActive(RegistrationSubmission registration)
-        => registration.Status == RegistrationStatus.CONFIRMED && registration.Invitation is { RevokedAt: null } invitation &&
-            clock.GetUtcNow() < invitation.TokenExpiresAt;
-
-    private async Task<List<long>> PromoteAsync(RegistrationForm form, Event eventDetails, CancellationToken ct)
-    {
-        var promoted = new List<long>();
-        if (form.Status != RegistrationFormStatus.PUBLISHED || clock.GetUtcNow() >= new DateTimeOffset(eventDetails.PreferredDate + eventDetails.EventDuration, TimeSpan.Zero)) return promoted;
-        var available = form.SeatLimit - await repository.ConfirmedCountAsync(form.EventId, ct);
-        if (available <= 0) return promoted;
-        foreach (var registration in await repository.WaitingAsync(form.EventId, ct))
-        {
-            if (!await eligibility.IsEligibleAsync(registration.Guest, eventDetails, ct)) continue;
-            var now = clock.GetUtcNow();
-            registration.Status = RegistrationStatus.CONFIRMED;
-            registration.ConfirmedAt = registration.UpdatedAt = now;
-            var invitation = new Invitation
-            {
-                RegistrationSubmissionId = registration.Id, RegistrationSubmission = registration,
-                Token = await UniqueTokenAsync(ct), CreatedAt = now, TokenExpiresAt = new DateTimeOffset(eventDetails.PreferredDate + eventDetails.EventDuration, TimeSpan.Zero)
-            };
-            registration.Invitation = invitation;
-            repository.AddInvitation(invitation);
-            await repository.SaveAsync(ct);
-            promoted.Add(registration.Id);
-            if (--available == 0) break;
-        }
-        return promoted;
-    }
-
-    private void Cancel(RegistrationSubmission registration)
-    {
-        if (registration.Status == RegistrationStatus.REJECTED)
-            throw Error(409, "registration_rejected", "A rejected registration cannot be cancelled or respond to an invitation.");
-        if (registration.Status == RegistrationStatus.CANCELLED) return;
-        var now = clock.GetUtcNow();
-        registration.Status = RegistrationStatus.CANCELLED;
-        registration.CancelledAt = registration.UpdatedAt = now;
-        if (registration.Invitation is { } invitation)
-        {
-            invitation.RevokedAt = now;
-            invitation.RsvpStatus = RsvpStatus.DECLINED;
-            invitation.RsvpedAt = now;
-        }
-    }
-
-    private async Task DeliverAsync(Guid eventId, IEnumerable<long> registrations, CancellationToken ct)
-    {
-        foreach (var id in registrations)
-        {
-            // Registration is already committed. An interrupted request leaves durable PENDING delivery for retry.
-            if (ct.IsCancellationRequested) return;
-            await repository.WithEventLockAsync(eventId, async eventDetails =>
-            {
-                var registration = await RequireRegistrationAsync(eventId, id, ct);
-                if (!IsActive(registration) || registration.Invitation!.DeliveryStatus == InvitationDeliveryStatus.SENT) return false;
-                var invitation = registration.Invitation!;
-                invitation.LastAttemptAt = clock.GetUtcNow();
-                invitation.DeliveryAttempts++;
-                EmailDeliveryResult delivery;
-                try
-                {
-                    delivery = await emailSender.SendAsync(new InvitationEmail(registration.Guest.EmailAddress,
-                        registration.Guest.FullName, eventDetails.EventName, new DateTimeOffset(eventDetails.PreferredDate, TimeSpan.Zero),
-                        eventDetails.PreferredVenue, invitation.Token, tokens.CreateQrPng(invitation.Token)), ct);
-                }
-                catch (Exception) when (!ct.IsCancellationRequested)
-                {
-                    // Transport details may contain credentials or PII; persist only the delivery outcome.
-                    delivery = EmailDeliveryResult.FAILED;
-                }
-                invitation.DeliveryStatus = delivery switch
-                {
-                    EmailDeliveryResult.SENT => InvitationDeliveryStatus.SENT,
-                    EmailDeliveryResult.UNAVAILABLE => InvitationDeliveryStatus.PENDING,
-                    _ => InvitationDeliveryStatus.FAILED
-                };
-                if (delivery == EmailDeliveryResult.SENT) invitation.SentAt = clock.GetUtcNow();
-                return true;
-            }, ct);
-        }
+        await allocation.AllocateAsync(eventId, ct);
+        return registration;
     }
 
     private async Task<string> UniqueTokenAsync(CancellationToken ct)
@@ -466,9 +246,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
     }
 
     private static void RequireOwner(Event eventDetails, string plannerId)
-    {
-        if (string.IsNullOrWhiteSpace(plannerId) || eventDetails.OwnerId.ToString() != plannerId) throw NotFound();
-    }
+        => RegistrationAccess.RequireOwner(eventDetails, plannerId);
 
     private static RegistrationException NotFound() => Error(404, "not_found", "Registration resource not found.");
     private static RegistrationException Error(int status, string code, string message) => new(status, code, message);

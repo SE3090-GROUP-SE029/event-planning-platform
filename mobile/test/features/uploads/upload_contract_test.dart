@@ -7,9 +7,33 @@ import 'package:mobile/core/api/dio_client.dart';
 import 'package:mobile/core/api/session_store.dart';
 import 'package:mobile/features/auth/models/auth_response_model.dart';
 import 'package:mobile/features/guest_management/api/guest_management_remote_datasource.dart';
+import 'package:mobile/features/guest_management/models/guest_registration_model.dart';
 import 'package:mobile/features/vendors/api/vendor_remote_datasource.dart';
 
 void main() {
+  test('guest upload result reads structured upload response fields', () {
+    final result = BulkUploadResult.fromJson({
+      'success': true,
+      'totalRows': 6,
+      'successfulRows': 2,
+      'failedRows': 2,
+      'duplicateRows': 1,
+      'alreadyRegisteredRows': 1,
+      'uploadedGuests': 3,
+      'queuedEmails': 2,
+      'invalidRows': 1,
+      'duplicates': 2,
+      'deliveryFailedRows': 1,
+      'errors': <dynamic>[],
+    });
+
+    expect(result.uploadedGuests, 3);
+    expect(result.queuedEmails, 2);
+    expect(result.invalidRows, 1);
+    expect(result.duplicateRows, 2);
+    expect(result.deliveryFailedRows, 1);
+  });
+
   group('vendor image upload request', () {
     late RequestOptions? capturedRequest;
     late Dio dio;

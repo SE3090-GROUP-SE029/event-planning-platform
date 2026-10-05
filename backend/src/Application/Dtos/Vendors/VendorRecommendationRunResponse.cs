@@ -24,6 +24,9 @@ public class VendorRecommendationRunResponse
     public Guid EventPlanDraftId { get; set; }
     public int CandidateCount { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string Status { get; set; } = "Completed";
+    public string Stage { get; set; } = string.Empty;
+    public string? FailureMessage { get; set; }
     public string? SourceNote { get; set; }
     public bool FromCache { get; set; }
     public IReadOnlyList<VendorRecommendationItemResponse> Items { get; set; } = [];

@@ -53,6 +53,9 @@ class VendorRecommendationRun {
   final String eventPlanDraftId;
   final int candidateCount;
   final DateTime createdAt;
+  final String status;
+  final String stage;
+  final String? failureMessage;
   final String? sourceNote;
   final bool fromCache;
   final List<VendorRecommendationItem> items;
@@ -63,6 +66,9 @@ class VendorRecommendationRun {
     required this.eventPlanDraftId,
     required this.candidateCount,
     required this.createdAt,
+    required this.status,
+    required this.stage,
+    required this.failureMessage,
     required this.sourceNote,
     required this.fromCache,
     required this.items,
@@ -76,6 +82,9 @@ class VendorRecommendationRun {
         candidateCount: (json['candidateCount'] as num?)?.toInt() ?? 0,
         createdAt:
             DateTime.tryParse('${json['createdAt']}') ?? DateTime.now().toUtc(),
+        status: '${json['status'] ?? 'Completed'}',
+        stage: '${json['stage'] ?? ''}',
+        failureMessage: json['failureMessage'] as String?,
         sourceNote: json['sourceNote'] as String?,
         fromCache: json['fromCache'] as bool? ?? false,
         items: (json['items'] as List<dynamic>? ?? [])
@@ -83,4 +92,9 @@ class VendorRecommendationRun {
             .map(VendorRecommendationItem.fromJson)
             .toList(),
       );
+
+  bool get isPending => status.toLowerCase() == 'pending';
+  bool get isRunning => status.toLowerCase() == 'running';
+  bool get isCompleted => status.toLowerCase() == 'completed';
+  bool get isFailed => status.toLowerCase() == 'failed';
 }
