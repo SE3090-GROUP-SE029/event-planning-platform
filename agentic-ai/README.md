@@ -37,6 +37,13 @@ credential errors move to the next configured fallback without retry loops.
 Successful structured responses are cached in-process for 15 minutes (up to
 512 entries) by prompt, schema, and configured model set.
 
+ADK agents validate structured-output schemas before each provider call and
+log the model, generation configuration, response schema, and a request
+payload with user text redacted. Gemini-specific ADK output models omit
+`additionalProperties`; the service still validates returned JSON against its
+strict application models. The same validation/logging callback is used by
+guest review and registration-question agents.
+
 The graph is sequential: analyze requirements → categorize services → propose
 timeline → allocate budget → assess risks → detect missing requirements →
 calculate completeness → generate rationale → self-validate. The Gemini nodes
@@ -66,12 +73,17 @@ present in several nodes because they serve distinct tasks; if input payloads
 grow, trim optional fields before each node or summarize long requirements once
 and reuse the summary.
 
-The default Gemini timeout is 15 seconds per provider attempt; retries can
-extend a node duration, while the coordinator, ASP.NET-to-agent request, and
-mobile plan request allow 240, 250, and 260 seconds respectively. Override
-these values and the default checkpoint path with the settings in
-`.env.example`. The coordinator defaults to one graph pass to avoid repeating
-the full multi-call workflow after validation failures.
+The default Gemini timeout is 15 seconds per provider attempt. Coordinator
+Gemini nodes also have a total operation deadline that bounds retries, backoff,
+and all key/model fallbacks; by default it is 30 seconds per node (derived from
+the coordinator timeout and `MAX_ITERATIONS`). This keeps the seven sequential
+Gemini calls within the coordinator's 240-second budget with time reserved for
+graph work. Other Gemini client operations retain their existing retry budget.
+The ASP.NET-to-agent and mobile plan requests allow 250 and 260 seconds,
+respectively. Same-event lock waiting is included in the coordinator timeout,
+and cancellation is propagated to an active Gemini request. Override the
+coordinator timeout and maximum iterations, along with the default checkpoint
+path, using settings in `.env.example`.
 
 Example safe fallback logs:
 

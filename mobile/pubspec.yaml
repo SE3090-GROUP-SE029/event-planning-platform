@@ -17,6 +17,8 @@ dependencies:
   flutter_dotenv: ^5.2.1
   flutter_riverpod: ^3.4.3
   image_picker: ^1.1.2
+  mobile_scanner: ^5.2.3
+  file_picker: ^11.0.3
   intl: ^0.20.3
 
 dev_dependencies:

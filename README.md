@@ -89,3 +89,14 @@ python -m venv venv
 source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 python -m uvicorn src.main:app --reload
+```
+
+## Persistent vendor image storage
+
+The API stores vendor images in `wwwroot/uploads/vendors` by default. For a
+container deployment, attach persistent storage and set
+`VENDOR_IMAGE_STORAGE_PATH` to the mounted image directory. For Render, mount a
+persistent disk at `/var/data` and set the variable to
+`/var/data/uploads/vendors`. The API serves files from this directory at
+`/uploads/vendors`; leaving the variable unset retains the local development
+path.

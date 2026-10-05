@@ -67,6 +67,18 @@ _RETRYABLE_ERRORS = (
 )
 _RESPONSE_CACHE_TTL_SECONDS = 900
 _RESPONSE_CACHE_MAX_ENTRIES = 512
+_COORDINATOR_GEMINI_NODES = frozenset(
+    {
+        "analyze_requirements",
+        "identify_service_categories",
+        "propose_timeline",
+        "allocate_budget",
+        "assess_risks",
+        "detect_missing_requirements",
+        "generate_rationale",
+    }
+)
+_GEMINI_CALLS_PER_PASS = len(_COORDINATOR_GEMINI_NODES)
 _response_cache: OrderedDict[str, tuple[float, str]] = OrderedDict()
 _response_cache_lock = threading.Lock()
 
@@ -165,6 +177,7 @@ class GeminiClient:
         max_retries: int | None = None,
         retry_delay: float | None = None,
         timeout: float | None = None,
+        operation_timeout: float | None = None,
         temperature: float = 0.7,
         top_k: int = 40,
         top_p: float = 0.95,
@@ -243,8 +256,15 @@ class GeminiClient:
             )
             return schema.model_validate_json(cached_json)
 
+        operation_timeout = self.operation_timeout
+        if operation_timeout is None and node_name in _COORDINATOR_GEMINI_NODES:
+            operation_timeout = self.coordinator_operation_timeout
         response = await self._call_with_retry(
-            prompt, schema, token_count=token_estimate, node_name=node_name
+            prompt,
+            schema,
+            token_count=token_estimate,
+            node_name=node_name,
+            operation_timeout=operation_timeout,
         )
         parsed = self._parse_response(response, schema)
         if self.model is None:
@@ -264,6 +284,7 @@ class GeminiClient:
             stream=True,
             token_count=token_estimate,
             node_name="generate_plan_streaming",
+            operation_timeout=self.operation_timeout,
         )
         for chunk in chunks:
             yield chunk
@@ -294,6 +315,7 @@ class GeminiClient:
         stream: bool = False,
         token_count: int = 0,
         node_name: str = "unspecified",
+        operation_timeout: float | None = None,
     ) -> Any:
         generation_config = {
             "temperature": self.temperature,
@@ -302,10 +324,19 @@ class GeminiClient:
             "response_mime_type": "application/json",
             "response_schema": pydantic_to_gemini_schema(schema),
         }
+        safe_payload = {
+            "contents": [{"role": "user", "parts": [{"text": "<redacted>"}]}],
+            "generation_config": generation_config,
+        }
         failures: list[tuple[str, Exception]] = []
         invalid_key_indices: set[int] = set()
         invalid_model_names: set[str] = set()
         retries_used = 0
+        operation_deadline = (
+            asyncio.get_running_loop().time() + operation_timeout
+            if operation_timeout is not None
+            else None
+        )
 
         for model_index, model_name in enumerate(self.model_names):
             if model_name in invalid_model_names:
@@ -338,6 +369,16 @@ class GeminiClient:
                     model = _configured_model(model_name, api_key)
                 retry_count = 0
                 while True:
+                    remaining_timeout = (
+                        operation_deadline - asyncio.get_running_loop().time()
+                        if operation_deadline is not None
+                        else self.timeout
+                    )
+                    if operation_deadline is not None and remaining_timeout <= 0:
+                        cause = failures[-1][1] if failures else TimeoutError()
+                        raise GeminiTimeoutError(
+                            f"Gemini operation exceeded {operation_timeout:g} seconds"
+                        ) from cause
                     logger.info(
                         "Calling Gemini node=%s model=%s api_key_index=%d "
                         "api_key=%s retry_count=%d input_tokens_estimate=%d",
@@ -348,19 +389,48 @@ class GeminiClient:
                         retry_count,
                         token_count,
                     )
+                    logger.info(
+                        "Gemini request generation_config=%s "
+                        "serialized_request_payload=%s",
+                        json.dumps(generation_config, sort_keys=True),
+                        json.dumps(safe_payload, sort_keys=True),
+                    )
+                    attempt_started_at = time.monotonic()
                     try:
-                        response = await model.generate_content_async(
-                            prompt,
-                            generation_config=generation_config,
-                            stream=stream,
-                            request_options={"timeout": self.timeout},
+                        attempt_timeout = (
+                            min(self.timeout, remaining_timeout)
+                            if operation_deadline is not None
+                            else self.timeout
+                        )
+                        response = await asyncio.wait_for(
+                            model.generate_content_async(
+                                prompt,
+                                generation_config=generation_config,
+                                stream=stream,
+                                request_options={"timeout": attempt_timeout},
+                            ),
+                            timeout=attempt_timeout,
                         )
                         if stream:
-                            chunks: list[str] = []
-                            async for chunk in response:
-                                text = getattr(chunk, "text", "")
-                                if text:
-                                    chunks.append(text)
+                            async def collect_chunks() -> list[str]:
+                                chunks: list[str] = []
+                                async for chunk in response:
+                                    text = getattr(chunk, "text", "")
+                                    if text:
+                                        chunks.append(text)
+                                return chunks
+
+                            if operation_deadline is None:
+                                chunks = await collect_chunks()
+                            else:
+                                remaining_timeout = (
+                                    operation_deadline
+                                    - asyncio.get_running_loop().time()
+                                )
+                                chunks = await asyncio.wait_for(
+                                    collect_chunks(),
+                                    timeout=remaining_timeout,
+                                )
                             logger.info(
                                 "Gemini response complete node=%s model=%s "
                                 "api_key_index=%d output_tokens_estimate=%d",
@@ -394,7 +464,11 @@ class GeminiClient:
                         )
                         if category == "rate_limit" and retries_used < self.max_retries:
                             await self._wait_before_retry(
-                                retries_used, node_name, model_name
+                                retries_used,
+                                node_name,
+                                model_name,
+                                operation_deadline,
+                                operation_timeout,
                             )
                             retries_used += 1
                             retry_count += 1
@@ -414,7 +488,13 @@ class GeminiClient:
                                 type(exc).__name__,
                             )
                             break
-                        await self._wait_before_retry(retries_used, node_name, model_name)
+                        await self._wait_before_retry(
+                            retries_used,
+                            node_name,
+                            model_name,
+                            operation_deadline,
+                            operation_timeout,
+                        )
                         retries_used += 1
                         retry_count += 1
                     except (Unauthenticated, PermissionDenied) as exc:
@@ -453,15 +533,44 @@ class GeminiClient:
                             type(exc).__name__,
                         )
                         break
+                    finally:
+                        logger.info(
+                            "Gemini attempt finished node=%s model=%s "
+                            "api_key_index=%d elapsed_seconds=%.3f",
+                            node_name,
+                            model_name,
+                            key_index,
+                            time.monotonic() - attempt_started_at,
+                        )
                 if model_name in invalid_model_names:
                     break
 
         self._raise_provider_failure(failures)
 
     async def _wait_before_retry(
-        self, retry_count: int, node_name: str, model_name: str
+        self,
+        retry_count: int,
+        node_name: str,
+        model_name: str,
+        operation_deadline: float | None,
+        operation_timeout: float | None,
     ) -> None:
         delay = min(self.retry_delay * (2**retry_count), self.retry_max_delay)
+        if operation_deadline is None:
+            remaining_timeout = None
+        else:
+            remaining_timeout = (
+                operation_deadline - asyncio.get_running_loop().time()
+            )
+        if remaining_timeout is not None and delay >= remaining_timeout:
+            timeout_label = (
+                f"{operation_timeout:g}"
+                if operation_timeout is not None
+                else "configured"
+            )
+            raise GeminiTimeoutError(
+                f"Gemini operation exceeded {timeout_label} seconds"
+            )
         logger.warning(
             "Gemini retry scheduled node=%s model=%s retry_count=%d delay_seconds=%.1f",
             node_name,
@@ -469,7 +578,24 @@ class GeminiClient:
             retry_count + 1,
             delay,
         )
-        await asyncio.sleep(delay)
+        backoff_started_at = time.monotonic()
+        try:
+            if remaining_timeout is None:
+                await asyncio.sleep(delay)
+            else:
+                await asyncio.wait_for(
+                    asyncio.sleep(delay),
+                    timeout=remaining_timeout,
+                )
+        finally:
+            logger.info(
+                "Gemini retry backoff finished node=%s model=%s "
+                "retry_count=%d elapsed_seconds=%.3f",
+                node_name,
+                model_name,
+                retry_count + 1,
+                time.monotonic() - backoff_started_at,
+            )
 
     @staticmethod
     def _raise_provider_failure(failures: list[tuple[str, Exception]]) -> None:

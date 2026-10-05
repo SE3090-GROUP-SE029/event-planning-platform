@@ -74,6 +74,7 @@ public static class GuestManagementConfiguration
             entity.Property(e => e.PublicReference).IsRequired().HasMaxLength(43);
             entity.Property(e => e.StatusSecretHash).IsRequired().HasMaxLength(64);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.CheckedInMethod).HasConversion<string>().HasMaxLength(20);
             entity.HasOne(e => e.RegistrationForm).WithMany().HasForeignKey(e => new { e.RegistrationFormId, e.EventId })
                 .HasPrincipalKey(e => new { e.Id, e.EventId }).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.Guest).WithMany().HasForeignKey(e => new { e.GuestId, e.EventId })
@@ -92,7 +93,7 @@ public static class GuestManagementConfiguration
         modelBuilder.Entity<RegistrationAnswer>(entity =>
         {
             entity.HasKey(e => new { e.RegistrationSubmissionId, e.RegistrationQuestionId });
-            entity.Property(e => e.Answer).IsRequired().HasMaxLength(4000);
+            entity.Property(e => e.Answer).HasMaxLength(4000);
             entity.HasOne(e => e.RegistrationSubmission).WithMany(e => e.Answers)
                 .HasForeignKey(e => new { e.RegistrationSubmissionId, e.RegistrationFormId })
                 .HasPrincipalKey(e => new { e.Id, e.RegistrationFormId }).OnDelete(DeleteBehavior.Restrict);

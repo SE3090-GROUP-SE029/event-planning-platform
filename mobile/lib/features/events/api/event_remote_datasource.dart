@@ -20,6 +20,7 @@ class EventRemoteDataSource {
       int pageSize = 10,
       EventType? type,
       EventStatus? status,
+      String? search,
       String sortBy = 'createdAt',
       String sortOrder = 'desc'}) async {
     final response = await dio.get('/api/events',
@@ -30,6 +31,8 @@ class EventRemoteDataSource {
           'sortOrder': sortOrder,
           if (type != null) 'eventType': _enumName(type),
           if (status != null) 'status': _enumName(status),
+          if (search != null && search.trim().isNotEmpty)
+            'search': search.trim(),
         },
         options: _auth(token));
     return EventPage.fromJson(response.data as Map<String, dynamic>);

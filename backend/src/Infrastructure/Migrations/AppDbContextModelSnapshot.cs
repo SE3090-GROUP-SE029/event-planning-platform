@@ -594,7 +594,6 @@ namespace Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Answer")
-                        .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
@@ -706,6 +705,13 @@ namespace Infrastructure.Data.Migrations
 
                     b.Property<DateTimeOffset?>("CancelledAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("CheckedInAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CheckedInMethod")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTimeOffset?>("ConfirmedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1138,6 +1144,46 @@ namespace Infrastructure.Data.Migrations
                     b.ToTable("VendorServices", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Entities.VendorRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ReviewerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.HasIndex("ReviewerUserId");
+
+                    b.HasIndex("VendorId");
+
+                    b.ToTable("VendorRatings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_VendorRatings_Rating_Range", "\"Rating\" >= 1 AND \"Rating\" <= 5");
+                        });
+                });
+
             modelBuilder.Entity("Domain.Entities.VendorRecommendationItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1207,6 +1253,7 @@ namespace Infrastructure.Data.Migrations
                     b.ToTable("VendorRecommendationItems", null, t =>
                         {
                             t.HasCheckConstraint("CK_VendorRecommendationItems_Rank_Positive", "\"Rank\" >= 1");
+
                             t.HasCheckConstraint("CK_VendorRecommendationItems_Score_Range", "\"Score\" >= 0 AND \"Score\" <= 100");
                         });
                 });
@@ -1243,46 +1290,6 @@ namespace Infrastructure.Data.Migrations
                     b.HasIndex("EventId", "CreatedAt");
 
                     b.ToTable("VendorRecommendationRuns", (string)null);
-                });
-
-            modelBuilder.Entity("Domain.Entities.VendorRating", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("BookingId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("ReviewerUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("VendorId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BookingId")
-                        .IsUnique();
-
-                    b.HasIndex("ReviewerUserId");
-
-                    b.HasIndex("VendorId");
-
-                    b.ToTable("VendorRatings", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_VendorRatings_Rating_Range", "\"Rating\" >= 1 AND \"Rating\" <= 5");
-                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.Booking", b =>
@@ -1623,6 +1630,21 @@ namespace Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domain.Entities.VendorRating", b =>
+                {
+                    b.HasOne("Domain.Entities.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Vendor", null)
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Entities.VendorRecommendationItem", b =>
                 {
                     b.HasOne("Domain.Entities.VendorRecommendationRun", "Run")
@@ -1662,21 +1684,6 @@ namespace Infrastructure.Data.Migrations
                     b.Navigation("Event");
 
                     b.Navigation("EventPlanDraft");
-                });
-
-            modelBuilder.Entity("Domain.Entities.VendorRating", b =>
-                {
-                    b.HasOne("Domain.Entities.Booking", null)
-                        .WithMany()
-                        .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Entities.Vendor", null)
-                        .WithMany()
-                        .HasForeignKey("VendorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Entities.Event", b =>

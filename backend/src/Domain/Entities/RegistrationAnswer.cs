@@ -7,5 +7,5 @@ public class RegistrationAnswer
     public Guid RegistrationQuestionId { get; set; }
     public RegistrationQuestion RegistrationQuestion { get; set; } = null!;
     public Guid RegistrationFormId { get; set; }
-    public string Answer { get; set; } = string.Empty;
+    public string? Answer { get; set; }
 }

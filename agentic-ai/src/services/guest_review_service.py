@@ -11,6 +11,7 @@ from uuid import uuid4
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from src.agents.adk_schema import AdkSchemaError
 from src.coordinator_agent.config import (
     AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
     get_settings,
@@ -186,7 +187,18 @@ async def run_adk(
                         status_code,
                     )
                     continue
+                if status_code == 400:
+                    logger.error(
+                        "Guest AI Gemini rejected request model=%s status=%d error=%s",
+                        model_name,
+                        status_code,
+                        type(exc).__name__,
+                    )
+                    raise AnalysisError("ai_request_invalid", 502) from None
                 raise AnalysisError("ai_unavailable", 503) from None
+            except AdkSchemaError as exc:
+                logger.error("Guest AI response schema rejected: %s", exc)
+                raise AnalysisError("invalid_output_schema", 500) from None
             except httpx.TimeoutException as exc:
                 transient_failures.append(exc)
                 logger.warning(

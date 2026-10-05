@@ -33,6 +33,15 @@ public class EventRepository : IEventRepository
             events = events.Where(e => e.EventType == query.EventType.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLowerInvariant();
+            events = events.Where(e =>
+                e.EventName.ToLower().Contains(search) ||
+                (e.PreferredVenue != null &&
+                 e.PreferredVenue.ToLower().Contains(search)));
+        }
+
         var descending = string.Equals(query.SortOrder, "desc", StringComparison.OrdinalIgnoreCase);
         events = query.SortBy?.ToLowerInvariant() switch
         {
@@ -67,15 +76,17 @@ public class EventRepository : IEventRepository
             }
             else
             {
-                events = events.Where(_ => false);
+                var normalizedSearch = search.ToLowerInvariant();
+                events = events.Where(e =>
+                    e.EventName.ToLower().Contains(normalizedSearch) ||
+                    (e.PreferredVenue != null &&
+                     e.PreferredVenue.ToLower().Contains(normalizedSearch)));
             }
         }
         if (query.DateFrom.HasValue) events = events.Where(e => e.PreferredDate >= query.DateFrom.Value);
         if (query.DateTo.HasValue)
         {
-            var dateTo = query.DateTo.Value.TimeOfDay == TimeSpan.Zero
-                ? query.DateTo.Value.Date.AddDays(1)
-                : query.DateTo.Value;
+            var dateTo = Application.Common.UtcDateTime.ToExclusiveUpperBound(query.DateTo.Value);
             events = events.Where(e => e.PreferredDate < dateTo);
         }
 

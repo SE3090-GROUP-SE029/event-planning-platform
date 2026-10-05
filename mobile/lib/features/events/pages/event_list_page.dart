@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,6 +24,7 @@ class EventListPage extends ConsumerStatefulWidget {
 class _EventListPageState extends ConsumerState<EventListPage> {
   AuthResponseModel? _auth;
   final _scroll = ScrollController();
+  Timer? _searchDebounce;
 
   @override
   void didChangeDependencies() {
@@ -46,6 +49,7 @@ class _EventListPageState extends ConsumerState<EventListPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -146,155 +150,201 @@ class _EventListPageState extends ConsumerState<EventListPage> {
         session: _auth,
         currentIndex: 1,
       ),
-      body: RefreshIndicator(
-        color: AppColors.obsidianBlack,
-        backgroundColor: AppColors.surfacePure,
-        onRefresh: () => controller.load(refresh: true),
-        child: controller.loading && controller.events.isEmpty
-            ? const Center(
-                child: CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(AppColors.obsidianBlack),
-                ),
-              )
-            : controller.hasError && controller.events.isEmpty
-                ? ListView(
-                    padding: const EdgeInsets.all(AppDimens.space20),
-                    children: [
-                      const SizedBox(height: 120),
-                      PastelEmptyState(
-                        icon: Icons.error_outline_rounded,
-                        iconVariant: PastelIconVariant.pink,
-                        title: 'Unable to load events',
-                        description:
-                            'Something went wrong while fetching your events. Please try again.',
-                        actionLabel: 'Retry',
-                        onActionTap: () => controller.load(refresh: true),
-                      ),
-                    ],
-                  )
-                : controller.events.isEmpty
-                    ? ListView(
-                        padding: const EdgeInsets.all(AppDimens.space20),
-                        children: [
-                          const SizedBox(height: 100),
-                          PastelEmptyState(
-                            icon: Icons.calendar_today_outlined,
-                            iconVariant: PastelIconVariant.yellow,
-                            title: 'No events yet',
-                            description:
-                                'Create your first event plan to start organizing vendors, guests, and budgets.',
-                            actionLabel: 'Create event',
-                            onActionTap: () => Navigator.pushNamed(
-                              context,
-                              '/events/create',
-                              arguments: _auth,
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(
-                          AppDimens.space18,
-                          AppDimens.space12,
-                          AppDimens.space18,
-                          AppDimens.space24,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppDimens.space18,
+              AppDimens.space12,
+              AppDimens.space18,
+              AppDimens.space4,
+            ),
+            child: TextField(
+              textInputAction: TextInputAction.search,
+              decoration: const InputDecoration(
+                hintText: 'Search events by name or venue',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (value) {
+                controller.searchQuery = value.trim();
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(
+                  const Duration(milliseconds: 300),
+                  () => controller.load(refresh: true),
+                );
+              },
+              onSubmitted: (_) {
+                _searchDebounce?.cancel();
+                controller.load(refresh: true);
+              },
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.obsidianBlack,
+              backgroundColor: AppColors.surfacePure,
+              onRefresh: () => controller.load(refresh: true),
+              child: controller.loading && controller.events.isEmpty
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.obsidianBlack,
                         ),
-                        itemCount: controller.events.length +
-                            (controller.loadingMore ? 1 : 0),
-                        itemBuilder: (_, index) {
-                          if (index == controller.events.length) {
-                            return const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(AppDimens.space16),
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.obsidianBlack),
-                                ),
-                              ),
-                            );
-                          }
-
-                          final event = controller.events[index];
-                          final dateText = event.preferredDate
-                              .toString()
-                              .split(' ')
-                              .first;
-
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                                bottom: AppDimens.space14),
-                            child: PastelCard(
-                              padding: const EdgeInsets.all(AppDimens.space18),
-                              onTap: () async {
-                                await Navigator.pushNamed(
-                                  context,
-                                  '/events/details',
-                                  arguments: {'auth': _auth, 'event': event},
-                                );
-                                controller.load(refresh: true);
-                              },
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Header row: Type badge & Status badge
-                                  Row(
-                                    children: [
-                                      PastelPillBadge(
-                                        text: event.eventType.name.toUpperCase(),
-                                        style: _getTypeBadgeStyle(
-                                            event.eventType),
-                                      ),
-                                      const Spacer(),
-                                      PastelPillBadge(
-                                        text: event.status.name.toUpperCase(),
-                                        style: _getStatusBadgeStyle(
-                                            event.status),
-                                      ),
-                                    ],
+                      ),
+                    )
+                  : controller.hasError && controller.events.isEmpty
+                      ? ListView(
+                          padding: const EdgeInsets.all(AppDimens.space20),
+                          children: [
+                            const SizedBox(height: 120),
+                            PastelEmptyState(
+                              icon: Icons.error_outline_rounded,
+                              iconVariant: PastelIconVariant.pink,
+                              title: 'Unable to load events',
+                              description:
+                                  'Something went wrong while fetching your events. Please try again.',
+                              actionLabel: 'Retry',
+                              onActionTap: () => controller.load(refresh: true),
+                            ),
+                          ],
+                        )
+                      : controller.events.isEmpty
+                          ? ListView(
+                              padding: const EdgeInsets.all(AppDimens.space20),
+                              children: [
+                                const SizedBox(height: 100),
+                                PastelEmptyState(
+                                  icon: Icons.calendar_today_outlined,
+                                  iconVariant: PastelIconVariant.yellow,
+                                  title: 'No events yet',
+                                  description:
+                                      'Create your first event plan to start organizing vendors, guests, and budgets.',
+                                  actionLabel: 'Create event',
+                                  onActionTap: () => Navigator.pushNamed(
+                                    context,
+                                    '/events/create',
+                                    arguments: _auth,
                                   ),
-                                  const SizedBox(height: AppDimens.space14),
+                                ),
+                              ],
+                            )
+                          : ListView.builder(
+                              controller: _scroll,
+                              padding: const EdgeInsets.fromLTRB(
+                                AppDimens.space18,
+                                AppDimens.space12,
+                                AppDimens.space18,
+                                AppDimens.space24,
+                              ),
+                              itemCount: controller.events.length +
+                                  (controller.loadingMore ? 1 : 0),
+                              itemBuilder: (_, index) {
+                                if (index == controller.events.length) {
+                                  return const Center(
+                                    child: Padding(
+                                      padding:
+                                          EdgeInsets.all(AppDimens.space16),
+                                      child: CircularProgressIndicator(
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                AppColors.obsidianBlack),
+                                      ),
+                                    ),
+                                  );
+                                }
 
-                                  // Event title
-                                  Text(
-                                    event.eventName.isEmpty
-                                        ? 'Untitled Event'
-                                        : event.eventName,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.3,
+                                final event = controller.events[index];
+                                final dateText = event.preferredDate
+                                    .toLocal()
+                                    .toString()
+                                    .split(' ')
+                                    .first;
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(
+                                      bottom: AppDimens.space14),
+                                  child: PastelCard(
+                                    padding:
+                                        const EdgeInsets.all(AppDimens.space18),
+                                    onTap: () async {
+                                      await Navigator.pushNamed(
+                                        context,
+                                        '/events/details',
+                                        arguments: {
+                                          'auth': _auth,
+                                          'event': event
+                                        },
+                                      );
+                                      controller.load(refresh: true);
+                                    },
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Header row: Type badge & Status badge
+                                        Row(
+                                          children: [
+                                            PastelPillBadge(
+                                              text: event.eventType.name
+                                                  .toUpperCase(),
+                                              style: _getTypeBadgeStyle(
+                                                  event.eventType),
+                                            ),
+                                            const Spacer(),
+                                            PastelPillBadge(
+                                              text: event.status.name
+                                                  .toUpperCase(),
+                                              style: _getStatusBadgeStyle(
+                                                  event.status),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(
+                                            height: AppDimens.space14),
+
+                                        // Event title
+                                        Text(
+                                          event.eventName.isEmpty
+                                              ? 'Untitled Event'
+                                              : event.eventName,
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: -0.3,
+                                          ),
+                                        ),
+                                        const SizedBox(
+                                            height: AppDimens.space12),
+
+                                        // Information Badges row
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            _buildInfoBadge(
+                                              Icons.calendar_today_outlined,
+                                              dateText,
+                                            ),
+                                            _buildInfoBadge(
+                                              Icons.people_outline_rounded,
+                                              '${event.guestCount} guests',
+                                            ),
+                                            _buildInfoBadge(
+                                              Icons.attach_money_rounded,
+                                              event.budget.toStringAsFixed(0),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: AppDimens.space12),
-
-                                  // Information Badges row
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      _buildInfoBadge(
-                                        Icons.calendar_today_outlined,
-                                        dateText,
-                                      ),
-                                      _buildInfoBadge(
-                                        Icons.people_outline_rounded,
-                                        '${event.guestCount} guests',
-                                      ),
-                                      _buildInfoBadge(
-                                        Icons.attach_money_rounded,
-                                        event.budget.toStringAsFixed(0),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
+            ),
+          ),
+        ],
       ),
     );
   }

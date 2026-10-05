@@ -53,9 +53,9 @@ public class RegistrationFormsController(RegistrationService service) : Controll
         => Ok(PlannerFormResponse.From(await service.SetSeatLimitAsync(eventId, PlannerId, request.SeatLimit, ct)));
 
     [HttpGet("registrations")]
-    public async Task<IActionResult> List(Guid eventId, CancellationToken ct, int page = 1, int pageSize = 50)
+    public async Task<IActionResult> List(Guid eventId, CancellationToken ct, int page = 1, int pageSize = 50, Domain.Enums.RegistrationStatus? status = null, Domain.Enums.RsvpStatus? rsvpStatus = null, bool? isWaitlisted = null, bool? checkedIn = null)
     {
-        var result = await service.ListAsync(eventId, PlannerId, page, pageSize, ct);
+        var result = await service.ListAsync(eventId, PlannerId, page, pageSize, ct, status, rsvpStatus, isWaitlisted, checkedIn);
         return Ok(new { items = result.Items.Select(PlannerRegistrationResponse.From), result.Total, result.Page, result.PageSize });
     }
 
@@ -74,6 +74,14 @@ public class RegistrationFormsController(RegistrationService service) : Controll
     [HttpPost("invitations/validate")]
     public async Task<IActionResult> ValidateInvitation(Guid eventId, ValidateInvitationRequest request, CancellationToken ct)
         => Ok(new { valid = await service.ValidateInvitationAsync(eventId, PlannerId, request.Token, ct) });
+
+    [HttpPost("check-in")]
+    public async Task<IActionResult> CheckIn(Guid eventId, ValidateInvitationRequest request, CancellationToken ct)
+    {
+        var registration = await service.CheckInGuestAsync(eventId, PlannerId, request.Token, ct);
+        // Check-in state is persisted by the event-locked registration operation.
+        return Ok(new { message = "Guest checked in successfully.", guest = PlannerRegistrationResponse.From(registration) });
+    }
 
     [HttpGet("registrations/{registrationId:long}/ai-review")]
     public async Task<IActionResult> AiReview(Guid eventId, long registrationId,

@@ -79,7 +79,11 @@ export default function AdminEventManagementPage() {
       activeTab="events"
       title="Event Governance"
       subtitle="Review and manage all platform events"
-      onSearch={(value) => setFilters((current) => ({ ...current, search: value }))}
+      searchValue={filters.search}
+      onSearch={(value) => {
+        setPage(0);
+        setFilters((current) => ({ ...current, search: value }));
+      }}
     >
       <Box sx={{ mb: 3 }}>
         <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.04em', mb: 0.5 }}>

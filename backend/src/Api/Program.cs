@@ -29,6 +29,16 @@ using Infrastructure.Services.Scheduling;
 using Infrastructure.Services.Vendors;
 
 var builder = WebApplication.CreateBuilder(args);
+var configuredVendorImagePath = builder.Configuration["VENDOR_IMAGE_STORAGE_PATH"];
+if (!string.IsNullOrWhiteSpace(configuredVendorImagePath)
+    && !Path.IsPathRooted(configuredVendorImagePath))
+{
+    throw new InvalidOperationException("VENDOR_IMAGE_STORAGE_PATH must be an absolute path.");
+}
+var vendorImageStoragePath = string.IsNullOrWhiteSpace(configuredVendorImagePath)
+    ? Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "uploads", "vendors")
+    : Path.GetFullPath(configuredVendorImagePath);
+Directory.CreateDirectory(vendorImageStoragePath);
 
 // Add services to the container.
 builder.Services.AddEndpointsApiExplorer();
@@ -114,12 +124,8 @@ builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IVendorRatingRepository, VendorRatingRepository>();
 builder.Services.AddScoped<IVendorRecommendationRepository, VendorRecommendationRepository>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-builder.Services.AddScoped<IVendorImageStorage>(_ =>
-{
-    var webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
-    Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "vendors"));
-    return new LocalVendorImageStorage(webRoot);
-});
+builder.Services.AddScoped<IVendorImageStorage>(
+    _ => new LocalVendorImageStorage(vendorImageStoragePath));
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -212,6 +218,9 @@ builder.Services.AddCors(options =>
     });
 });
 var app = builder.Build();
+app.Logger.LogInformation(
+    "Vendor image storage directory configured at {VendorImageStoragePath}",
+    vendorImageStoragePath);
 
 app.UseCors("AllowAll");
 
@@ -221,6 +230,11 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(webRootPath),
     RequestPath = ""
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(vendorImageStoragePath),
+    RequestPath = "/uploads/vendors"
 });
 
 // Configure the HTTP request pipeline.

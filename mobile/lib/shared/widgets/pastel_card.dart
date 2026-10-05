@@ -26,7 +26,7 @@ class PastelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(borderRadius ?? AppDimens.radiusCard);
 
-    Widget content = Container(
+    final content = Container(
       padding: padding,
       decoration: BoxDecoration(
         color: backgroundColor ?? AppColors.surfacePure,
@@ -40,6 +40,7 @@ class PastelCard extends StatelessWidget {
     if (onTap != null) {
       return Material(
         color: Colors.transparent,
+        borderRadius: radius,
         child: InkWell(
           onTap: onTap,
           borderRadius: radius,
@@ -48,6 +49,10 @@ class PastelCard extends StatelessWidget {
       );
     }
 
-    return content;
+    return Material(
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: radius),
+      child: content,
+    );
   }
 }

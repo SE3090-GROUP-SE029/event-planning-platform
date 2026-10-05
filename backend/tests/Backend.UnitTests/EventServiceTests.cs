@@ -38,6 +38,23 @@ public class EventServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_normalizes_unspecified_preferred_date_to_utc()
+    {
+        var repository = new TestEventRepository();
+        var service = new EventService(repository, new CreateEventRequestValidator());
+        var preferredDate = new DateTime(
+            DateTime.UtcNow.AddDays(14).Ticks,
+            DateTimeKind.Unspecified);
+        var request = ValidRequest();
+        request.PreferredDate = preferredDate;
+
+        await service.CreateAsync(Guid.NewGuid(), request);
+
+        Assert.Equal(DateTimeKind.Utc, repository.AddedEvent!.PreferredDate.Kind);
+        Assert.Equal(preferredDate.Ticks, repository.AddedEvent.PreferredDate.Ticks);
+    }
+
+    [Fact]
     public async Task CreateAsync_RejectsInvalidRequest()
     {
         var repository = new TestEventRepository();

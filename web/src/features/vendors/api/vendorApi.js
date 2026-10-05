@@ -12,6 +12,48 @@ export const VENDOR_CATEGORIES = [
   'TRANSPORTATION',
 ];
 
+const VENDOR_IMAGE_TYPES = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
+export function prepareVendorImage(file) {
+  if (!file || file.size <= 0) {
+    throw new Error('Select a non-empty image file.');
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error('Image must be 2 MB or smaller.');
+  }
+
+  const extension = file.name?.split('.').pop()?.toLowerCase();
+  const expectedType = VENDOR_IMAGE_TYPES[extension];
+  const rawType = file.type?.toLowerCase();
+  const declaredType = rawType === 'image/jpg' ? 'image/jpeg' : rawType;
+  if (!expectedType || (declaredType && declaredType !== expectedType)) {
+    throw new Error('Image must be a JPEG, PNG, or WebP file.');
+  }
+
+  return rawType === expectedType ? file : file.slice(0, file.size, expectedType);
+}
+
+export async function uploadVendorProfileImage(file) {
+  const upload = prepareVendorImage(file);
+  const formData = new FormData();
+  formData.append('file', upload, file.name);
+  const response = await apiClient.post('/api/vendors/me/profile-image', formData);
+  return response.data;
+}
+
+export async function uploadVendorGalleryImage(file) {
+  const upload = prepareVendorImage(file);
+  const formData = new FormData();
+  formData.append('file', upload, file.name);
+  const response = await apiClient.post('/api/vendors/me/images', formData);
+  return response.data;
+}
+
 export function resolveVendorImageUrl(profileImageUrl) {
   if (!profileImageUrl) return null;
   if (/^https?:\/\//i.test(profileImageUrl)) return profileImageUrl;
@@ -66,12 +108,7 @@ export function useUpdateVendorProfile() {
 export function useUploadVendorProfileImage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (file) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await apiClient.post('/api/vendors/me/profile-image', formData);
-      return response.data;
-    },
+    mutationFn: uploadVendorProfileImage,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendor-profile', 'me'] });
     },
@@ -92,19 +129,7 @@ export function useMyVendorGallery(enabled = true) {
 export function useUploadVendorGalleryImage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (file) => {
-      if (file.size > 2 * 1024 * 1024) {
-        throw new Error('Image must be 2 MB or smaller.');
-      }
-      const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-      if (file.type && !allowed.includes(file.type)) {
-        throw new Error('Image must be a JPEG, PNG, or WebP file.');
-      }
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await apiClient.post('/api/vendors/me/images', formData);
-      return response.data;
-    },
+    mutationFn: uploadVendorGalleryImage,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendor-gallery', 'me'] });
     },

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Application.DTOs.Scheduling;
 using Application.Common.Interfaces;
+using Application.Common;
 using Domain.Entities;
 using Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -62,6 +63,13 @@ public class ScheduleService
         Guid? vendorId,
         CancellationToken cancellationToken = default)
     {
+        startTime = UtcDateTime.Normalize(startTime);
+        endTime = UtcDateTime.Normalize(endTime);
+        if (endTime <= startTime)
+        {
+            throw new ArgumentException("EndTime must be strictly after StartTime.");
+        }
+
         var (schedule, eventEntity) = await RequirePlannerScheduleWithEventAsync(scheduleId, plannerUserId, cancellationToken);
         await ValidateActivityFieldsAsync(title, startTime, endTime, vendorId, eventEntity);
 

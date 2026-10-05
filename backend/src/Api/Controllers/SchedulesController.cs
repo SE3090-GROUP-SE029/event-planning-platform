@@ -1,3 +1,4 @@
+using Application.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Diagnostics;
@@ -67,7 +68,9 @@ public class SchedulesController : ControllerBase
         [FromBody] CreateActivityRequest request,
         CancellationToken ct)
     {
-        if (request.EndTime <= request.StartTime)
+        var startTime = UtcDateTime.Normalize(request.StartTime);
+        var endTime = UtcDateTime.Normalize(request.EndTime);
+        if (endTime <= startTime)
         {
             return BadRequest(new { message = "EndTime must be strictly after StartTime." });
         }

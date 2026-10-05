@@ -13,6 +13,7 @@ public static class GuestManagementServices
         services.AddScoped<IRegistrationEligibilityPolicy, ValidatedRegistrationEligibilityPolicy>();
         services.AddScoped<IGuestRegistrationRepository, GuestRegistrationRepository>();
         services.AddScoped<RegistrationService>();
+        services.AddScoped<BulkGuestUploadService>(); // C4 planner guest list upload
         services.Configure<GuestAiOptions>(configuration.GetSection("GuestAi"));
         services.PostConfigure<GuestAiOptions>(options =>
             options.TimeoutSeconds = Math.Max(

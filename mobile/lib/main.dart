@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,6 +31,8 @@ import 'features/vendors/pages/vendor_analytics_page.dart';
 import 'features/vendors/pages/vendor_availability_page.dart';
 import 'features/vendors/pages/vendor_marketplace_detail_page.dart';
 import 'features/vendors/pages/vendor_marketplace_page.dart';
+import 'features/guest_management/pages/guest_management_page.dart';
+import 'features/guest_management/pages/guest_registration_page.dart';
 import 'features/vendors/pages/vendor_profile_page.dart';
 import 'features/vendors/pages/vendor_services_page.dart';
 
@@ -48,6 +50,8 @@ const _plannerRoutes = {
   '/bookings/mine',
   '/bookings/details',
   '/plans/review',
+  // C4 — Guest Management (planner-only)
+  '/guests',
   '/recommendations',
 };
 
@@ -265,6 +269,14 @@ final Map<String, WidgetBuilder> _pageBuilders = {
   '/plans/review': (context) => PlanReviewPage(
         planId: ModalRoute.of(context)!.settings.arguments as String,
       ),
+  // C4 — Guest Management (planner-facing, args read internally from ModalRoute)
+  '/guests': (_) => const GuestManagementPage(),
+  // C4 — Public guest registration (no auth required)
+  '/guest/register': (context) {
+    final publicId =
+        ModalRoute.of(context)!.settings.arguments as String? ?? '';
+    return GuestRegistrationPage(publicFormId: publicId);
+  },
   '/recommendations': (context) {
     final args = ModalRoute.of(context)!.settings.arguments as Map;
     return VendorRecommendationsPage(
@@ -278,6 +290,8 @@ bool isRouteAllowedForSession(
   String routeName,
   AuthResponseModel? session,
 ) {
+  // C4 public registration — no authentication required
+  if (routeName == '/guest/register') return true;
   if (session == null || !session.isAuthorizedForMobile) return false;
   if (_plannerRoutes.contains(routeName)) {
     return session.roles.contains('EVENT_PLANNER');
@@ -331,6 +345,14 @@ bool isRouteArgumentsValid(String routeName, Object? arguments) {
           _nonEmptyString(arguments['bookingId']) &&
           (arguments['auth'] == null || arguments['auth'] is AuthResponseModel);
     case '/plans/review':
+      return _nonEmptyString(arguments);
+    // C4 — Guest Management
+    case '/guests':
+      return arguments is Map &&
+          arguments['auth'] is AuthResponseModel &&
+          arguments['event'] is EventModel;
+    // C4 — Public guest registration (requires a non-empty public form ID)
+    case '/guest/register':
       return _nonEmptyString(arguments);
     case '/recommendations':
       return arguments is Map && _nonEmptyString(arguments['eventId']);

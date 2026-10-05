@@ -63,7 +63,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
             foreach (var (question, index) in selected.Select((q, i) => (q, i)))
             {
                 var saved = new RegistrationQuestion { RegistrationFormId = form.Id,
-                    Question = question.Question, Required = question.Required, DisplayOrder = index };
+                    Question = question.Question, Required = question.Required ?? false, DisplayOrder = index };
                 form.Questions.Add(saved);
                 repository.AddQuestion(saved);
             }
@@ -236,7 +236,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
             return true;
         }, ct);
 
-    public Task<RegistrationPage> ListAsync(Guid eventId, string plannerId, int page, int pageSize, CancellationToken ct)
+    public Task<RegistrationPage> ListAsync(Guid eventId, string plannerId, int page, int pageSize, CancellationToken ct, RegistrationStatus? status = null, RsvpStatus? rsvpStatus = null, bool? isWaitlisted = null, bool? checkedIn = null)
     {
         if (page < 1 || pageSize is < 1 or > 100 || (long)(page - 1) * pageSize > int.MaxValue)
             throw Error(400, "invalid_pagination", "Page must be positive and page size must be between 1 and 100.");
@@ -244,7 +244,7 @@ public class RegistrationService(IGuestRegistrationRepository repository,
         {
             RequireOwner(eventDetails, plannerId);
             await RequireFormAsync(eventId, ct);
-            return await repository.ListAsync(eventId, page, pageSize, ct);
+            return await repository.ListAsync(eventId, page, pageSize, ct, status, rsvpStatus, isWaitlisted, checkedIn);
         }, ct);
     }
 
@@ -317,6 +317,44 @@ public class RegistrationService(IGuestRegistrationRepository repository,
             RegistrationValidator.ValidatePublicCredential(token);
             var invitation = await repository.FindInvitationByTokenAsync(token, ct);
             return invitation is not null && invitation.RegistrationSubmission.EventId == eventId && IsActive(invitation.RegistrationSubmission);
+        }, ct);
+        
+    public Task<RegistrationSubmission> CheckInGuestAsync(Guid eventId, string plannerId, string token, CancellationToken ct)
+        => repository.WithEventLockAsync(eventId, async eventDetails =>
+        {
+            RequireOwner(eventDetails, plannerId);
+            RegistrationValidator.ValidatePublicCredential(token);
+            var invitation = await repository.FindInvitationByTokenAsync(token, ct);
+            if (invitation is null)
+                throw Error(400, "invalid_qr", "Invalid QR code. Invitation not found.");
+            
+            var registration = invitation.RegistrationSubmission;
+            
+            if (registration.EventId != eventId)
+                throw Error(400, "wrong_event", "This invitation is for a different event.");
+                
+            if (registration.Status == RegistrationStatus.CANCELLED || invitation.RevokedAt != null)
+                throw Error(400, "cancelled_invitation", "This invitation has been cancelled.");
+                
+            if (registration.Status == RegistrationStatus.REJECTED)
+                throw Error(400, "rejected_guest", "This guest's registration was rejected.");
+                
+            if (registration.Status == RegistrationStatus.WAITING_LIST || registration.Status == RegistrationStatus.PENDING_AI)
+                throw Error(400, "waitlisted_guest", "This guest is waitlisted or pending review.");
+                
+            if (clock.GetUtcNow() > invitation.TokenExpiresAt)
+                throw Error(400, "expired_qr", "This QR code has expired.");
+                
+            if (!IsActive(registration))
+                throw Error(400, "invalid_qr", "This invitation is no longer active.");
+
+            if (registration.CheckedInAt != null)
+                throw Error(400, "already_checked_in", "Guest has already checked in.");
+
+            registration.CheckedInAt = clock.GetUtcNow();
+            registration.CheckedInMethod = CheckedInMethod.QR_CODE;
+            
+            return registration;
         }, ct);
 
     public bool IsActive(RegistrationSubmission registration)

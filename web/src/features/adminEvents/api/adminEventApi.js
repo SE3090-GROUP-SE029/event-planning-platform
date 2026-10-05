@@ -31,6 +31,19 @@ export function useAdminEvent(id) {
   });
 }
 
+export async function getEventAnalytics(id) {
+  const response = await apiClient.get(`/api/events/${id}/analytics`);
+  return response.data;
+}
+
+export function useEventAnalytics(id) {
+  return useQuery({
+    queryKey: ['event-analytics', id],
+    queryFn: () => getEventAnalytics(id),
+    enabled: Boolean(id),
+  });
+}
+
 export function enumLabel(value, names = EVENT_STATUS_NAMES) {
   if (typeof value === 'number') {
     return names[value] || 'Unknown';

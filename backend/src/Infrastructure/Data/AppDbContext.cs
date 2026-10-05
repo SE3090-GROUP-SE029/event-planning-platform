@@ -8,6 +8,32 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
+    public override int SaveChanges()
+    {
+        NormalizeTrackedDateTimes();
+        return base.SaveChanges();
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        NormalizeTrackedDateTimes();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        NormalizeTrackedDateTimes();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        NormalizeTrackedDateTimes();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
     // C4 Guest Management DbSets
     public DbSet<TestMessage> TestMessages { get; set; }
     public DbSet<Event> Events { get; set; }
@@ -47,5 +73,26 @@ public class AppDbContext : DbContext
         
         GuestManagementConfiguration.Configure(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+    }
+
+    private void NormalizeTrackedDateTimes()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is EntityState.Added or EntityState.Modified)
+            {
+                foreach (var property in entry.Properties)
+                {
+                    if (property.CurrentValue is DateTime dateTime)
+                    {
+                        property.CurrentValue = Application.Common.UtcDateTime.Normalize(dateTime);
+                    }
+                    else if (property.CurrentValue is DateTimeOffset dateTimeOffset)
+                    {
+                        property.CurrentValue = Application.Common.UtcDateTime.Normalize(dateTimeOffset);
+                    }
+                }
+            }
+        }
     }
 }

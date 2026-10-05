@@ -110,6 +110,7 @@ export default function AdminVendorDirectoryPage() {
           user={user}
           title="Vendors"
           subtitle="Approve, suspend, and restore marketplace vendors"
+          searchValue={filters.search}
           onSearch={(value) => {
             setPage(0);
             setFilters((current) => ({ ...current, search: value }));

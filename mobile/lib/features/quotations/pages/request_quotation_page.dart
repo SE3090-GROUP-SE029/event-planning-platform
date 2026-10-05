@@ -242,19 +242,25 @@ class _RequestQuotationPageState extends State<RequestQuotationPage> {
                             ),
                           ],
                           const SizedBox(height: 16),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Requested start'),
-                            subtitle: Text(_start?.toString() ?? 'Select start'),
-                            trailing: const Icon(Icons.schedule),
-                            onTap: () => _pickDateTime(isStart: true),
+                          Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Requested start'),
+                              subtitle: Text(_start?.toString() ?? 'Select start'),
+                              trailing: const Icon(Icons.schedule),
+                              onTap: () => _pickDateTime(isStart: true),
+                            ),
                           ),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Requested end'),
-                            subtitle: Text(_end?.toString() ?? 'Select end'),
-                            trailing: const Icon(Icons.schedule),
-                            onTap: () => _pickDateTime(isStart: false),
+                          Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Requested end'),
+                              subtitle: Text(_end?.toString() ?? 'Select end'),
+                              trailing: const Icon(Icons.schedule),
+                              onTap: () => _pickDateTime(isStart: false),
+                            ),
                           ),
                           TextField(
                             controller: _messageController,
