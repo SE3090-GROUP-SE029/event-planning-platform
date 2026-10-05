@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Globalization;
 using Application.DTOs.Scheduling;
 using Application.Common.Interfaces;
 using Domain.Entities;
 using Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Services.Scheduling;
 
@@ -13,19 +15,22 @@ public class ScheduleService
     private readonly IEventRepository _eventRepository;
     private readonly IScheduleAiClient _scheduleAiClient;
     private readonly IVendorRepository _vendorRepository;
+    private readonly ILogger<ScheduleService> _logger;
 
     public ScheduleService(
         IScheduleRepository scheduleRepository,
         ConflictDetectionService conflictDetector,
         IEventRepository eventRepository,
         IScheduleAiClient scheduleAiClient,
-        IVendorRepository vendorRepository)
+        IVendorRepository vendorRepository,
+        ILogger<ScheduleService> logger)
     {
         _scheduleRepository = scheduleRepository;
         _conflictDetector = conflictDetector;
         _eventRepository = eventRepository;
         _scheduleAiClient = scheduleAiClient;
         _vendorRepository = vendorRepository;
+        _logger = logger;
     }
 
     public async Task<EventSchedule> GetOrCreateScheduleForPlannerAsync(
@@ -48,12 +53,12 @@ public class ScheduleService
     }
 
     public async Task<TimelineActivity> AddActivityForPlannerAsync(
-        Guid scheduleId, 
+        Guid scheduleId,
         Guid plannerUserId,
-        string title, 
-        string? description, 
-        DateTime startTime, 
-        DateTime endTime, 
+        string title,
+        string? description,
+        DateTime startTime,
+        DateTime endTime,
         Guid? vendorId,
         CancellationToken cancellationToken = default)
     {
@@ -134,9 +139,9 @@ public class ScheduleService
     }
 
     public async Task<TimelineActivity?> UpdateActivityStatusForPlannerAsync(
-        Guid activityId, 
+        Guid activityId,
         Guid plannerUserId,
-        ActivityStatus status, 
+        ActivityStatus status,
         CancellationToken cancellationToken = default)
     {
         var activity = await _scheduleRepository.GetActivityByIdAsync(activityId, cancellationToken);
@@ -209,57 +214,171 @@ public class ScheduleService
         Guid plannerUserId,
         CancellationToken cancellationToken = default)
     {
-        var (schedule, eventEntity) = await RequirePlannerScheduleWithEventAsync(scheduleId, plannerUserId, cancellationToken);
+        const int timeoutMilliseconds = 30 * 60 * 1000;
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMilliseconds));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            timeoutCts.Token);
+        var generationToken = linkedCts.Token;
+        var stopwatch = Stopwatch.StartNew();
+        var requestStartedAt = DateTimeOffset.UtcNow;
+        string? timeoutSource = null;
+        string? cancellationSource = null;
+        string? exceptionType = null;
 
-        var aiResponse = await _scheduleAiClient.GenerateScheduleAsync(eventEntity, cancellationToken);
+        _logger.LogInformation(
+            "AI schedule generation started for schedule {ScheduleId} at {RequestStartedAt}",
+            scheduleId,
+            requestStartedAt);
 
-        var generatedActivities = aiResponse.Activities
-            .Select(activityDto => new TimelineActivity
-            {
-                ScheduleId = scheduleId,
-                Title = activityDto.Title,
-                Description = activityDto.Description,
-                StartTime = NormalizeWallClockTimestamp(ParseTimestamp(activityDto.StartTime, "start_time")),
-                EndTime = NormalizeWallClockTimestamp(ParseTimestamp(activityDto.EndTime, "end_time")),
-                AssignedVendorId = null,
-                Status = ActivityStatus.SCHEDULED.ToString()
-            })
-            .ToList();
-
-        ValidateGeneratedActivities(generatedActivities, eventEntity);
-
-        var persistedActivities = new List<TimelineActivity>();
-        foreach (var activity in generatedActivities)
+        try
         {
-            persistedActivities.Add(await _scheduleRepository.AddActivityAsync(activity, cancellationToken));
-        }
+            var (schedule, eventEntity) = await RequirePlannerScheduleWithEventAsync(
+                scheduleId,
+                plannerUserId,
+                generationToken);
 
-        var generatedConflicts = aiResponse.Conflicts
-            .Select(conflict => new ScheduleConflict
+            var aiResponse = await _scheduleAiClient.GenerateScheduleAsync(eventEntity, generationToken);
+
+            var generatedActivities = aiResponse.Activities
+                .Select(activityDto => new TimelineActivity
+                {
+                    ScheduleId = scheduleId,
+                    Title = activityDto.Title,
+                    Description = activityDto.Description,
+                    StartTime = NormalizeWallClockTimestamp(ParseTimestamp(activityDto.StartTime, "start_time")),
+                    EndTime = NormalizeWallClockTimestamp(ParseTimestamp(activityDto.EndTime, "end_time")),
+                    AssignedVendorId = null,
+                    Status = ActivityStatus.SCHEDULED.ToString()
+                })
+                .ToList();
+
+            _logger.LogInformation(
+                "Received {ActivityCount} activities and {ConflictCount} conflicts for schedule {ScheduleId} from AI",
+                generatedActivities.Count,
+                aiResponse.Conflicts.Count,
+                scheduleId);
+            ValidateGeneratedActivities(generatedActivities, eventEntity);
+
+            var persistedActivities = new List<TimelineActivity>();
+            foreach (var activity in generatedActivities)
             {
-                ScheduleId = scheduleId,
-                ActivityId1 = persistedActivities.FirstOrDefault()?.Id ?? Guid.Empty,
-                ActivityId2 = Guid.Empty,
-                ConflictType = "AIGenerated",
-                Description = conflict,
-                IsResolved = false,
-                DetectedAt = DateTime.UtcNow
-            })
-            .ToList();
+                _logger.LogDebug(
+                    "Persisting generated timeline activity for schedule {ScheduleId}",
+                    scheduleId);
+                persistedActivities.Add(await _scheduleRepository.AddActivityAsync(activity, generationToken));
+            }
 
-        if (generatedConflicts.Count != 0)
-        {
-            await _scheduleRepository.AddConflictsAsync(generatedConflicts, cancellationToken);
+            var generatedConflicts = aiResponse.Conflicts
+                .Select(conflict => new ScheduleConflict
+                {
+                    ScheduleId = scheduleId,
+                    ActivityId1 = persistedActivities.FirstOrDefault()?.Id ?? Guid.Empty,
+                    ActivityId2 = Guid.Empty,
+                    ConflictType = "AIGenerated",
+                    Description = conflict,
+                    IsResolved = false,
+                    DetectedAt = DateTime.UtcNow
+                })
+                .ToList();
+
+            if (generatedConflicts.Count != 0)
+            {
+                _logger.LogDebug(
+                    "Persisting {ConflictCount} AI-generated conflicts for schedule {ScheduleId}",
+                    generatedConflicts.Count,
+                    scheduleId);
+                await _scheduleRepository.AddConflictsAsync(generatedConflicts, generationToken);
+            }
+
+            _logger.LogDebug(
+                "Recalculating persisted conflicts for schedule {ScheduleId}",
+                scheduleId);
+            await RecalculateDeterministicConflictsAsync(scheduleId, generationToken);
+            var conflicts = await _scheduleRepository.GetConflictsByScheduleIdAsync(scheduleId, generationToken);
+
+            _logger.LogInformation(
+                "Persisted {ActivityCount} activities and loaded {ConflictCount} conflicts for schedule {ScheduleId}",
+                persistedActivities.Count,
+                conflicts.Count,
+                scheduleId);
+            schedule.Activities = persistedActivities;
+            schedule.Conflicts = conflicts;
+            schedule.UpdatedAt = DateTime.UtcNow;
+            ApplyEventContext(schedule, eventEntity);
+            _logger.LogInformation(
+                "Schedule persistence completed for schedule {ScheduleId} after {ElapsedMilliseconds} ms",
+                scheduleId,
+                stopwatch.ElapsedMilliseconds);
+            return schedule;
         }
-
-        await RecalculateDeterministicConflictsAsync(scheduleId, cancellationToken);
-        var conflicts = await _scheduleRepository.GetConflictsByScheduleIdAsync(scheduleId, cancellationToken);
-
-        schedule.Activities = persistedActivities;
-        schedule.Conflicts = conflicts;
-        schedule.UpdatedAt = DateTime.UtcNow;
-        ApplyEventContext(schedule, eventEntity);
-        return schedule;
+        catch (OperationCanceledException ex)
+            when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            timeoutSource = "Backend";
+            cancellationSource = "BackendGenerationTimeout";
+            exceptionType = typeof(TimeoutException).FullName;
+            _logger.LogError(
+                ex,
+                "AI schedule generation timed out for schedule {ScheduleId} after {ElapsedMilliseconds} ms; timeout source {TimeoutSource}, cancellation source {CancellationSource}, exception type {ExceptionType}",
+                scheduleId,
+                stopwatch.ElapsedMilliseconds,
+                timeoutSource,
+                cancellationSource,
+                exceptionType);
+            throw new TimeoutException(
+                $"AI schedule generation exceeded {timeoutMilliseconds} ms.",
+                ex);
+        }
+        catch (OperationCanceledException ex)
+        {
+            cancellationSource = cancellationToken.IsCancellationRequested
+                ? "RequestAborted"
+                : "UpstreamCancellation";
+            exceptionType = ex.GetType().FullName;
+            _logger.LogWarning(
+                ex,
+                "AI schedule generation cancelled for schedule {ScheduleId}; cancellation source {CancellationSource}, exception type {ExceptionType}",
+                scheduleId,
+                cancellationSource,
+                exceptionType);
+            throw;
+        }
+        catch (TimeoutException ex)
+        {
+            timeoutSource = ex.InnerException is OperationCanceledException
+                ? "Backend"
+                : "AI Service";
+            exceptionType = ex.GetType().FullName;
+            _logger.LogError(
+                ex,
+                "AI schedule generation failed for schedule {ScheduleId}; timeout source {TimeoutSource}, exception type {ExceptionType}",
+                scheduleId,
+                timeoutSource,
+                exceptionType);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            exceptionType = ex.GetType().FullName;
+            _logger.LogError(
+                ex,
+                "AI schedule generation failed for schedule {ScheduleId}; exception type {ExceptionType}",
+                scheduleId,
+                exceptionType);
+            throw;
+        }
+        finally
+        {
+            _logger.LogInformation(
+                "AI schedule generation completed for schedule {ScheduleId} at {RequestCompletedAt}; total duration {ElapsedMilliseconds} ms; timeout source {TimeoutSource}; cancellation source {CancellationSource}; exception type {ExceptionType}",
+                scheduleId,
+                DateTimeOffset.UtcNow,
+                stopwatch.ElapsedMilliseconds,
+                timeoutSource ?? "None",
+                cancellationSource ?? "None",
+                exceptionType ?? "None");
+        }
     }
 
     private async Task<Event> RequirePlannerEventAsync(Guid eventId, Guid plannerUserId)
@@ -401,7 +520,7 @@ public class ScheduleService
         throw new InvalidOperationException($"AI schedule returned an invalid {fieldName} timestamp: {value}");
     }
 
-    private static void ValidateGeneratedActivities(
+    private void ValidateGeneratedActivities(
         IReadOnlyList<TimelineActivity> activities,
         Event eventEntity)
     {
@@ -423,6 +542,12 @@ public class ScheduleService
             }
             catch (ArgumentException ex)
             {
+                _logger.LogWarning(
+                    ex,
+                    "Generated activity validation failed: type {ExceptionType}, message {ExceptionMessage}, inner exception {InnerException}",
+                    ex.GetType().FullName,
+                    ex.Message,
+                    ex.InnerException?.ToString() ?? "none");
                 throw new InvalidOperationException(ex.Message, ex);
             }
         }

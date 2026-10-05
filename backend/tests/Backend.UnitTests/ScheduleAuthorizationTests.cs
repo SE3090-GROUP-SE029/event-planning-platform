@@ -7,6 +7,7 @@ using Infrastructure.Data;
 using Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Backend.UnitTests;
 
@@ -688,7 +689,8 @@ public class ScheduleAuthorizationTests
             new ConflictDetectionService(),
             new EventRepository(db),
             aiClient ?? new FakeScheduleAiClient(),
-            new VendorRepository(db));
+            new VendorRepository(db),
+            NullLogger<ScheduleService>.Instance);
 
     private static Event SeedEvent(AppDbContext db, Guid ownerId)
     {

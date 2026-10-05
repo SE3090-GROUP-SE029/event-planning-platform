@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/scheduling_api.dart';
@@ -16,12 +17,22 @@ class ScheduleNotifier extends AsyncNotifier<EventSchedule> {
 
   @override
   Future<EventSchedule> build() async {
-    return _loadScheduleWithConflicts();
+    try {
+      return await _loadScheduleWithConflicts();
+    } catch (error, stackTrace) {
+      _logFailure('Initial schedule load', error, stackTrace);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(_loadScheduleWithConflicts);
+    try {
+      state = AsyncData(await _loadScheduleWithConflicts());
+    } catch (error, stackTrace) {
+      _logFailure('Schedule refresh', error, stackTrace);
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   Future<EventSchedule> _loadScheduleWithConflicts() async {
@@ -81,13 +92,11 @@ class ScheduleNotifier extends AsyncNotifier<EventSchedule> {
   }
 
   Future<void> generateWithAi(String scheduleId) async {
-    state = const AsyncLoading();
     try {
       final schedule = await _api.generateAiSchedule(scheduleId);
-      final conflicts = await _api.getConflicts(schedule.id);
-      state = AsyncData(schedule.copyWith(conflicts: conflicts));
+      state = AsyncData(schedule);
     } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
+      _logFailure('AI schedule generation state update', error, stackTrace);
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
@@ -96,8 +105,17 @@ class ScheduleNotifier extends AsyncNotifier<EventSchedule> {
     try {
       state = AsyncData(await _loadScheduleWithConflicts());
     } catch (error, stackTrace) {
+      _logFailure('Schedule reload after mutation', error, stackTrace);
       state = AsyncError(error, stackTrace);
       Error.throwWithStackTrace(error, stackTrace);
     }
+  }
+
+  void _logFailure(String operation, Object error, StackTrace stackTrace) {
+    if (!kDebugMode) return;
+    debugPrint(
+      '$operation failed: type=${error.runtimeType}; message=$error; '
+      'innerException=not available\nstackTrace=$stackTrace',
+    );
   }
 }

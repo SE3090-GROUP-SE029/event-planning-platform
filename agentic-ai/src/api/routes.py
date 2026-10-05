@@ -1,7 +1,9 @@
 """Coordinator API routes."""
 
+import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+from time import perf_counter
 from typing import Literal
 from uuid import UUID
 
@@ -9,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.agents.scheduling_agent import SchedulingAgent
+from src.coordinator_agent.config import AGENTIC_AI_REQUEST_TIMEOUT_SECONDS
 from src.coordinator_agent.execution import (
     CoordinatorExecutionError,
     CoordinatorProviderError,
@@ -17,7 +20,7 @@ from src.coordinator_agent.execution import (
 )
 from src.coordinator_agent.models import CoordinatorPlanOutput
 from src.gemini_client.client import GeminiClient
-from src.gemini_client.exceptions import GeminiClientError
+from src.gemini_client.exceptions import GeminiClientError, GeminiTimeoutError
 from src.models.scheduling_models import (
     GenerateScheduleRequest,
     GenerateScheduleResponse,
@@ -27,6 +30,10 @@ from src.models.scheduling_models import (
 router = APIRouter(prefix="/api/coordinator", tags=["Coordinator"])
 schedule_router = APIRouter(prefix="/api/schedules", tags=["Scheduling"])
 logger = logging.getLogger(__name__)
+SCHEDULE_GENERATION_TIMEOUT_SECONDS = AGENTIC_AI_REQUEST_TIMEOUT_SECONDS
+SCHEDULE_GENERATION_TIMEOUT_MESSAGE = (
+    "AI schedule generation exceeded the maximum allowed processing time."
+)
 _PROVIDER_MESSAGES = {
     "quota_exhausted": "Gemini quota is exhausted. Retry later.",
     "rate_limit": "Gemini is rate limiting requests. Retry later.",
@@ -104,6 +111,7 @@ async def generate_coordinator_plan(
         return await execute_coordinator_agent(
             str(request.event_id),
             request.event.model_dump(mode="json"),
+            timeout_seconds=AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
             checkpointer=getattr(
                 http_request.app.state, "coordinator_checkpointer", None
             ),
@@ -164,49 +172,128 @@ async def generate_schedule(
 ) -> GenerateScheduleResponse:
     """Generate a structured event schedule from the backend request payload."""
 
-    gemini_client = getattr(http_request.app.state, "gemini_client", None) or GeminiClient()
-    agent = SchedulingAgent(gemini_client)
-
-    state = ScheduleState(
-        event_id=request.event_id,
-        title=request.title,
-        event_description=request.event_description or request.requirements,
-        event_type=request.event_type,
-        date=request.date,
-        start_time=request.start_time,
-        end_time=request.end_time,
-        guest_count=request.guest_count,
-        requirements=request.requirements,
-        vendor_service_context=request.vendor_service_context,
+    started_at = datetime.now(timezone.utc)
+    started = perf_counter()
+    status_code = 500
+    timeout_source = "None"
+    cancellation_source = "None"
+    exception_type = "None"
+    logger.info(
+        "AI schedule generation started event_id=%s request_started_at=%s timeout_seconds=%d",
+        request.event_id,
+        started_at.isoformat(),
+        SCHEDULE_GENERATION_TIMEOUT_SECONDS,
     )
 
     try:
-        return await agent.run(state)
-    except TimeoutError as exc:
-        logger.warning("Schedule generation timed out for event %s", request.event_id)
+        gemini_client = getattr(http_request.app.state, "gemini_client", None)
+        if gemini_client is None:
+            gemini_client = GeminiClient(
+                timeout=float(SCHEDULE_GENERATION_TIMEOUT_SECONDS)
+            )
+        agent = SchedulingAgent(gemini_client)
+
+        state = ScheduleState(
+            event_id=request.event_id,
+            title=request.title,
+            event_description=request.event_description or request.requirements,
+            event_type=request.event_type,
+            date=request.date,
+            start_time=request.start_time,
+            end_time=request.end_time,
+            guest_count=request.guest_count,
+            requirements=request.requirements,
+            vendor_service_context=request.vendor_service_context,
+        )
+        result = await asyncio.wait_for(
+            agent.run(state),
+            timeout=SCHEDULE_GENERATION_TIMEOUT_SECONDS,
+        )
+        status_code = 200
+        return result
+    except asyncio.CancelledError as exc:
+        status_code = 499
+        cancellation_source = "AI Service request cancellation"
+        exception_type = type(exc).__name__
+        logger.exception(
+            "AI schedule generation cancelled event_id=%s cancellation_source=%s",
+            request.event_id,
+            cancellation_source,
+        )
+        raise
+    except GeminiTimeoutError as exc:
+        status_code = 504
+        timeout_source = "AI Provider"
+        exception_type = type(exc).__name__
+        logger.exception(
+            "AI schedule generation timed out event_id=%s timeout_source=%s",
+            request.event_id,
+            timeout_source,
+        )
         raise HTTPException(
-            status_code=504,
+            status_code=status_code,
             detail={
                 "code": "provider_timeout",
-                "message": "Schedule generation took too long. Please try again.",
+                "message": SCHEDULE_GENERATION_TIMEOUT_MESSAGE,
+            },
+        ) from exc
+    except TimeoutError as exc:
+        status_code = 504
+        timeout_source = (
+            "AI Service"
+            if perf_counter() - started >= SCHEDULE_GENERATION_TIMEOUT_SECONDS
+            else "AI Provider"
+        )
+        exception_type = type(exc).__name__
+        logger.exception(
+            "AI schedule generation timed out event_id=%s timeout_source=%s",
+            request.event_id,
+            timeout_source,
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={
+                "code": "provider_timeout",
+                "message": SCHEDULE_GENERATION_TIMEOUT_MESSAGE,
             },
         ) from exc
     except GeminiClientError as exc:
-        logger.warning(
-            "Schedule generation provider unavailable for event %s error=%s",
+        status_code = 503
+        exception_type = type(exc).__name__
+        logger.exception(
+            "AI schedule generation provider unavailable event_id=%s exception_type=%s",
             request.event_id,
-            type(exc).__name__,
+            exception_type,
         )
         raise HTTPException(
-            status_code=503,
+            status_code=status_code,
             detail="AI schedule generation is temporarily unavailable. Please try again later.",
         ) from exc
     except Exception as exc:
-        logger.exception("Schedule generation failed for event %s", request.event_id)
+        status_code = 500
+        exception_type = type(exc).__name__
+        logger.exception(
+            "AI schedule generation failed event_id=%s exception_type=%s",
+            request.event_id,
+            exception_type,
+        )
         raise HTTPException(
-            status_code=500,
+            status_code=status_code,
             detail={
                 "code": "schedule_generation_failed",
                 "message": "Schedule generation failed. Please try again later.",
             },
         ) from exc
+    finally:
+        logger.info(
+            "AI schedule generation completed event_id=%s request_completed_at=%s "
+            "duration_ms=%.0f status_code=%d timeout_source=%s "
+            "cancellation_source=%s exception_type=%s",
+            request.event_id,
+            datetime.now(timezone.utc).isoformat(),
+            (perf_counter() - started) * 1000,
+            status_code,
+            timeout_source,
+            cancellation_source,
+            exception_type,
+        )

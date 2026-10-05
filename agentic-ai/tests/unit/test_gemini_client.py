@@ -264,6 +264,12 @@ def test_model_not_found_is_not_retried() -> None:
     assert model.call_count == 1
 
 
+def test_gemini_client_never_uses_a_provider_timeout_below_30_minutes() -> None:
+    client = GeminiClient(model=_DeadlineModel())
+
+    assert client.timeout == 1800
+
+
 def test_gemini_deadline_is_reported_as_timeout() -> None:
     client = GeminiClient(model=_DeadlineModel(), max_retries=0)
 

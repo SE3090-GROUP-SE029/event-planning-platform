@@ -1,10 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Diagnostics;
 using Application.DTOs.Scheduling;
 using Application.Services.Scheduling;
 using Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Api.Controllers;
 
@@ -14,10 +16,14 @@ namespace Api.Controllers;
 public class SchedulesController : ControllerBase
 {
     private readonly ScheduleService _scheduleService;
+    private readonly ILogger<SchedulesController> _logger;
 
-    public SchedulesController(ScheduleService scheduleService)
+    public SchedulesController(
+        ScheduleService scheduleService,
+        ILogger<SchedulesController> logger)
     {
         _scheduleService = scheduleService;
+        _logger = logger;
     }
 
     [HttpGet("event/{eventId:guid}")]
@@ -57,8 +63,8 @@ public class SchedulesController : ControllerBase
     [HttpPost("{scheduleId:guid}/activities")]
     [Authorize(Policy = "EventPlannerOnly")]
     public async Task<IActionResult> AddActivity(
-        Guid scheduleId, 
-        [FromBody] CreateActivityRequest request, 
+        Guid scheduleId,
+        [FromBody] CreateActivityRequest request,
         CancellationToken ct)
     {
         if (request.EndTime <= request.StartTime)
@@ -169,8 +175,8 @@ public class SchedulesController : ControllerBase
     [HttpPatch("activities/{activityId:guid}/status")]
     [Authorize(Roles = "EVENT_PLANNER,VENDOR")]
     public async Task<IActionResult> UpdateActivityStatus(
-        Guid activityId, 
-        [FromBody] UpdateActivityStatusRequest request, 
+        Guid activityId,
+        [FromBody] UpdateActivityStatusRequest request,
         CancellationToken ct)
     {
         try
@@ -227,25 +233,125 @@ public class SchedulesController : ControllerBase
     [Authorize(Policy = "EventPlannerOnly")]
     public async Task<IActionResult> GenerateAiSchedule(Guid scheduleId, CancellationToken ct)
     {
+        var stopwatch = Stopwatch.StartNew();
+        var requestStartedAt = DateTimeOffset.UtcNow;
+        int? statusCode = null;
+        string? timeoutSource = null;
+        string? cancellationSource = null;
+        string? exceptionType = null;
+        _logger.LogInformation(
+            "AI schedule API request started for schedule {ScheduleId} at {RequestStartedAt}",
+            scheduleId,
+            requestStartedAt);
+
         try
         {
             var updatedSchedule = await _scheduleService.GenerateScheduleWithAiForPlannerAsync(
                 scheduleId,
                 GetCurrentUserId(),
                 ct);
+            statusCode = StatusCodes.Status200OK;
+            _logger.LogInformation(
+                "AI schedule API request succeeded for schedule {ScheduleId}: status {StatusCode}, {ActivityCount} activities and {ConflictCount} conflicts",
+                scheduleId,
+                statusCode,
+                updatedSchedule.Activities.Count,
+                updatedSchedule.Conflicts.Count);
             return Ok(updatedSchedule);
+        }
+        catch (TimeoutException ex)
+        {
+            statusCode = StatusCodes.Status504GatewayTimeout;
+            timeoutSource = ex.InnerException is OperationCanceledException
+                ? "Backend"
+                : "AI Service";
+            exceptionType = ex.GetType().FullName;
+            _logger.LogError(
+                ex,
+                "AI schedule API request timed out for schedule {ScheduleId} after {ElapsedMilliseconds} ms; timeout source {TimeoutSource}, status {StatusCode}, exception type {ExceptionType}",
+                scheduleId,
+                stopwatch.ElapsedMilliseconds,
+                timeoutSource,
+                statusCode,
+                exceptionType);
+            return StatusCode(statusCode.Value, new
+            {
+                message = "AI schedule generation exceeded the maximum allowed processing time."
+            });
+        }
+        catch (OperationCanceledException ex)
+        {
+            cancellationSource = ct.IsCancellationRequested
+                ? "RequestAborted"
+                : "UpstreamCancellation";
+            exceptionType = ex.GetType().FullName;
+            _logger.LogWarning(
+                ex,
+                "AI schedule API request cancelled for schedule {ScheduleId}; cancellation source {CancellationSource}, exception type {ExceptionType}",
+                scheduleId,
+                cancellationSource,
+                exceptionType);
+            throw;
         }
         catch (KeyNotFoundException ex)
         {
+            statusCode = StatusCodes.Status404NotFound;
+            exceptionType = ex.GetType().FullName;
+            _logger.LogWarning(
+                ex,
+                "AI schedule API request failed for schedule {ScheduleId}: status {StatusCode}, exception type {ExceptionType}",
+                scheduleId,
+                statusCode,
+                exceptionType);
             return NotFound(new { message = ex.Message });
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            statusCode = StatusCodes.Status403Forbidden;
+            exceptionType = ex.GetType().FullName;
+            _logger.LogWarning(
+                ex,
+                "AI schedule API request failed for schedule {ScheduleId}: status {StatusCode}, exception type {ExceptionType}",
+                scheduleId,
+                statusCode,
+                exceptionType);
             return Forbid();
         }
         catch (InvalidOperationException ex)
         {
+            statusCode = StatusCodes.Status400BadRequest;
+            exceptionType = ex.GetType().FullName;
+            _logger.LogWarning(
+                ex,
+                "AI schedule API request failed for schedule {ScheduleId}: status {StatusCode}, exception type {ExceptionType}",
+                scheduleId,
+                statusCode,
+                exceptionType);
             return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            statusCode = StatusCodes.Status500InternalServerError;
+            exceptionType = ex.GetType().FullName;
+            _logger.LogError(
+                ex,
+                "AI schedule API request failed for schedule {ScheduleId}: status {StatusCode}, exception type {ExceptionType}",
+                scheduleId,
+                statusCode,
+                exceptionType);
+            throw;
+        }
+        finally
+        {
+            _logger.LogInformation(
+                "AI schedule API request completed for schedule {ScheduleId} at {RequestCompletedAt}; total duration {ElapsedMilliseconds} ms; status {StatusCode}; timeout source {TimeoutSource}; cancellation source {CancellationSource}; exception type {ExceptionType}",
+                scheduleId,
+                DateTimeOffset.UtcNow,
+                stopwatch.ElapsedMilliseconds,
+                statusCode?.ToString() ?? "not returned",
+                timeoutSource ?? "None",
+                cancellationSource ?? "None",
+                exceptionType ?? "None");
         }
     }
 

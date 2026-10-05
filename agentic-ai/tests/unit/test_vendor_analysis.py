@@ -165,6 +165,31 @@ def test_recommend_route_maps_provider_timeout(monkeypatch: pytest.MonkeyPatch) 
     assert response.json()["detail"]["code"] == "provider_timeout"
 
 
+def test_recommend_route_enforces_30_minute_request_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(routes, "AGENTIC_AI_REQUEST_TIMEOUT_SECONDS", 0.01)
+
+    async def slow(*_args, **_kwargs):
+        await asyncio.sleep(1)
+        return VendorRecommendationResponse(recommendations=[])
+
+    monkeypatch.setattr(routes, "execute_vendor_analysis", slow)
+
+    app = FastAPI()
+    app.include_router(routes.router)
+    payload = _request().model_dump(mode="json", by_alias=True)
+
+    async def call() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.post("/api/vendor-analysis/recommend", json=payload)
+
+    response = asyncio.run(call())
+    assert response.status_code == 504
+    assert response.json()["detail"]["code"] == "provider_timeout"
+
+
 def test_recommend_route_success(monkeypatch: pytest.MonkeyPatch) -> None:
     candidate = _candidate()
     request = _request([candidate])

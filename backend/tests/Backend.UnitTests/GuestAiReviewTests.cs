@@ -15,12 +15,24 @@ public class GuestAiReviewTests
     private static string Result(string recommendation = "ACCEPTED", object? confidence = null,
         string[]? reasons = null, string[]? flags = null) => JsonSerializer.Serialize(new
         {
-            decision = recommendation, confidence = confidence ?? 0.9, reasons = reasons ?? ["Supplied information is consistent."],
-            flags = flags ?? [], model = "gemini-3.8-flash", promptVersion = "guest-filtering-v2"
+            decision = recommendation,
+            confidence = confidence ?? 0.9,
+            reasons = reasons ?? ["Supplied information is consistent."],
+            flags = flags ?? [],
+            model = "gemini-3.8-flash",
+            promptVersion = "guest-filtering-v2"
         });
 
     private static AiClient Client(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send, int timeout = 120)
         => new(new HttpClient(new FakeHandler(send)) { Timeout = Timeout.InfiniteTimeSpan }, new AiClientOptions { TimeoutSeconds = timeout });
+
+    [Fact]
+    public void DefaultAgenticAiClientTimeoutIsThirtyMinutes()
+    {
+        var options = new AiClientOptions();
+        Assert.Equal(1800, options.TimeoutSeconds);
+        Assert.True(options.IsValid);
+    }
 
     private static AiClient Client(string body, HttpStatusCode status = HttpStatusCode.OK)
         => Client((_, _) => Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") }));

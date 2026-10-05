@@ -14,6 +14,10 @@ public static class GuestManagementServices
         services.AddScoped<IGuestRegistrationRepository, GuestRegistrationRepository>();
         services.AddScoped<RegistrationService>();
         services.Configure<GuestAiOptions>(configuration.GetSection("GuestAi"));
+        services.PostConfigure<GuestAiOptions>(options =>
+            options.TimeoutSeconds = Math.Max(
+                options.TimeoutSeconds,
+                AiClientOptions.RequestTimeoutSeconds));
         services.AddSingleton<AiClientOptions>(provider =>
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<GuestAiOptions>>().Value);
         services.AddHttpClient<IGuestAiClient, AiClient>(client => client.Timeout = Timeout.InfiniteTimeSpan)

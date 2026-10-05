@@ -15,6 +15,7 @@ public sealed class ScheduleAiClientTests
     [Fact]
     public async Task GenerateScheduleAsync_UsesScheduleGeneratePath()
     {
+        Assert.Equal(1800, new AgenticAiOptions().TimeoutSeconds);
         const string responseJson = """
             {
               "activities": [
@@ -22,24 +23,26 @@ public sealed class ScheduleAiClientTests
                   "title": "Welcome",
                   "description": "Guest arrival",
                   "start_time": "2026-10-15T09:00:00Z",
-                  "end_time": "2026-10-15T09:30:00Z"
+                  "end_time": "2026-10-15T09:30:00Z",
+                  "vendor_type": "Hospitality"
                 }
               ],
               "conflicts": []
             }
             """;
         var handler = new CapturingHttpMessageHandler(responseJson);
+        var clientFactory = new TestHttpClientFactory(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("http://agentic-ai.test")
+        });
         var client = new ScheduleAiClient(
-            new TestHttpClientFactory(new HttpClient(handler)
-            {
-                BaseAddress = new Uri("http://agentic-ai.test")
-            }),
+            clientFactory,
             Options.Create(new AgenticAiOptions
             {
                 GeneratePath = "/api/coordinator/generate",
                 ScheduleGeneratePath = "/api/schedules/generate"
             }),
-            NullLogger<ScheduleAiClient>.Instance);
+        NullLogger<ScheduleAiClient>.Instance);
 
         var result = await client.GenerateScheduleAsync(new Event
         {
@@ -54,6 +57,7 @@ public sealed class ScheduleAiClientTests
             Requirements = "Keep sessions concise."
         });
 
+        Assert.Equal("AgenticAI", clientFactory.LastRequestedName);
         Assert.Equal("/api/schedules/generate", handler.RequestPath);
         using var json = JsonDocument.Parse(handler.RequestBody!);
         var root = json.RootElement;
@@ -64,12 +68,50 @@ public sealed class ScheduleAiClientTests
         Assert.Equal("11:00:00", root.GetProperty("eventEndTime").GetString());
         Assert.Equal("Keep sessions concise.", root.GetProperty("eventDescription").GetString());
         Assert.Equal(JsonValueKind.Array, root.GetProperty("vendorServiceContext").ValueKind);
-        Assert.Equal("Welcome", Assert.Single(result.Activities).Title);
+        var activity = Assert.Single(result.Activities);
+        Assert.Equal("Welcome", activity.Title);
+        Assert.Equal("2026-10-15T09:00:00Z", activity.StartTime);
+        Assert.Equal("2026-10-15T09:30:00Z", activity.EndTime);
+        Assert.Empty(result.Conflicts);
+    }
+
+    [Fact]
+    public async Task GenerateScheduleAsync_ConvertsGatewayTimeoutToTimeoutException()
+    {
+        var handler = new CapturingHttpMessageHandler(
+            "{\"detail\":\"generation timed out\"}",
+            HttpStatusCode.GatewayTimeout);
+        var client = new ScheduleAiClient(
+            new TestHttpClientFactory(new HttpClient(handler)
+            {
+                BaseAddress = new Uri("http://agentic-ai.test")
+            }),
+            Options.Create(new AgenticAiOptions()),
+            NullLogger<ScheduleAiClient>.Instance);
+
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            client.GenerateScheduleAsync(new Event
+            {
+                Id = Guid.NewGuid(),
+                EventName = "Conference launch",
+                EventType = EventType.CORPORATE,
+                PreferredDate = new DateTime(2026, 10, 15, 0, 0, 0, DateTimeKind.Utc),
+                StartTime = new TimeOnly(9, 0),
+                EndTime = new TimeOnly(11, 0),
+                EventDuration = TimeSpan.FromHours(2),
+                GuestCount = 100
+            }));
     }
 
     private sealed class TestHttpClientFactory(HttpClient client) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => client;
+        public string? LastRequestedName { get; private set; }
+
+        public HttpClient CreateClient(string name)
+        {
+            LastRequestedName = name;
+            return client;
+        }
     }
 
     private sealed class CapturingHttpMessageHandler(

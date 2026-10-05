@@ -153,7 +153,8 @@ builder.Services.AddScoped<IScheduleAiClient, ScheduleAiClient>();
 builder.Services.AddHttpClient("AgenticAI", client =>
 {
     client.BaseAddress = new Uri(agenticAiOptions.BaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(agenticAiOptions.TimeoutSeconds);
+    client.Timeout = TimeSpan.FromSeconds(
+        Math.Max(agenticAiOptions.TimeoutSeconds, AgenticAiOptions.RequestTimeoutSeconds));
 });
 builder.Services.AddScoped<IValidator<CreateEventRequest>, CreateEventRequestValidator>();
 

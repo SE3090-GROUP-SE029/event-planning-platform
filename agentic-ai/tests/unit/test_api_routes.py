@@ -11,7 +11,11 @@ from src.coordinator_agent.execution import (
     CoordinatorProviderError,
     CoordinatorValidationError,
 )
-from src.gemini_client.exceptions import GeminiClientError, GeminiQuotaError
+from src.gemini_client.exceptions import (
+    GeminiClientError,
+    GeminiQuotaError,
+    GeminiTimeoutError,
+)
 
 
 def _valid_generate_payload() -> dict[str, object]:
@@ -77,9 +81,11 @@ def test_coordinator_route_accepts_backend_event_contract(
     payload = _valid_generate_payload()
     payload["eventId"] = event_id
     calls: list[tuple[str, dict[str, object]]] = []
+    timeouts: list[object] = []
 
     async def execute(event_id_arg: str, event: dict[str, object], **_kwargs: object) -> object:
         calls.append((event_id_arg, event))
+        timeouts.append(_kwargs.get("timeout_seconds"))
         return {
             "service_categories": ["Catering"],
             "target_vendor_types": ["Caterer"],
@@ -120,6 +126,7 @@ def test_coordinator_route_accepts_backend_event_contract(
     assert len(response.json()["proposed_timeline"]) == 3
     assert len(calls) == 1
     assert calls[0][0] == event_id
+    assert timeouts == [routes.AGENTIC_AI_REQUEST_TIMEOUT_SECONDS]
     assert set(calls[0][1]) == {
         "name",
         "type",
@@ -274,3 +281,61 @@ def test_schedule_route_returns_safe_unavailable_for_provider_failure(
     }
     assert str(failure) not in response.text
     assert "Traceback" not in response.text
+
+
+def test_schedule_route_returns_gateway_timeout_for_provider_timeout() -> None:
+    class TimedOutGeminiClient:
+        async def generate_with_prompt(self, *_args: object, **_kwargs: object) -> object:
+            raise GeminiTimeoutError("provider timed out")
+
+    response = asyncio.run(_post_schedule_generate(TimedOutGeminiClient()))
+
+    assert response.status_code == 504
+    assert response.json()["detail"] == {
+        "code": "provider_timeout",
+        "message": routes.SCHEDULE_GENERATION_TIMEOUT_MESSAGE,
+    }
+    assert "provider timed out" not in response.text
+
+
+def test_schedule_route_cancels_generation_at_configured_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(routes, "SCHEDULE_GENERATION_TIMEOUT_SECONDS", 0.01)
+
+    class SlowGeminiClient:
+        async def generate_with_prompt(self, *_args: object, **_kwargs: object) -> object:
+            await asyncio.sleep(1)
+            return {"activities": []}
+
+    response = asyncio.run(_post_schedule_generate(SlowGeminiClient()))
+
+    assert response.status_code == 504
+    assert response.json()["detail"]["message"] == (
+        routes.SCHEDULE_GENERATION_TIMEOUT_MESSAGE
+    )
+
+
+def test_schedule_route_configures_gemini_timeout_to_30_minutes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured_timeouts: list[float] = []
+
+    class StubAgent:
+        def __init__(self, _client: object) -> None:
+            pass
+
+        async def run(self, _state: object) -> dict[str, object]:
+            return {"activities": [], "conflicts": []}
+
+    def make_gemini_client(*, timeout: float) -> object:
+        configured_timeouts.append(timeout)
+        return object()
+
+    monkeypatch.setattr(routes, "GeminiClient", make_gemini_client)
+    monkeypatch.setattr(routes, "SchedulingAgent", StubAgent)
+
+    response = asyncio.run(_post_schedule_generate(None))
+
+    assert response.status_code == 200
+    assert configured_timeouts == [1800.0]

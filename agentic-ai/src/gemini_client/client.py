@@ -33,7 +33,10 @@ from google.api_core.exceptions import (
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from src.coordinator_agent.config import get_settings
+from src.coordinator_agent.config import (
+    AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
+    get_settings,
+)
 from src.coordinator_agent.prompts import PLAN_GENERATION_PROMPT
 
 from .exceptions import (
@@ -192,7 +195,14 @@ class GeminiClient:
             if retry_delay is None
             else max(settings.gemini_retry_max_delay_seconds, retry_delay)
         )
-        self.timeout = timeout if timeout is not None else settings.gemini_timeout_seconds
+        self.timeout = (
+            timeout
+            if timeout is not None
+            else max(
+                settings.gemini_timeout_seconds,
+                AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
+            )
+        )
         self.temperature = temperature
         self.top_k = top_k
         self.top_p = top_p
@@ -540,7 +550,12 @@ def list_available_gemini_models(api_key: str | None = None) -> tuple[str, ...]:
     try:
         models = genai.list_models(
             client=_configured_model_service_client(selected_key),
-            request_options={"timeout": settings.gemini_timeout_seconds},
+            request_options={
+                "timeout": max(
+                    settings.gemini_timeout_seconds,
+                    AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
+                )
+            },
         )
         names = []
         for model in models:

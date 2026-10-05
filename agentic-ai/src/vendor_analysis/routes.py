@@ -1,8 +1,11 @@
 """Vendor analysis API routes."""
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException
+
+from src.coordinator_agent.config import AGENTIC_AI_REQUEST_TIMEOUT_SECONDS
 
 from .models import VendorRecommendationRequest, VendorRecommendationResponse
 from .service import (
@@ -38,7 +41,10 @@ async def recommend_vendors(
     """Rank pre-filtered candidate vendors for an approved event plan."""
 
     try:
-        return await execute_vendor_analysis(request)
+        return await asyncio.wait_for(
+            execute_vendor_analysis(request),
+            timeout=AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
+        )
     except TimeoutError as exc:
         logger.warning(
             "Vendor analysis timed out for event %s plan %s",

@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Application.Common.Interfaces;
 using Application.Services.Scheduling;
@@ -47,41 +49,136 @@ public sealed class ScheduleAiClient(
             ? "/api/schedules/generate"
             : options.Value.ScheduleGeneratePath;
 
-        using var response = await client.PostAsJsonAsync(path, request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
-            logger.LogWarning(
-                "AI schedule generation failed for event {EventId} with status {StatusCode}: {Payload}",
-                eventEntity.Id,
-                (int)response.StatusCode,
-                payload);
-            response.EnsureSuccessStatusCode();
-        }
+        var stopwatch = Stopwatch.StartNew();
+        var requestStartedAt = DateTimeOffset.UtcNow;
+        int? statusCode = null;
+        string? timeoutSource = null;
+        string? cancellationSource = null;
+        string? exceptionType = null;
+        logger.LogInformation(
+            "AI schedule request started for event {EventId} at {RequestStartedAt}, path {Path}, timeout {TimeoutMilliseconds} ms",
+            eventEntity.Id,
+            requestStartedAt,
+            path,
+            client.Timeout.TotalMilliseconds);
 
-        var output = await response.Content.ReadFromJsonAsync<AiScheduleApiResponse>(cancellationToken)
-            ?? throw new InvalidOperationException("The AI schedule service returned an empty response.");
-
-        return new AiScheduleGenerationResult
+        try
         {
-            Activities = output.Activities.Select(a => new AiScheduleActivity
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, path)
             {
-                Title = a.Title,
-                Description = a.Description,
-                StartTime = a.StartTime,
-                EndTime = a.EndTime
-            }).ToList(),
-            Conflicts = output.Conflicts
-        };
+                Content = JsonContent.Create(request)
+            };
+            using var response = await client.SendAsync(
+                httpRequest,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            statusCode = (int)response.StatusCode;
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            logger.LogInformation(
+                "AI schedule response received for event {EventId}: status {StatusCode}, elapsed {ElapsedMilliseconds} ms",
+                eventEntity.Id,
+                statusCode,
+                stopwatch.ElapsedMilliseconds);
+
+            if (response.StatusCode is System.Net.HttpStatusCode.GatewayTimeout
+                or System.Net.HttpStatusCode.RequestTimeout)
+            {
+                timeoutSource = "AI Service";
+                throw new TimeoutException(
+                    $"AI schedule service returned HTTP {statusCode.Value}.");
+            }
+
+            response.EnsureSuccessStatusCode();
+            var output = JsonSerializer.Deserialize<AiScheduleApiResponse>(
+                responseBody,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (output?.Activities is null || output.Conflicts is null)
+            {
+                throw new InvalidOperationException(
+                    "The AI schedule service response must contain activities and conflicts arrays.");
+            }
+
+            logger.LogInformation(
+                "Deserialized AI schedule for event {EventId}: {ActivityCount} activities and {ConflictCount} conflicts",
+                eventEntity.Id,
+                output.Activities.Count,
+                output.Conflicts.Count);
+
+            return new AiScheduleGenerationResult
+            {
+                Activities = output.Activities.Select(a => new AiScheduleActivity
+                {
+                    Title = a.Title,
+                    Description = a.Description,
+                    StartTime = a.StartTime,
+                    EndTime = a.EndTime
+                }).ToList(),
+                Conflicts = output.Conflicts
+            };
+        }
+        catch (OperationCanceledException ex)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            timeoutSource = "Backend";
+            exceptionType = ex.GetType().FullName;
+            logger.LogError(
+                ex,
+                "AI schedule request timed out for event {EventId} after {ElapsedMilliseconds} ms; timeout source {TimeoutSource}, status {StatusCode}, exception type {ExceptionType}",
+                eventEntity.Id,
+                stopwatch.ElapsedMilliseconds,
+                timeoutSource,
+                statusCode?.ToString() ?? "none",
+                exceptionType);
+            throw new TimeoutException(
+                $"AI schedule request exceeded {client.Timeout.TotalMilliseconds:0} ms.",
+                ex);
+        }
+        catch (OperationCanceledException ex)
+        {
+            cancellationSource = "ScheduleGenerationToken";
+            exceptionType = ex.GetType().FullName;
+            logger.LogWarning(
+                ex,
+                "AI schedule request cancelled for event {EventId}; cancellation source {CancellationSource}, status {StatusCode}, exception type {ExceptionType}",
+                eventEntity.Id,
+                cancellationSource,
+                statusCode?.ToString() ?? "none",
+                exceptionType);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            exceptionType = ex.GetType().FullName;
+            logger.LogError(
+                ex,
+                "AI schedule request failed for event {EventId}; status {StatusCode}, exception type {ExceptionType}",
+                eventEntity.Id,
+                statusCode?.ToString() ?? "none",
+                exceptionType);
+            throw;
+        }
+        finally
+        {
+            logger.LogInformation(
+                "AI schedule request completed for event {EventId} at {RequestCompletedAt}; total duration {ElapsedMilliseconds} ms; status {StatusCode}; timeout source {TimeoutSource}; cancellation source {CancellationSource}; exception type {ExceptionType}",
+                eventEntity.Id,
+                DateTimeOffset.UtcNow,
+                stopwatch.ElapsedMilliseconds,
+                statusCode?.ToString() ?? "not received",
+                timeoutSource ?? "None",
+                cancellationSource ?? "None",
+                exceptionType ?? "None");
+        }
     }
 
     private sealed class AiScheduleApiResponse
     {
         [JsonPropertyName("activities")]
-        public List<AiScheduleApiActivity> Activities { get; init; } = [];
+        public List<AiScheduleApiActivity>? Activities { get; init; }
 
         [JsonPropertyName("conflicts")]
-        public List<string> Conflicts { get; init; } = [];
+        public List<string>? Conflicts { get; init; }
     }
 
     private sealed class AiScheduleApiActivity
@@ -98,4 +195,5 @@ public sealed class ScheduleAiClient(
         [JsonPropertyName("end_time")]
         public string EndTime { get; init; } = string.Empty;
     }
+
 }

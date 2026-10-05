@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -32,6 +33,7 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
   List<_ScheduleVendorOption> _vendorOptions = [];
   String? _busyActivityId;
   bool _isSubmitting = false;
+  bool _isGeneratingAi = false;
 
   @override
   void dispose() {
@@ -42,7 +44,8 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
   @override
   Widget build(BuildContext context) {
     final scheduleAsync = ref.watch(scheduleNotifierProvider(widget.eventId));
-    final notifier = ref.read(scheduleNotifierProvider(widget.eventId).notifier);
+    final notifier =
+        ref.read(scheduleNotifierProvider(widget.eventId).notifier);
     final session = ref.watch(currentUserProvider);
     final isPlanner = session?.roles.contains('EVENT_PLANNER') ?? false;
 
@@ -192,7 +195,8 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
     final vendorLookup = {
       for (final vendor in _vendorOptions) vendor.id: vendor,
     };
-    final filteredActivities = _filteredActivities(sortedActivities, vendorLookup);
+    final filteredActivities =
+        _filteredActivities(sortedActivities, vendorLookup);
     final activityLookup = {
       for (final activity in schedule.activities) activity.id: activity,
     };
@@ -206,6 +210,7 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
           searchController: _searchController,
           query: _query,
           statusFilter: _statusFilter,
+          isGeneratingAi: _isGeneratingAi,
           onSearchChanged: (value) => setState(() => _query = value),
           onStatusChanged: (value) {
             if (value != null) setState(() => _statusFilter = value);
@@ -216,6 +221,15 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
                 }
               : null,
         ),
+        if (_isGeneratingAi) ...[
+          const SizedBox(height: 12),
+          const _InfoBanner(
+            icon: Icons.auto_awesome_rounded,
+            text: 'Generating your schedule with AI. Your current schedule '
+                'will remain available while this runs.',
+            color: AppColors.pastelBlueLight,
+          ),
+        ],
         const SizedBox(height: 12),
         _VendorSourceBanner(
           loading: _vendorsLoading,
@@ -336,7 +350,8 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
 
     setState(() => _isSubmitting = true);
     try {
-      final notifier = ref.read(scheduleNotifierProvider(widget.eventId).notifier);
+      final notifier =
+          ref.read(scheduleNotifierProvider(widget.eventId).notifier);
       if (existingActivity == null) {
         await notifier.addActivity(
           title: payload.title,
@@ -425,14 +440,32 @@ class _EventSchedulePageState extends ConsumerState<EventSchedulePage> {
   ) async {
     if (_isSubmitting) return;
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _isGeneratingAi = true;
+    });
     try {
       await notifier.generateWithAi(scheduleId);
+      if (!context.mounted) return;
       _showSnack(context, 'AI schedule generated.');
-    } catch (error) {
-      _showSnack(context, error.toString().replaceFirst('Exception: ', ''));
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint(
+          'AI schedule UI action failed: type=${error.runtimeType}; '
+          'message=$error; innerException=not available\n'
+          'stackTrace=$stackTrace',
+        );
+      }
+      if (context.mounted) {
+        _showSnack(context, error.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _isGeneratingAi = false;
+        });
+      }
     }
   }
 
@@ -449,6 +482,7 @@ class _ScheduleToolbar extends StatelessWidget {
     required this.searchController,
     required this.query,
     required this.statusFilter,
+    required this.isGeneratingAi,
     required this.onSearchChanged,
     required this.onStatusChanged,
     required this.onGenerateAi,
@@ -457,6 +491,7 @@ class _ScheduleToolbar extends StatelessWidget {
   final TextEditingController searchController;
   final String query;
   final String statusFilter;
+  final bool isGeneratingAi;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String?> onStatusChanged;
   final VoidCallback? onGenerateAi;
@@ -505,12 +540,14 @@ class _ScheduleToolbar extends StatelessWidget {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'ALL', child: Text('All statuses')),
-                    DropdownMenuItem(value: 'SCHEDULED', child: Text('Scheduled')),
+                    DropdownMenuItem(
+                        value: 'SCHEDULED', child: Text('Scheduled')),
                     DropdownMenuItem(
                       value: 'IN_PROGRESS',
                       child: Text('In Progress'),
                     ),
-                    DropdownMenuItem(value: 'COMPLETED', child: Text('Completed')),
+                    DropdownMenuItem(
+                        value: 'COMPLETED', child: Text('Completed')),
                     DropdownMenuItem(value: 'SKIPPED', child: Text('Skipped')),
                   ],
                   onChanged: onStatusChanged,
@@ -520,7 +557,16 @@ class _ScheduleToolbar extends StatelessWidget {
               IconButton.filled(
                 tooltip: 'Generate schedule with AI',
                 onPressed: onGenerateAi,
-                icon: const Icon(Icons.auto_awesome_rounded),
+                icon: isGeneratingAi
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.auto_awesome_rounded),
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.obsidianBlack,
                   foregroundColor: Colors.white,
@@ -798,7 +844,8 @@ class _ActivityEditChip extends StatelessWidget {
         activity.title,
         overflow: TextOverflow.ellipsis,
       ),
-      onPressed: onEditActivity == null ? null : () => onEditActivity!(activity),
+      onPressed:
+          onEditActivity == null ? null : () => onEditActivity!(activity),
     );
   }
 }
@@ -1199,7 +1246,8 @@ class _ActivityFormSheetState extends State<_ActivityFormSheet> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: _submit,
-                  icon: Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
+                  icon:
+                      Icon(isEditing ? Icons.save_rounded : Icons.add_rounded),
                   label: Text(isEditing ? 'Save Activity' : 'Add Activity'),
                 ),
               ),

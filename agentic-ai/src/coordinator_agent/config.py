@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+AGENTIC_AI_REQUEST_TIMEOUT_SECONDS = 30 * 60
+
 _DEVELOPMENT_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -63,7 +65,9 @@ class Settings(BaseSettings):
         validation_alias="GEMINI_FALLBACK_MODELS",
     )
     gemini_timeout_seconds: float = Field(
-        default=15.0, gt=0, validation_alias="GEMINI_TIMEOUT_SECONDS"
+        default=float(AGENTIC_AI_REQUEST_TIMEOUT_SECONDS),
+        gt=0,
+        validation_alias="GEMINI_TIMEOUT_SECONDS",
     )
     gemini_max_retries: int = Field(default=5, ge=0, le=5, validation_alias="GEMINI_MAX_RETRIES")
     gemini_retry_delay_seconds: float = Field(
@@ -73,7 +77,9 @@ class Settings(BaseSettings):
         default=16.0, gt=0, validation_alias="GEMINI_RETRY_MAX_DELAY_SECONDS"
     )
     coordinator_timeout_seconds: int = Field(
-        default=240, gt=0, validation_alias="COORDINATOR_TIMEOUT_SECONDS"
+        default=AGENTIC_AI_REQUEST_TIMEOUT_SECONDS,
+        gt=0,
+        validation_alias="COORDINATOR_TIMEOUT_SECONDS",
     )
     coordinator_checkpoint_db_path: str = Field(
         default=".data/coordinator-checkpoints.sqlite",
