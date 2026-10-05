@@ -9,6 +9,8 @@ const AdminEventManagementPage = lazy(() => import('../features/adminEvents/page
 const AdminEventDetailsPage = lazy(() => import('../features/adminEvents/pages/AdminEventDetailsPage'));
 const AdminPlanDashboardPage = lazy(() => import('../features/adminPlans/pages/AdminPlanDashboardPage'));
 const AdminPlanDetailsPage = lazy(() => import('../features/adminPlans/pages/AdminPlanDetailsPage'));
+const AdminScheduleListPage = lazy(() => import('../features/adminSchedules/pages/AdminScheduleListPage'));
+const AdminScheduleDetailsPage = lazy(() => import('../features/adminSchedules/pages/AdminScheduleDetailsPage'));
 const AdminAnalyticsPage = lazy(() => import('../features/dashboard/pages/AdminAnalyticsPage'));
 const AdminUsersPage = lazy(() => import('../features/dashboard/pages/AdminUsersPage'));
 const AdminVendorsPage = lazy(() => import('../features/dashboard/pages/AdminVendorsPage'));
@@ -76,6 +78,14 @@ export function AdminPlansRoute() {
 
 export function AdminPlanDetailsRoute() {
   return <AdminPage page={AdminPlanDetailsPage} />;
+}
+
+export function AdminSchedulesRoute() {
+  return <AdminPage page={AdminScheduleListPage} />;
+}
+
+export function AdminScheduleDetailsRoute() {
+  return <AdminPage page={AdminScheduleDetailsPage} />;
 }
 
 export function AdminSystemRoute() {

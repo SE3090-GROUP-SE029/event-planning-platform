@@ -139,6 +139,8 @@ builder.Services.AddScoped<IAdminEventService, AdminEventService>();
 builder.Services.AddScoped<IAdminVendorService, AdminVendorService>();
 builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
 builder.Services.AddScoped<IAdminReadService, AdminReadService>();
+builder.Services.AddScoped<IAdminScheduleRepository, AdminScheduleRepository>();
+builder.Services.AddScoped<IAdminScheduleService, AdminScheduleService>();
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IEventPlanDraftRepository, EventPlanDraftRepository>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();

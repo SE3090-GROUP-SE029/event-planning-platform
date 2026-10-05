@@ -6,6 +6,8 @@ import {
   AdminEventsRoute,
   AdminPlanDetailsRoute,
   AdminPlansRoute,
+  AdminScheduleDetailsRoute,
+  AdminSchedulesRoute,
   AdminSystemRoute,
   AdminUsersRoute,
   AdminVendorsRoute,
@@ -57,6 +59,14 @@ export const router = createBrowserRouter([
   {
     path: '/admin/plans/:id',
     element: <AdminPlanDetailsRoute />,
+  },
+  {
+    path: '/admin/schedules',
+    element: <AdminSchedulesRoute />,
+  },
+  {
+    path: '/admin/schedules/:id',
+    element: <AdminScheduleDetailsRoute />,
   },
   {
     path: '/admin/system',
